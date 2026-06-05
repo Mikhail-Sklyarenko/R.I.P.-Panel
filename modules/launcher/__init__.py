@@ -60,7 +60,11 @@ def run(ctx: dict[str, Any] | None = None) -> bool:
 
         if config.steam_auto_login and login:
             _emit(EventType.STEAM_LOGIN_START, f"steam login [{login}]")
-            auth = _login_steam(login, config)
+            auth = _login_steam(
+                login,
+                config,
+                on_progress=ctx.get("on_login_progress"),
+            )
             if not auth.ok:
                 raise LauncherError(auth.detail)
             detail = auth.detail
@@ -96,13 +100,22 @@ def run(ctx: dict[str, Any] | None = None) -> bool:
         return False
 
 
-def _login_steam(login: str, config: AppConfig) -> SteamAuthResult | SteamGuiLoginResult:
+def _login_steam(
+    login: str,
+    config: AppConfig,
+    *,
+    on_progress=None,
+) -> SteamAuthResult | SteamGuiLoginResult:
     mode = config.steam_login_mode
     if mode == "api":
         return steam_auth.login_steam_account(login, config)
     if mode == "gui":
-        return steam_gui_login.login_steam_gui(login, config)
-    gui_result = steam_gui_login.login_steam_gui(login, config)
+        return steam_gui_login.login_steam_gui(
+            login, config, on_progress=on_progress
+        )
+    gui_result = steam_gui_login.login_steam_gui(
+        login, config, on_progress=on_progress
+    )
     if gui_result.ok:
         return gui_result
     api_result = steam_auth.login_steam_account(login, config)

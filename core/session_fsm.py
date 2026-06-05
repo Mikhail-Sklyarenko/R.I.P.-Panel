@@ -93,6 +93,7 @@ def _hook_launcher(ctx: SessionContext) -> bool:
         "login": ctx.login,
         "emit": ctx.emit,
         "config": load_config(),
+        "on_login_progress": lambda msg: ctx._ui_main(f"[{ctx.login}] {msg}"),
     }
     ok = launcher.run(run_ctx)
     if not ok:

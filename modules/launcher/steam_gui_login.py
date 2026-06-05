@@ -6,6 +6,7 @@ import logging
 import os
 import sys
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -23,6 +24,8 @@ from modules.ui_nav.steam_window import (
     classify_steam_title,
     find_main_steam_for_login,
     find_steam_hwnd,
+    is_steam_login_client,
+    is_steam_main_client,
     logged_in_main_visible,
     login_window_open,
     title_indicates_logged_in_as,
@@ -345,23 +348,44 @@ def _wait_main_for_login(
     login: str,
     *,
     timeout_sec: float,
+    on_progress: Callable[[str], None] | None = None,
 ) -> SteamWindowMatch:
     deadline = time.monotonic() + timeout_sec
     last_log = 0.0
+
+    def _heartbeat() -> None:
+        main = find_main_steam_for_login(login)
+        main_sz = "none"
+        if main is not None and is_valid_hwnd(main.hwnd):
+            try:
+                w, h = client_size(main.hwnd)
+                main_sz = f"{w}x{h}"
+            except UiNavError:
+                main_sz = "?"
+        login_open = login_window_open()
+        msg = f"waiting logged-in (main={main_sz} login_open={login_open})"
+        _log.info("steam GUI login: %s", msg)
+        if on_progress:
+            on_progress(msg)
+
     while time.monotonic() < deadline:
         main = logged_in_main_visible(login)
         if main is not None:
             return main
         main = find_main_steam_for_login(login)
         if main is not None and is_valid_hwnd(main.hwnd):
+            if is_steam_main_client(main.hwnd):
+                return main
             if title_indicates_logged_in_as(main.title, login):
                 return main
             login_win = find_steam_hwnd(prefer=SteamWindowKind.LOGIN)
             if login_win is None or not is_valid_hwnd(login_win.hwnd):
                 return main
+            if not is_steam_login_client(login_win.hwnd):
+                return main
         now = time.monotonic()
         if now - last_log >= 10.0:
-            _log.info("steam GUI login: waiting for main Steam window…")
+            _heartbeat()
             last_log = now
         time.sleep(0.5)
     raise UiNavError(
@@ -498,7 +522,12 @@ def _enter_guard_code(
     raise UiNavError("steam guard field timeout (30s)")
 
 
-def login_steam_gui(login: str, config: AppConfig) -> SteamGuiLoginResult:
+def login_steam_gui(
+    login: str,
+    config: AppConfig,
+    *,
+    on_progress: Callable[[str], None] | None = None,
+) -> SteamGuiLoginResult:
     """
     GUI login: account + password + TOTP in Steam client window.
     Secrets from vault only — never log password/TOTP.
@@ -711,7 +740,11 @@ def login_steam_gui(login: str, config: AppConfig) -> SteamGuiLoginResult:
                 return done
 
             try:
-                _wait_main_for_login(login, timeout_sec=timeout)
+                _wait_main_for_login(
+                    login,
+                    timeout_sec=timeout,
+                    on_progress=on_progress,
+                )
                 return _login_ok_result(login, coords_profile=coords_profile)
             except UiNavError as exc:
                 recovered = _recover_from_ui_error(

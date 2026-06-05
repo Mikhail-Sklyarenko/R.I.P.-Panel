@@ -28,6 +28,11 @@ _UPDATE_TITLE_MARKERS = (
     "обновление steam",
 )
 _MAIN_EXACT = ("steam",)
+# LOGIN client ~705×440; MAIN store client is taller/wider (ArmoryFarm post-login).
+_MAIN_CLIENT_MIN_W = 680
+_MAIN_CLIENT_MIN_H = 480
+_LOGIN_CLIENT_MAX_W = 780
+_LOGIN_CLIENT_MAX_H = 480
 _PROMO_TITLE_MARKERS = (
     "sale",
     "promo",
@@ -186,25 +191,67 @@ def find_main_steam_for_login(login: str) -> SteamWindowMatch | None:
     return None
 
 
-def login_window_open() -> bool:
-    """True if a live Steam LOGIN window exists."""
-    login = find_steam_hwnd(prefer=SteamWindowKind.LOGIN)
-    if login is None:
+def is_steam_main_client(hwnd: int) -> bool:
+    """True for post-login Steam client (store/library), not 705×440 sign-in."""
+    from modules.ui_nav.window import client_size, is_valid_hwnd
+
+    if not is_valid_hwnd(hwnd):
         return False
+    try:
+        w, h = client_size(hwnd)
+    except Exception:
+        return False
+    return w >= _MAIN_CLIENT_MIN_W and h >= _MAIN_CLIENT_MIN_H
+
+
+def is_steam_login_client(hwnd: int) -> bool:
+    """True for compact sign-in / Guard window (~705×440)."""
+    from modules.ui_nav.window import client_size, is_valid_hwnd
+
+    if not is_valid_hwnd(hwnd):
+        return False
+    try:
+        w, h = client_size(hwnd)
+    except Exception:
+        return False
+    return w <= _LOGIN_CLIENT_MAX_W and h <= _LOGIN_CLIENT_MAX_H
+
+
+def login_window_open() -> bool:
+    """
+    True if a blocking LOGIN-sized window is open.
+    Large MAIN (store) overrides ghost LOGIN hwnd in Win32.
+    """
     from modules.ui_nav.window import is_valid_hwnd
 
-    return is_valid_hwnd(login.hwnd)
+    main = find_main_steam_for_login("")
+    if (
+        main is not None
+        and is_valid_hwnd(main.hwnd)
+        and is_steam_main_client(main.hwnd)
+    ):
+        return False
+
+    login = find_steam_hwnd(prefer=SteamWindowKind.LOGIN)
+    if login is None or not is_valid_hwnd(login.hwnd):
+        return False
+    if is_steam_main_client(login.hwnd):
+        return False
+    return is_steam_login_client(login.hwnd)
 
 
 def logged_in_main_visible(login: str) -> SteamWindowMatch | None:
     """
-    MAIN Steam client without an open LOGIN window — post-login state.
+    Post-login: MAIN visible and no blocking LOGIN window.
+    Large MAIN client (store) counts as logged in even if ghost LOGIN hwnd exists.
     """
     from modules.ui_nav.window import is_valid_hwnd
 
     main = find_main_steam_for_login(login)
     if main is None or not is_valid_hwnd(main.hwnd):
         return None
+    if is_steam_main_client(main.hwnd):
+        return main
     if login_window_open():
         return None
     return main

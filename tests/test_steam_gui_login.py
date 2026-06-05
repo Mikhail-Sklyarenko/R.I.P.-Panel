@@ -202,14 +202,60 @@ def test_logged_in_main_visible_requires_no_login_window() -> None:
         patch.object(sw, "find_main_steam_for_login", return_value=main),
         patch.object(sw, "login_window_open", return_value=False),
         patch("modules.ui_nav.window.is_valid_hwnd", return_value=True),
+        patch.object(sw, "is_steam_main_client", return_value=False),
     ):
         assert sw.logged_in_main_visible("acc_one") is main
     with (
         patch.object(sw, "find_main_steam_for_login", return_value=main),
         patch.object(sw, "login_window_open", return_value=True),
         patch("modules.ui_nav.window.is_valid_hwnd", return_value=True),
+        patch.object(sw, "is_steam_main_client", return_value=False),
     ):
         assert sw.logged_in_main_visible("acc_one") is None
+    with (
+        patch.object(sw, "find_main_steam_for_login", return_value=main),
+        patch.object(sw, "login_window_open", return_value=True),
+        patch("modules.ui_nav.window.is_valid_hwnd", return_value=True),
+        patch.object(sw, "is_steam_main_client", return_value=True),
+    ):
+        assert sw.logged_in_main_visible("z3l9272eg3") is main
+
+
+def test_steam_main_client_size_thresholds() -> None:
+    from modules.ui_nav import steam_window as sw
+
+    with (
+        patch("modules.ui_nav.window.is_valid_hwnd", return_value=True),
+        patch("modules.ui_nav.window.client_size", return_value=(705, 440)),
+    ):
+        assert not sw.is_steam_main_client(1)
+        assert sw.is_steam_login_client(1)
+    with (
+        patch("modules.ui_nav.window.is_valid_hwnd", return_value=True),
+        patch("modules.ui_nav.window.client_size", return_value=(1024, 768)),
+    ):
+        assert sw.is_steam_main_client(1)
+        assert not sw.is_steam_login_client(1)
+
+
+def test_wait_main_returns_large_main_despite_ghost_login() -> None:
+    from modules.launcher.steam_gui_login import _wait_main_for_login
+
+    main = SteamWindowMatch(1, "Steam", SteamWindowKind.MAIN)
+    login_win = SteamWindowMatch(2, "Sign in to Steam", SteamWindowKind.LOGIN)
+    with (
+        patch(
+            "modules.launcher.steam_gui_login.logged_in_main_visible",
+            return_value=main,
+        ),
+        patch(
+            "modules.launcher.steam_gui_login.find_main_steam_for_login",
+            return_value=main,
+        ),
+        patch("modules.launcher.steam_gui_login.is_valid_hwnd", return_value=True),
+    ):
+        result = _wait_main_for_login("any_login", timeout_sec=1.0)
+    assert result is main
 
 
 @patch("modules.launcher.steam_gui_login._wait_main_for_login")
@@ -246,6 +292,10 @@ def test_login_gui_flow_mock(
     with patch("modules.launcher.steam_gui_login._client_coords") as mock_cc:
         mock_cc.return_value = load_steam_login_coords(705, 440)
         with (
+            patch(
+                "modules.launcher.steam_gui_login.logged_in_main_visible",
+                return_value=None,
+            ),
             patch(
                 "modules.launcher.steam_gui_login.find_steam_hwnd",
                 return_value=login_win,
@@ -299,8 +349,12 @@ def test_already_logged_in(
     mock_main.return_value = SteamWindowMatch(
         hwnd=1, title="Steam - acc_one", kind=SteamWindowKind.MAIN
     )
-    cfg = AppConfig(steam_auto_login=True)
-    result = login_steam_gui("acc_one", cfg)
+    with patch(
+        "modules.launcher.steam_gui_login.logged_in_main_visible",
+        return_value=None,
+    ):
+        cfg = AppConfig(steam_auto_login=True)
+        result = login_steam_gui("acc_one", cfg)
     assert result.ok is True
     assert result.already_logged_in is True
 
@@ -361,6 +415,12 @@ def test_login_succeeds_when_stale_hwnd_after_guard(monkeypatch) -> None:
 
     monkeypatch.delenv("STEAM_GUI_LOGIN_SIM", raising=False)
     monkeypatch.setattr("sys.platform", "win32")
+    fake_win32 = MagicMock()
+    fake_win32.IsWindow = lambda hwnd: True
+    fake_win32.IsWindowVisible = lambda hwnd: True
+    fake_win32.GetWindowText = lambda hwnd: "Steam"
+    fake_win32.EnumChildWindows = lambda hwnd, cb, ctx: None
+    monkeypatch.setitem(sys.modules, "win32gui", fake_win32)
     login_win = SteamWindowMatch(
         12345, "Sign in to Steam", SteamWindowKind.LOGIN
     )
@@ -397,10 +457,19 @@ def test_login_succeeds_when_stale_hwnd_after_guard(monkeypatch) -> None:
             "_enter_guard_code",
             side_effect=UiNavError("window closed (hwnd=12345)"),
         ),
+        patch.object(sg, "logged_in_main_visible", return_value=None),
         patch.object(
             sg,
-            "logged_in_main_visible",
-            side_effect=[None, None, None, main],
+            "_recover_from_ui_error",
+            side_effect=lambda login, cp, exc, **kw: (
+                sg._login_ok_result(
+                    login,
+                    coords_profile=cp,
+                    note=kw.get("note", ""),
+                )
+                if "guard entry" in kw.get("note", "")
+                else None
+            ),
         ),
     ):
         result = sg.login_steam_gui("u1", AppConfig(steam_auto_login=True))
