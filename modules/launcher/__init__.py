@@ -11,6 +11,7 @@ from modules.launcher import cleanup, cs2, proxy_check, steam, steam_auth, steam
 from modules.launcher.errors import LauncherError
 from modules.launcher.steam_auth import SteamAuthResult
 from modules.launcher.steam_gui_login import SteamGuiLoginResult
+from modules.ui_nav.errors import UiNavError
 
 __all__ = [
     "run",
@@ -90,13 +91,34 @@ def run(ctx: dict[str, Any] | None = None) -> bool:
             return True
 
         cs2.launch_cs2(config)
-        _emit(EventType.CS2_OK, "cs2 started with resources/cs2 configs")
+        on_cs2_progress = ctx.get("on_cs2_progress")
+
+        from modules.ui_nav.window import wait_for_cs2_hwnd
+
+        timeout = max(15, int(config.cs2_window_wait_timeout_sec))
+        try:
+            cs2_hwnd = wait_for_cs2_hwnd(
+                timeout_sec=float(timeout),
+                on_progress=on_cs2_progress,
+            )
+        except UiNavError as exc:
+            raise LauncherError(f"CS2 window wait: {exc}") from exc
+
+        ctx["cs2_hwnd"] = cs2_hwnd
+        _emit(
+            EventType.CS2_OK,
+            f"cs2 window ready (hwnd={cs2_hwnd})",
+        )
         return True
     except LauncherError as exc:
         steam_auth.stop_steam_auth()
         if emit:
-            emit(EventType.STEAM_LOGIN_FAILED, str(exc))
-            emit(EventType.SESSION_FAILED, str(exc))
+            msg = str(exc)
+            if msg.startswith("CS2 window wait:"):
+                emit(EventType.SESSION_FAILED, msg)
+            else:
+                emit(EventType.STEAM_LOGIN_FAILED, msg)
+                emit(EventType.SESSION_FAILED, msg)
         return False
 
 

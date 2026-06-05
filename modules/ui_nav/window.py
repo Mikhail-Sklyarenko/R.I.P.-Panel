@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import sys
+import time
+from collections.abc import Callable
 
 from modules.ui_nav.errors import UiNavError, UiNavPlatformError
 
@@ -31,6 +33,32 @@ def find_cs2_hwnd() -> int:
     if not found:
         raise UiNavError("CS2 window not found")
     return found[0]
+
+
+def wait_for_cs2_hwnd(
+    *,
+    timeout_sec: float = 90.0,
+    poll_sec: float = 0.5,
+    on_progress: Callable[[str], None] | None = None,
+) -> int:
+    """Poll until CS2 top-level window appears (after Popen)."""
+    _require_windows()
+    deadline = time.monotonic() + timeout_sec
+    last_log = 0.0
+    if on_progress:
+        on_progress("waiting for CS2 window…")
+    while time.monotonic() < deadline:
+        try:
+            return find_cs2_hwnd()
+        except UiNavError:
+            pass
+        now = time.monotonic()
+        if on_progress and now - last_log >= 10.0:
+            remaining = max(0, int(deadline - now))
+            on_progress(f"waiting for CS2 window ({remaining}s left)")
+            last_log = now
+        time.sleep(poll_sec)
+    raise UiNavError(f"CS2 window not found within {timeout_sec:.0f}s")
 
 
 def is_valid_hwnd(hwnd: int) -> bool:

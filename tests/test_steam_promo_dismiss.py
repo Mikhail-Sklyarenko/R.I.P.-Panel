@@ -151,6 +151,7 @@ def test_soft_fail_still_returns_detail(monkeypatch) -> None:
     assert "promo still visible" in result.detail
 
 
+@patch("modules.ui_nav.window.wait_for_cs2_hwnd", return_value=12345)
 @patch("modules.launcher.proxy_check.check_proxy", return_value=(True, "ip ok"))
 @patch("modules.launcher.steam_promo_dismiss.dismiss_steam_promo")
 @patch("modules.launcher.cs2.launch_cs2")
@@ -166,6 +167,7 @@ def test_launcher_calls_dismiss_between_login_ok_and_steam_ok(
     mock_cs2: MagicMock,
     mock_dismiss: MagicMock,
     _proxy: MagicMock,
+    _wait_cs2: MagicMock,
     monkeypatch,
 ) -> None:
     from core.events import EventType
@@ -206,6 +208,7 @@ def test_launcher_calls_dismiss_between_login_ok_and_steam_ok(
     assert "dismissed 1 promo" in steam_ok_detail
 
 
+@patch("modules.ui_nav.window.wait_for_cs2_hwnd", return_value=12345)
 @patch("modules.launcher.proxy_check.check_proxy", return_value=(True, "ip ok"))
 @patch("modules.launcher.steam_promo_dismiss.dismiss_steam_promo")
 @patch("modules.launcher.cs2.launch_cs2")
@@ -221,6 +224,7 @@ def test_launcher_soft_fail_still_emits_steam_ok_and_cs2(
     mock_cs2: MagicMock,
     mock_dismiss: MagicMock,
     _proxy: MagicMock,
+    _wait_cs2: MagicMock,
     monkeypatch,
 ) -> None:
     from core.events import EventType

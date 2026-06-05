@@ -127,6 +127,8 @@ def test_wait_for_ready_parses_json_line() -> None:
     assert result.ok is True
 
 
+@patch("modules.ui_nav.window.wait_for_cs2_hwnd", return_value=12345)
+@patch("modules.launcher.steam_promo_dismiss.dismiss_steam_promo")
 @patch("modules.launcher.cs2.launch_cs2")
 @patch("modules.launcher.steam.launch_steam")
 @patch("modules.launcher.steam_auth.login_steam_account")
@@ -138,10 +140,17 @@ def test_launcher_run_steam_auth_flow(
     mock_auth: MagicMock,
     mock_steam: MagicMock,
     mock_cs2: MagicMock,
+    mock_dismiss: MagicMock,
+    _wait_cs2: MagicMock,
     monkeypatch,
 ) -> None:
+    from modules.launcher.steam_promo_dismiss import SteamPromoDismissResult
+
     monkeypatch.setattr("sys.platform", "win32")
     mock_auth.return_value = SteamAuthResult(ok=True, login="u1", detail="ok")
+    mock_dismiss.return_value = SteamPromoDismissResult(
+        dismissed=0, found=0, detail="main only — no promo"
+    )
     mock_steam.return_value = MagicMock(poll=MagicMock(return_value=None))
     mock_cs2.return_value = MagicMock(poll=MagicMock(return_value=None))
 

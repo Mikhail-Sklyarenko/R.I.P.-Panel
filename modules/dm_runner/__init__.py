@@ -37,13 +37,18 @@ def run(ctx: dict[str, Any] | None = None) -> bool:
     emit: _Emit | None = ctx.get("emit")
     login = str(ctx.get("login", ""))
     config: AppConfig = ctx.get("config") or load_config()
-    nav = DmNavigator(
-        config=config,
-        session_id=_session_id(ctx),
-        login=login,
-        emit=emit,
-        hwnd=ctx.get("hwnd"),
-    )
+    try:
+        nav = DmNavigator(
+            config=config,
+            session_id=_session_id(ctx),
+            login=login,
+            emit=emit,
+            hwnd=ctx.get("hwnd"),
+        )
+    except UiNavError as exc:
+        if emit:
+            emit(EventType.SESSION_FAILED, f"dm_runner init: {exc}")
+        return False
     try:
         nav.navigate_to_dm_with_retries()
         return True

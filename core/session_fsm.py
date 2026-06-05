@@ -27,6 +27,7 @@ class SessionContext:
     force_farm: bool = False
     early_launch_wait: bool = False
     only_launch_steam: bool = False
+    cs2_hwnd: int | None = None
 
     def emit(
         self,
@@ -94,10 +95,12 @@ def _hook_launcher(ctx: SessionContext) -> bool:
         "emit": ctx.emit,
         "config": load_config(),
         "on_login_progress": lambda msg: ctx._ui_main(f"[{ctx.login}] {msg}"),
+        "on_cs2_progress": lambda msg: ctx._ui_main(f"[{ctx.login}] {msg}"),
     }
     ok = launcher.run(run_ctx)
     if not ok:
         return False
+    ctx.cs2_hwnd = run_ctx.get("cs2_hwnd")
     if run_ctx.get("stop_after_steam"):
         ctx.only_launch_steam = True
         ctx.state = advance(ctx.state, SessionState.CLEANUP)
@@ -120,12 +123,15 @@ def _hook_launcher(ctx: SessionContext) -> bool:
 
 
 def _dm_ctx(ctx: SessionContext) -> dict:
-    return {
+    dm: dict = {
         "login": ctx.login,
         "emit": ctx.emit,
         "session_id": ctx.session_id,
         "config": load_config(),
     }
+    if ctx.cs2_hwnd:
+        dm["hwnd"] = ctx.cs2_hwnd
+    return dm
 
 
 def _hook_dm_to_match(ctx: SessionContext) -> bool:

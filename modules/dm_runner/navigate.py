@@ -49,7 +49,11 @@ class DmNavigator:
                 "map_load_delay_sec": config.map_load_delay_sec,
             },
         )
-        self.driver = create_driver(self.coords, self.artifacts, hwnd=hwnd)
+        self.driver = create_driver(
+            self.coords,
+            self.artifacts,
+            hwnd=hwnd,
+        )
 
     def _set_sim_phase(self, state: ScreenState) -> None:
         if isinstance(self.driver, SimDriver):

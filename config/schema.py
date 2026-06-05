@@ -85,6 +85,11 @@ class AppConfig(BaseModel):
     map_load_delay_sec: int = Field(
         default=65, ge=10, description="FSM MAP_LOAD_DELAY — загрузка карты"
     )
+    cs2_window_wait_timeout_sec: int = Field(
+        default=90,
+        ge=15,
+        description="Таймаут ожидания окна CS2 после Popen",
+    )
     search_retries: int = Field(
         default=5, ge=1, description="FSM SEARCH_RETRIES_BEFORE_SHUFFLE"
     )

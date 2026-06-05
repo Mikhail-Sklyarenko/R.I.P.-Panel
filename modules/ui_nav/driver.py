@@ -108,13 +108,14 @@ def create_driver(
     artifacts: ArtifactStore,
     *,
     hwnd: int | None = None,
+    on_progress=None,
 ) -> NavDriver:
     if use_sim_driver():
         return SimDriver(coords, artifacts)
     if sys.platform != "win32":
         raise UiNavError("real dm_nav requires Windows or DM_NAV_SIM=1")
     if hwnd is None:
-        from modules.ui_nav.window import find_cs2_hwnd
+        from modules.ui_nav.window import wait_for_cs2_hwnd
 
-        hwnd = find_cs2_hwnd()
+        hwnd = wait_for_cs2_hwnd(timeout_sec=90.0, on_progress=on_progress)
     return Win32Driver(hwnd)

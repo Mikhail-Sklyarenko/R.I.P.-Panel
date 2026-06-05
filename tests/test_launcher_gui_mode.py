@@ -11,6 +11,8 @@ from modules.launcher.steam_auth import SteamAuthResult
 from modules.launcher.steam_gui_login import SteamGuiLoginResult
 
 
+@patch("modules.ui_nav.window.wait_for_cs2_hwnd", return_value=12345)
+@patch("modules.launcher.steam_promo_dismiss.dismiss_steam_promo")
 @patch("modules.launcher.cs2.launch_cs2")
 @patch("modules.launcher.steam.launch_steam")
 @patch("modules.launcher.steam_auth.login_steam_account")
@@ -24,10 +26,17 @@ def test_launcher_gui_mode(
     mock_api: MagicMock,
     mock_steam: MagicMock,
     mock_cs2: MagicMock,
+    mock_dismiss: MagicMock,
+    _wait_cs2: MagicMock,
     monkeypatch,
 ) -> None:
+    from modules.launcher.steam_promo_dismiss import SteamPromoDismissResult
+
     monkeypatch.setattr("sys.platform", "win32")
     mock_gui.return_value = SteamGuiLoginResult(ok=True, login="u1", detail="gui ok")
+    mock_dismiss.return_value = SteamPromoDismissResult(
+        dismissed=0, found=0, detail="main only — no promo"
+    )
     mock_steam.return_value = MagicMock(poll=MagicMock(return_value=None))
     mock_cs2.return_value = MagicMock(poll=MagicMock(return_value=None))
 
@@ -48,6 +57,8 @@ def test_launcher_gui_mode(
     assert EventType.STEAM_LOGIN_OK in [e for e, _ in emitted]
 
 
+@patch("modules.ui_nav.window.wait_for_cs2_hwnd", return_value=12345)
+@patch("modules.launcher.steam_promo_dismiss.dismiss_steam_promo")
 @patch("modules.launcher.cs2.launch_cs2")
 @patch("modules.launcher.steam.launch_steam")
 @patch("modules.launcher.steam_auth.login_steam_account")
@@ -61,11 +72,18 @@ def test_launcher_gui_then_api_fallback(
     mock_api: MagicMock,
     mock_steam: MagicMock,
     mock_cs2: MagicMock,
+    mock_dismiss: MagicMock,
+    _wait_cs2: MagicMock,
     monkeypatch,
 ) -> None:
+    from modules.launcher.steam_promo_dismiss import SteamPromoDismissResult
+
     monkeypatch.setattr("sys.platform", "win32")
     mock_gui.return_value = SteamGuiLoginResult(
         ok=False, login="u1", detail="coords miss"
+    )
+    mock_dismiss.return_value = SteamPromoDismissResult(
+        dismissed=0, found=0, detail="main only — no promo"
     )
     mock_api.return_value = SteamAuthResult(ok=True, login="u1", detail="api ok")
     mock_steam.return_value = MagicMock(poll=MagicMock(return_value=None))
