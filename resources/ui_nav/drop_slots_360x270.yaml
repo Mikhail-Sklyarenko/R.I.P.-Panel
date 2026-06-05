@@ -1,0 +1,25 @@
+# Weekly Care Package — 4 slots @ 360x270 (calibrate per docs/DM_NAV_COORDS.md)
+meta:
+  base_width: 360
+  base_height: 270
+
+detectors:
+  care_package:
+    - {x: 180, y: 40, rgb: [90, 140, 200], tolerance: 80}
+    - {x: 180, y: 200, rgb: [50, 55, 60], tolerance: 60}
+
+slots:
+  - id: 1
+    name_rect: {x: 28, y: 88, w: 72, h: 22}
+    click: {x: 64, y: 120}
+  - id: 2
+    name_rect: {x: 104, y: 88, w: 72, h: 22}
+    click: {x: 140, y: 120}
+  - id: 3
+    name_rect: {x: 180, y: 88, w: 72, h: 22}
+    click: {x: 216, y: 120}
+  - id: 4
+    name_rect: {x: 256, y: 88, w: 72, h: 22}
+    click: {x: 292, y: 120}
+
+confirm_click: {x: 180, y: 228}

@@ -1,0 +1,8 @@
+# Defaults from FSM ../settings/settings.json (read-only reference at setup).
+# Do not edit ../settings/ — change paths in data/config.yaml only.
+
+[steam]
+-nofriendsui -vgui -noreactlogin -noverifyfiles -nobootstrapupdate -skipinitialbootstrap -norepairfiles -overridepackageurl -disable-winh264 -language english
+
+[cs2]
+-swapcores -noqueuedload -vrdisable -windowed -nopreload -limitvsconst -softparticlesdefaultoff -nohltv -noaafonts -nosound -novid +violence_hblood 0 +sethdmodels 0 +mat_disable_fancy_blending 1 +r_dynamic 0 +engine_no_focus_sleep 120

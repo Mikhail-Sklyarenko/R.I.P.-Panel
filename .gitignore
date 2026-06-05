@@ -1,0 +1,40 @@
+# Local runtime data (vault, logs, config)
+data/
+# FSM import staging (operator-local; templates created at runtime)
+data/import/logpass.txt
+data/import/maFiles/*.maFile
+data/import/maFiles/*.mafile
+
+# Node (install on Windows in vendor/looter)
+vendor/looter/node_modules/
+
+# csgobot Python venv (separate from panel venv)
+vendor/csgobot/venv/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+.venv/
+venv/
+*.egg-info/
+dist/
+build/
+*.spec.bak
+
+# Secrets and Steam guard
+*.maFile
+.vault_key
+logpass/
+maFiles/
+
+# Runtime logs and artifacts
+**/events.jsonl
+artifacts/
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

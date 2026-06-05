@@ -1,0 +1,17 @@
+# Steam sign-in client 705×440 @100% Windows scale (operator ArmoryFarm verified)
+meta:
+  base_width: 705
+  base_height: 440
+  note: "LOGIN window only; fields left, QR right — calibrate if Steam UI changes"
+
+clicks:
+  account_field: {x: 200, y: 155}
+  password_field: {x: 200, y: 210}
+  submit: {x: 210, y: 320}
+  # Guard/TOTP screens: centered layout (unlike login fields at x≈200)
+  guard_field: {x: 352, y: 200}
+  guard_submit: {x: 352, y: 280}
+  enter_code_instead: {x: 352, y: 320}
+  account_menu: {x: 48, y: 48}
+  sign_out: {x: 120, y: 280}
+  sign_out_confirm: {x: 352, y: 352}

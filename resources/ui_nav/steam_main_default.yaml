@@ -1,0 +1,8 @@
+# Steam MAIN client window — promo dismiss clicks (recalibrate per machine)
+meta:
+  base_width: 1024
+  base_height: 768
+  note: "MAIN window only; promo_close = top-right X on sale modal"
+
+clicks:
+  promo_close: {x: 990, y: 24}

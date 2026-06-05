@@ -1,0 +1,10 @@
+# Local data (vault, logs, secrets)
+data/
+
+# Installed deps (not source)
+vendor/looter/node_modules/
+vendor/csgobot/venv/
+
+# Runtime artifacts
+**/events.jsonl
+artifacts/

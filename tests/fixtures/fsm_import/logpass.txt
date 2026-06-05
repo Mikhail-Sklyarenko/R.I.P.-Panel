@@ -1,0 +1,4 @@
+# fixture logpass
+acc_one:pass_one
+acc_two:pass_two:extra
+no_mafile:only_pass

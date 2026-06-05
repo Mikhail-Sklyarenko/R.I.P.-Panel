@@ -1,0 +1,8 @@
+# Level-up UI probes @ 360x270 — calibrate locally (docs/LEVEL_DETECT.md)
+meta:
+  base_width: 360
+  base_height: 270
+
+level_up:
+  - {x: 180, y: 72, rgb: [255, 210, 60], tolerance: 70}
+  - {x: 180, y: 95, rgb: [40, 120, 200], tolerance: 80}

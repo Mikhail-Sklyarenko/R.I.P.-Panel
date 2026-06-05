@@ -1,0 +1,16 @@
+# Steam client login UI @ 1920×1080 (client area). Calibrate locally — see docs/LAUNCHER.md
+meta:
+  base_width: 1920
+  base_height: 1080
+  note: "Default placeholders; adjust account_field/password_field for your Steam skin/DPI"
+
+clicks:
+  account_field: {x: 640, y: 340}
+  password_field: {x: 640, y: 400}
+  submit: {x: 640, y: 470}
+  guard_field: {x: 640, y: 360}
+  guard_submit: {x: 640, y: 430}
+  # Logout (main window, FSM-like change user) — calibrate if steam_kill_before_login=false
+  account_menu: {x: 48, y: 48}
+  sign_out: {x: 120, y: 280}
+  sign_out_confirm: {x: 640, y: 520}

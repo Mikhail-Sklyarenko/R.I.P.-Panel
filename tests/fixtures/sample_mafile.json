@@ -1,0 +1,10 @@
+{
+  "account_name": "test_user",
+  "shared_secret": "dGVzdF9zaGFyZWQ=",
+  "identity_secret": "dGVzdF9pZGVudGl0eQ==",
+  "serial_number": "1",
+  "revocation_code": "R00000",
+  "uri": "otpauth://totp/Steam:test_user?secret=TEST&issuer=Steam",
+  "server_time": 0,
+  "token_gid": "00000000"
+}
