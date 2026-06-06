@@ -107,8 +107,23 @@ def run(ctx: dict[str, Any] | None = None) -> bool:
 
         ctx["cs2_hwnd"] = cs2_hwnd
 
+        import time
+
         from modules.ui_nav.coords import load_nav_coords_for_hwnd
         from modules.ui_nav.window import wait_for_cs2_main_menu
+        from modules.utils.windows import move_all_cs_windows
+
+        try:
+            layout = move_all_cs_windows(config=config)
+            if layout.count and on_cs2_progress:
+                on_cs2_progress(
+                    f"launcher layout: {layout.count} CS window(s) → "
+                    f"{layout.width}x{layout.height}"
+                )
+            time.sleep(0.5)
+        except Exception as exc:
+            if on_cs2_progress:
+                on_cs2_progress(f"launcher layout skipped: {exc}")
 
         session_id = str(ctx.get("session_id") or login or "launch")
         artifacts = ArtifactStore(session_id)

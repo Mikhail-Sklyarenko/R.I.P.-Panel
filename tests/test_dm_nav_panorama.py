@@ -119,6 +119,57 @@ def test_load_nav_coords_for_hwnd_warns_on_mismatch(monkeypatch) -> None:
 @patch("modules.launcher.ArtifactStore")
 @patch("modules.launcher.proxy_check.check_proxy", return_value=(True, "ip ok"))
 @patch("modules.launcher.steam_promo_dismiss.dismiss_steam_promo")
+@patch("modules.utils.windows.move_all_cs_windows")
+@patch("modules.ui_nav.window.wait_for_cs2_main_menu")
+@patch("modules.ui_nav.coords.load_nav_coords_for_hwnd")
+@patch("modules.ui_nav.window.wait_for_cs2_hwnd", return_value=9999)
+@patch("modules.launcher.cs2.launch_cs2")
+@patch("modules.launcher.steam.launch_steam")
+@patch("modules.launcher.steam_gui_login.login_steam_gui")
+@patch("modules.launcher.cleanup.kill_cs2")
+@patch("modules.launcher.cleanup.kill_all")
+def test_launcher_moves_windows_before_menu_wait(
+    _kill_all: MagicMock,
+    _kill_cs2: MagicMock,
+    mock_gui: MagicMock,
+    mock_steam: MagicMock,
+    mock_cs2: MagicMock,
+    mock_wait_hwnd: MagicMock,
+    mock_load_coords: MagicMock,
+    mock_wait_menu: MagicMock,
+    mock_move: MagicMock,
+    mock_dismiss: MagicMock,
+    _proxy: MagicMock,
+    _artifact_store: MagicMock,
+    monkeypatch,
+) -> None:
+    from modules.launcher import run
+    from modules.launcher.steam_gui_login import SteamGuiLoginResult
+    from modules.launcher.steam_promo_dismiss import SteamPromoDismissResult
+    from modules.utils.windows import MoveResult
+
+    mock_gui.return_value = SteamGuiLoginResult(ok=True, login="u1", detail="ok")
+    mock_dismiss.return_value = SteamPromoDismissResult(
+        dismissed=0, found=0, detail="main only — no promo"
+    )
+    mock_load_coords.return_value = load_nav_coords("360x270")
+    mock_wait_menu.return_value = MainMenuWaitResult(strict_ok=True, attempts=1)
+    mock_move.return_value = MoveResult(moved=[], width=360, height=270)
+    monkeypatch.setattr("sys.platform", "win32")
+
+    cfg = AppConfig(
+        steam_path=r"C:\Steam\steam.exe",
+        cs2_path=r"C:\CS2\cs2.exe",
+        steam_login_mode="gui",
+    )
+    assert run({"login": "u1", "emit": lambda *a, **k: None, "config": cfg}) is True
+    mock_move.assert_called_once()
+    mock_wait_menu.assert_called_once()
+
+
+@patch("modules.launcher.ArtifactStore")
+@patch("modules.launcher.proxy_check.check_proxy", return_value=(True, "ip ok"))
+@patch("modules.launcher.steam_promo_dismiss.dismiss_steam_promo")
 @patch("modules.ui_nav.window.wait_for_cs2_main_menu")
 @patch("modules.ui_nav.coords.load_nav_coords_for_hwnd")
 @patch("modules.ui_nav.window.wait_for_cs2_hwnd", return_value=9999)
@@ -253,6 +304,31 @@ def test_dm_run_stops_gracefully(data_dir, monkeypatch) -> None:
         side_effect=DmNavStopped("stopped"),
     ):
         assert run(ctx) is False
+
+
+def test_dm_retry_skips_menu_wait_after_clicks(data_dir, monkeypatch) -> None:
+    monkeypatch.setenv("DM_NAV_SIM", "1")
+    from modules.ui_nav.errors import UiNavTimeoutError
+    from modules.dm_runner.navigate import DmNavigator
+
+    nav = DmNavigator(
+        config=AppConfig(
+            map_load_delay_sec=10,
+            game_search_timeout_sec=10,
+            search_retries=2,
+        ),
+        session_id="retry1",
+        login="u1",
+    )
+    nav._menu_nav_done = True
+
+    with patch.object(nav, "_wait_search_and_in_dm", side_effect=UiNavTimeoutError("in_dm")) as mock_in_dm:
+        with patch.object(nav, "_run_menu_and_clicks") as mock_menu:
+            with patch.object(nav, "_prepare_cs2_window"):
+                with pytest.raises(UiNavTimeoutError):
+                    nav.navigate_to_dm_with_retries()
+    assert mock_menu.call_count == 0
+    assert mock_in_dm.call_count == 2
 
 
 @pytest.fixture

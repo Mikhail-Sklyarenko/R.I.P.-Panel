@@ -49,6 +49,7 @@ class DmNavigator:
         self.menu_probe_warn = menu_probe_warn
         self.menu_confirmed = menu_confirmed
         self.should_stop = should_stop
+        self._menu_nav_done = False
         self.coords = load_nav_coords_for_hwnd(
             hwnd,
             config.cs_resolution,
@@ -183,6 +184,45 @@ class DmNavigator:
             self._click_target(name)
             time.sleep(0.35)
 
+    def _run_menu_and_clicks(self) -> None:
+        """Menu wait + click sequence (once per session)."""
+        if self._menu_nav_done:
+            return
+        play_clicked = self._pre_click_main_menu_wait()
+        self._abort_if_stopped()
+        self._e(EventType.IN_MENU, "dm_runner: main menu")
+
+        if play_clicked:
+            self._click_sequence_after_play()
+        else:
+            self.click_sequence_deathmatch()
+        self._menu_nav_done = True
+
+    def _wait_search_and_in_dm(self) -> None:
+        self._set_sim_phase(ScreenState.SEARCHING)
+        self._e(EventType.SEARCHING_DM, "dm_runner: search started")
+
+        try:
+            wait_for_state(
+                self.driver,
+                ScreenState.SEARCHING,
+                self.coords,
+                self.artifacts,
+                timeout_sec=min(15.0, self.config.game_search_timeout_sec),
+            )
+        except UiNavTimeoutError:
+            self.artifacts.log_step("searching_skip", detail="probe optional")
+
+        self._set_sim_phase(ScreenState.IN_DM)
+        wait_for_state(
+            self.driver,
+            ScreenState.IN_DM,
+            self.coords,
+            self.artifacts,
+            timeout_sec=float(self.config.map_load_delay_sec),
+        )
+        self._e(EventType.IN_DM, "dm_runner: in_dm")
+
     def _click_target(self, name: str) -> None:
         before = self.driver.capture()
         on_main_before = detect_state(before, ScreenState.MAIN_MENU, self.coords)
@@ -225,37 +265,18 @@ class DmNavigator:
     def navigate_to_dm(self) -> None:
         """Меню → поиск DM → in_dm (таймауты из config)."""
         self._abort_if_stopped()
-        play_clicked = self._pre_click_main_menu_wait()
-        self._abort_if_stopped()
-        self._e(EventType.IN_MENU, "dm_runner: main menu")
+        self._run_menu_and_clicks()
+        self._wait_search_and_in_dm()
 
-        if play_clicked:
-            self._click_sequence_after_play()
-        else:
-            self.click_sequence_deathmatch()
-        self._set_sim_phase(ScreenState.SEARCHING)
-        self._e(EventType.SEARCHING_DM, "dm_runner: search started")
+    def _retry_focus_once(self) -> None:
+        if isinstance(self.driver, SimDriver) or not self.hwnd:
+            return
+        from modules.ui_nav.actions import focus_window
 
         try:
-            wait_for_state(
-                self.driver,
-                ScreenState.SEARCHING,
-                self.coords,
-                self.artifacts,
-                timeout_sec=min(15.0, self.config.game_search_timeout_sec),
-            )
-        except UiNavTimeoutError:
-            self.artifacts.log_step("searching_skip", detail="probe optional")
-
-        self._set_sim_phase(ScreenState.IN_DM)
-        wait_for_state(
-            self.driver,
-            ScreenState.IN_DM,
-            self.coords,
-            self.artifacts,
-            timeout_sec=float(self.config.map_load_delay_sec),
-        )
-        self._e(EventType.IN_DM, "dm_runner: in_dm")
+            focus_window(self.hwnd)
+        except UiNavError as exc:
+            self._nav_progress(f"dm nav: focus retry failed ({exc})")
 
     def navigate_to_dm_with_retries(self) -> None:
         self._prepare_cs2_window()
@@ -264,16 +285,25 @@ class DmNavigator:
             try:
                 self._abort_if_stopped()
                 self.artifacts.log_step("dm_attempt", attempt=attempt)
-                self.navigate_to_dm()
+                if self._menu_nav_done:
+                    self._nav_progress(
+                        f"dm nav: retry in_dm wait (attempt {attempt})"
+                    )
+                    self._wait_search_and_in_dm()
+                else:
+                    self.navigate_to_dm()
                 return
             except DmNavStopped:
                 raise
             except (UiNavTimeoutError, UiNavError) as exc:
                 last_err = exc
                 self.artifacts.log_step("dm_attempt_failed", attempt=attempt, err=str(exc))
+                if "focus" in str(exc).lower() or "SetForegroundWindow" in str(exc):
+                    self._retry_focus_once()
                 if attempt < self.config.search_retries:
                     time.sleep(2.0)
-                    self._set_sim_phase(ScreenState.MAIN_MENU)
+                    if not self._menu_nav_done:
+                        self._set_sim_phase(ScreenState.MAIN_MENU)
         if last_err:
             raise last_err
 

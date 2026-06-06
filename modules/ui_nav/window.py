@@ -89,7 +89,7 @@ def wait_for_cs2_main_menu(
 ) -> MainMenuWaitResult:
     """Poll until main_menu probes match. Timeout returns timed_out (no exception)."""
     _require_windows()
-    from modules.ui_nav.capture import capture_client
+    from modules.ui_nav.capture import capture_client_with_black_retry
     from modules.ui_nav.detectors import ScreenState, detect_state, probe_match_results
 
     probe_count = len(coords.probes("main_menu"))
@@ -105,7 +105,12 @@ def wait_for_cs2_main_menu(
         on_progress("waiting for CS2 main menu…")
     while time.monotonic() < deadline:
         attempt += 1
-        img = capture_client(hwnd)
+        img = capture_client_with_black_retry(
+            hwnd,
+            on_progress=on_progress,
+            artifacts=artifacts,
+            attempt=attempt,
+        )
         last_img = img
         probe_results = probe_match_results(img, ScreenState.MAIN_MENU, coords)
         last_probe_results = probe_results

@@ -40,7 +40,7 @@ def test_wait_for_cs2_main_menu_ok_soft_probe(monkeypatch, tmp_path) -> None:
             )
         ]
 
-    with patch("modules.ui_nav.capture.capture_client", return_value=img):
+    with patch("modules.ui_nav.capture.capture_client_with_black_retry", return_value=img):
         with patch("modules.ui_nav.detectors.detect_state", side_effect=fake_detect):
             with patch(
                 "modules.ui_nav.detectors.probe_match_results",
@@ -71,7 +71,7 @@ def test_wait_for_cs2_main_menu_timeout_returns_result(monkeypatch, tmp_path) ->
     img = Image.new("RGB", (360, 270), color=(0, 0, 0))
     artifacts = MagicMock()
 
-    with patch("modules.ui_nav.capture.capture_client", return_value=img):
+    with patch("modules.ui_nav.capture.capture_client_with_black_retry", return_value=img):
         with patch("modules.ui_nav.detectors.detect_state", return_value=False):
             result = wait_for_cs2_main_menu(
                 4242,

@@ -23,20 +23,18 @@
 | **ИГРАТЬ** | **~217** | `main_menu_play` + probes |
 | МАГАЗИН | ~255 | |
 
-## ArmoryFarm session z3l9272eg3 (v4 recalibration)
+## ArmoryFarm z3l9272eg3 (v4 probes + v5 capture)
 
-Диагностика из `steps.jsonl` (223 launcher probes @ 360×270):
+**v4:** orange @ **(217, 26)**, text @ **(218, 13)** — fixture `tests/fixtures/armoryfarm/z3l9272eg3/`.
 
-| Метрика | Значение |
-|---------|----------|
-| `strict=1` | **0 / 223** |
-| `matched=1` | только attempt **10, 11, 12, 14** (ранний переход) |
-| `matched=0` | attempt 15–223 на стабильном меню |
+**v5 (capture/focus):**
+- `last@(217,26)=[0,0,0]` = **чёрный grab**, не «не те coords» — не переходить на 720p
+- `capture_client` использует **`focus_window`** (как клики), не голый `SetForegroundWindow`
+- Launcher: **`move_all_cs_windows` до** `wait_for_cs2_main_menu` → `launcher layout: …`
+- Black frame: `capture_suspect_black` + refocus retry (1× per poll)
+- dm retry после clicks: **`dm nav: retry in_dm wait`** — без повторного 120s menu wait
 
-**Вывод:** старые probes @ (217,28) orange и (217,14) text не совпадали с ArmoryFarm.  
-v4: orange @ **(217, 26)**, text @ **(218, 13)** — см. yaml. Fixture: `tests/fixtures/armoryfarm/z3l9272eg3/`.
-
-**Probes ≠ mouse:** gate читает RGB со скрина; курсор двигается только после wait или **controlled fallback click**.
+**Probes ≠ mouse:** gate читает RGB; курсор — после wait или controlled fallback @217.
 
 ## Таймауты (config.yaml)
 
@@ -72,10 +70,11 @@ Main log при nav: `dm click main_menu_play @(x,y)` — если строк н
 ## Launcher + dm_runner sequence
 
 1. `wait_for_cs2_hwnd` → `waiting for CS2 window…`
-2. `wait_for_cs2_main_menu` (**strict 2/2**, timeout 120s; per-probe `p0/p1/rgb0/rgb1` в `steps.jsonl`)
-3. `cs2_ok` → `cs2 menu ready` **или** `cs2 menu unconfirmed … trying dm nav`
-4. dm_runner pre-click wait (strict or soft)
-5. **Fallback:** `dm nav: main_menu probe timeout; controlled click ИГРАТЬ @(x,y)` → `mode_deathmatch` → `start_search` → `in_dm`
+2. **`move_all_cs_windows`** → `launcher layout: …` (v5)
+3. `wait_for_cs2_main_menu` (**strict 2/2**, unified focus capture)
+4. `cs2_ok` → ready **или** unconfirmed
+5. dm_runner: menu wait / fallback click @217
+6. Retry fail **in_dm** only: `dm nav: retry in_dm wait (attempt N)` — **не** повторный soft probe wait
 
 Timeout log: `main_menu timeout: p0=… p1=… last@(x,y)=[r,g,b] expected=[…]`
 
@@ -99,10 +98,10 @@ Timeout log: `main_menu timeout: p0=… p1=… last@(x,y)=[r,g,b] expected=[…]
 
 | Symptom | Check |
 |---------|--------|
-| 720s без `dm click` | v4 fallback после menu timeout; перекалибровка probes |
-| `main_menu_play @(168,…)` на Loadout | Обновить yaml: **x=217** для ИГРАТЬ |
-| `strict=0` на всех attempt | `steps.jsonl` p0/p1 + `sample_probe_rgb` на timeout PNG |
-| `capture: invalid window handle` при Stop | Graceful: `dm nav: stopped or window closed` |
+| `last@…=[0,0,0]` | v5 focus capture; не 720p; не кликать в Farm Panel во время farm |
+| `soft probe wait` после `searching_dm` | v5 phased retry — обновить до v5 |
+| 720s без `dm click` | v4 fallback; v5 focus |
+| `SetForegroundWindow` error | focus retry; panel steals focus |
 
 ## Модули
 
