@@ -8,7 +8,6 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from config.schema import AppConfig
-from modules.utils.confirm import confirm_kill
 from modules.utils.errors import UtilsPlatformError
 
 
@@ -60,6 +59,5 @@ def kill_all_with_confirm(
     parent: Any | None = None,
     config: AppConfig | None = None,
 ) -> KillResult:
-    if not confirm_kill(parent=parent, config=config):
-        return KillResult(cancelled=True)
+    del parent, config  # kept for API compatibility
     return kill_all_cs_and_steam()

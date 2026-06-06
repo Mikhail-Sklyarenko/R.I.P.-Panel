@@ -128,6 +128,7 @@ def _dm_ctx(ctx: SessionContext) -> dict:
         "emit": ctx.emit,
         "session_id": ctx.session_id,
         "config": load_config(),
+        "on_nav_progress": lambda msg: ctx._ui_main(f"[{ctx.login}] {msg}"),
     }
     if ctx.cs2_hwnd:
         dm["hwnd"] = ctx.cs2_hwnd

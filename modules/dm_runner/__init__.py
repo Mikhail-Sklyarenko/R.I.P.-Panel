@@ -44,6 +44,7 @@ def run(ctx: dict[str, Any] | None = None) -> bool:
             login=login,
             emit=emit,
             hwnd=ctx.get("hwnd"),
+            on_nav_progress=ctx.get("on_nav_progress"),
         )
     except UiNavError as exc:
         if emit:

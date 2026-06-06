@@ -11,6 +11,8 @@ from modules.launcher.steam_auth import SteamAuthResult
 from modules.launcher.steam_gui_login import SteamGuiLoginResult
 
 
+@patch("modules.ui_nav.window.wait_for_cs2_main_menu")
+@patch("modules.ui_nav.coords.load_nav_coords_for_hwnd")
 @patch("modules.ui_nav.window.wait_for_cs2_hwnd", return_value=12345)
 @patch("modules.launcher.steam_promo_dismiss.dismiss_steam_promo")
 @patch("modules.launcher.cs2.launch_cs2")
@@ -27,13 +29,17 @@ def test_launcher_gui_mode(
     mock_steam: MagicMock,
     mock_cs2: MagicMock,
     mock_dismiss: MagicMock,
+    mock_load_coords: MagicMock,
+    _wait_menu: MagicMock,
     _wait_cs2: MagicMock,
     monkeypatch,
 ) -> None:
     from modules.launcher.steam_promo_dismiss import SteamPromoDismissResult
+    from modules.ui_nav.coords import load_nav_coords
 
     monkeypatch.setattr("sys.platform", "win32")
     mock_gui.return_value = SteamGuiLoginResult(ok=True, login="u1", detail="gui ok")
+    mock_load_coords.return_value = load_nav_coords("360x270")
     mock_dismiss.return_value = SteamPromoDismissResult(
         dismissed=0, found=0, detail="main only — no promo"
     )
@@ -57,6 +63,8 @@ def test_launcher_gui_mode(
     assert EventType.STEAM_LOGIN_OK in [e for e, _ in emitted]
 
 
+@patch("modules.ui_nav.window.wait_for_cs2_main_menu")
+@patch("modules.ui_nav.coords.load_nav_coords_for_hwnd")
 @patch("modules.ui_nav.window.wait_for_cs2_hwnd", return_value=12345)
 @patch("modules.launcher.steam_promo_dismiss.dismiss_steam_promo")
 @patch("modules.launcher.cs2.launch_cs2")
@@ -73,15 +81,19 @@ def test_launcher_gui_then_api_fallback(
     mock_steam: MagicMock,
     mock_cs2: MagicMock,
     mock_dismiss: MagicMock,
+    mock_load_coords: MagicMock,
+    _wait_menu: MagicMock,
     _wait_cs2: MagicMock,
     monkeypatch,
 ) -> None:
     from modules.launcher.steam_promo_dismiss import SteamPromoDismissResult
+    from modules.ui_nav.coords import load_nav_coords
 
     monkeypatch.setattr("sys.platform", "win32")
     mock_gui.return_value = SteamGuiLoginResult(
         ok=False, login="u1", detail="coords miss"
     )
+    mock_load_coords.return_value = load_nav_coords("360x270")
     mock_dismiss.return_value = SteamPromoDismissResult(
         dismissed=0, found=0, detail="main only — no promo"
     )

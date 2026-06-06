@@ -61,6 +61,36 @@ def wait_for_cs2_hwnd(
     raise UiNavError(f"CS2 window not found within {timeout_sec:.0f}s")
 
 
+def wait_for_cs2_main_menu(
+    hwnd: int,
+    coords,
+    *,
+    timeout_sec: float = 120.0,
+    poll_sec: float = 0.5,
+    on_progress: Callable[[str], None] | None = None,
+) -> None:
+    """Poll until Panorama main menu probes match (strict, all probes)."""
+    _require_windows()
+    from modules.ui_nav.capture import capture_client
+    from modules.ui_nav.detectors import ScreenState, detect_state
+
+    deadline = time.monotonic() + timeout_sec
+    last_log = 0.0
+    if on_progress:
+        on_progress("waiting for CS2 main menu…")
+    while time.monotonic() < deadline:
+        img = capture_client(hwnd)
+        if detect_state(img, ScreenState.MAIN_MENU, coords):
+            return
+        now = time.monotonic()
+        if on_progress and now - last_log >= 10.0:
+            remaining = max(0, int(deadline - now))
+            on_progress(f"waiting for CS2 main menu ({remaining}s left)")
+            last_log = now
+        time.sleep(poll_sec)
+    raise UiNavError(f"CS2 main menu not detected within {timeout_sec:.0f}s")
+
+
 def is_valid_hwnd(hwnd: int) -> bool:
     """True if hwnd is a live top-level window (not closed)."""
     _require_windows()

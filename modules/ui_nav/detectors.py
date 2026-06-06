@@ -25,6 +25,8 @@ _STATE_MAP = {
     ScreenState.IN_DM: "in_dm",
 }
 
+_STRICT_STATES = frozenset({ScreenState.MAIN_MENU, ScreenState.IN_DM})
+
 
 def _probe_match(img: Image.Image, probe: ColorProbe) -> bool:
     x, y = probe.x, probe.y
@@ -38,13 +40,30 @@ def _probe_match(img: Image.Image, probe: ColorProbe) -> bool:
     )
 
 
-def detect_state(img: Image.Image, state: ScreenState, coords: NavCoords) -> bool:
+def _required_matches(state: ScreenState, probe_count: int, min_match: int | None) -> int:
+    if probe_count <= 0:
+        return 1
+    if min_match is not None:
+        return min(max(1, min_match), probe_count)
+    if state in _STRICT_STATES:
+        return probe_count
+    return max(1, probe_count - 1)
+
+
+def detect_state(
+    img: Image.Image,
+    state: ScreenState,
+    coords: NavCoords,
+    *,
+    min_match: int | None = None,
+) -> bool:
     key = _STATE_MAP[state]
     probes = coords.probes(key)
     if not probes:
         return False
     matched = sum(1 for p in probes if _probe_match(img, p))
-    return matched >= max(1, len(probes) - 1)
+    required = _required_matches(state, len(probes), min_match)
+    return matched >= required
 
 
 def wait_for_state(
@@ -55,6 +74,7 @@ def wait_for_state(
     *,
     timeout_sec: float,
     poll_sec: float = 0.5,
+    min_match: int | None = None,
 ) -> Image.Image:
     deadline = time.monotonic() + timeout_sec
     attempt = 0
@@ -62,7 +82,7 @@ def wait_for_state(
         attempt += 1
         img = driver.capture()
         artifacts.save_image(f"wait_{state.value}_{attempt}", img)
-        if detect_state(img, state, coords):
+        if detect_state(img, state, coords, min_match=min_match):
             artifacts.log_step("detect_ok", state=state.value, attempt=attempt)
             return img
         time.sleep(poll_sec)

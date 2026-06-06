@@ -132,12 +132,13 @@ Config: `steam_dismiss_promo` (default `true`), `steam_promo_dismiss_timeout_sec
 | `steam_kill_before_login` | `true` | `kill_all` before each session |
 | `steam_dismiss_promo` | `true` | Close promo banner after login OK (best-effort) |
 | `steam_promo_dismiss_timeout_sec` | `10` | Promo detect/dismiss timeout |
-| `cs2_window_wait_timeout_sec` | `90` | Wait for CS2 window after Popen (before `cs2_ok`) |
+| `cs2_window_wait_timeout_sec` | `90` | Wait for CS2 window after Popen |
+| `cs2_main_menu_wait_timeout_sec` | `120` | Wait for Panorama main menu probes before `cs2_ok` |
 | `only_launch_steam` | `false` | Skip CS2; cleanup keeps Steam |
 
 ## Events (Main log)
 
-- `steam_login_start` → `steam_login_ok` → (promo dismiss) → `steam_ok` → **wait CS2 window** → `cs2_ok` → `in_dm`
+- `steam_login_start` → `steam_login_ok` → (promo dismiss) → `steam_ok` → **wait CS2 window** → **wait CS2 main menu** → `cs2_ok menu ready` → `dm click …` → `in_dm`
 - Fail: `steam_login_failed` + `session_failed`
 - `gui_then_api`: success detail may include `api fallback ok`
 
@@ -149,6 +150,8 @@ Config: `steam_dismiss_promo` (default `true`), `steam_promo_dismiss_timeout_sec
 | `invalid code from steam-totp` | `cd vendor\looter && npm install`; check `totp_once.js`; Windows time sync (NTP) |
 | Store visible but `logged-in state not detected` | Update to build with large MAIN detect (≥680×480); `git pull` |
 | `CS2 window not found` right after `cs2_ok` | Fixed: `wait_for_cs2_hwnd` before `cs2_ok`; increase `cs2_window_wait_timeout_sec` |
+| CS2 in menu but no DM / cursor still | Main log: `dm click …` lines? Calibrate `coords_360x270.yaml` (Panorama RU); strict `in_dm` |
+| `CS2 main menu not detected` | Increase `cs2_main_menu_wait_timeout_sec`; calibrate `main_menu` probes |
 | Steam opens but no typing | Calibrate `steam_login_705x440.yaml`; `steam_classic_login_ui: true` |
 | Guard timeout | Windows time sync (NTP); valid `shared_secret` in maFile |
 | `email Steam Guard not supported` | Mobile authenticator maFile only (post-MVP: email flow) |

@@ -71,7 +71,7 @@ pip install -r requirements.txt
 
 ## Utils (B12)
 
-**Move all CS windows** / **Kill ALL CS & Steam** (recovery), optional confirm — `docs/reference/UTILS.md`.
+**Move all CS windows** / **Kill ALL CS & Steam** (recovery) — `docs/reference/UTILS.md`.
 
 ## Telegram (B11)
 

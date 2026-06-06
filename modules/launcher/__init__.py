@@ -105,16 +105,36 @@ def run(ctx: dict[str, Any] | None = None) -> bool:
             raise LauncherError(f"CS2 window wait: {exc}") from exc
 
         ctx["cs2_hwnd"] = cs2_hwnd
+
+        from modules.ui_nav.coords import load_nav_coords_for_hwnd
+        from modules.ui_nav.window import wait_for_cs2_main_menu
+
+        coords = load_nav_coords_for_hwnd(
+            cs2_hwnd,
+            config.cs_resolution,
+            on_warn=on_cs2_progress,
+        )
+        menu_timeout = max(15, int(config.cs2_main_menu_wait_timeout_sec))
+        try:
+            wait_for_cs2_main_menu(
+                cs2_hwnd,
+                coords,
+                timeout_sec=float(menu_timeout),
+                on_progress=on_cs2_progress,
+            )
+        except UiNavError as exc:
+            raise LauncherError(f"CS2 main menu wait: {exc}") from exc
+
         _emit(
             EventType.CS2_OK,
-            f"cs2 window ready (hwnd={cs2_hwnd})",
+            f"cs2 menu ready (hwnd={cs2_hwnd})",
         )
         return True
     except LauncherError as exc:
         steam_auth.stop_steam_auth()
         if emit:
             msg = str(exc)
-            if msg.startswith("CS2 window wait:"):
+            if msg.startswith("CS2 window wait:") or msg.startswith("CS2 main menu wait:"):
                 emit(EventType.SESSION_FAILED, msg)
             else:
                 emit(EventType.STEAM_LOGIN_FAILED, msg)

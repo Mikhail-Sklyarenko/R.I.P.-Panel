@@ -151,6 +151,8 @@ def test_soft_fail_still_returns_detail(monkeypatch) -> None:
     assert "promo still visible" in result.detail
 
 
+@patch("modules.ui_nav.window.wait_for_cs2_main_menu")
+@patch("modules.ui_nav.coords.load_nav_coords_for_hwnd")
 @patch("modules.ui_nav.window.wait_for_cs2_hwnd", return_value=12345)
 @patch("modules.launcher.proxy_check.check_proxy", return_value=(True, "ip ok"))
 @patch("modules.launcher.steam_promo_dismiss.dismiss_steam_promo")
@@ -167,6 +169,8 @@ def test_launcher_calls_dismiss_between_login_ok_and_steam_ok(
     mock_cs2: MagicMock,
     mock_dismiss: MagicMock,
     _proxy: MagicMock,
+    mock_load_coords: MagicMock,
+    _wait_menu: MagicMock,
     _wait_cs2: MagicMock,
     monkeypatch,
 ) -> None:
@@ -174,8 +178,10 @@ def test_launcher_calls_dismiss_between_login_ok_and_steam_ok(
     from modules.launcher.steam_gui_login import SteamGuiLoginResult
     from modules.launcher.steam_promo_dismiss import SteamPromoDismissResult
     from modules.launcher import run
+    from modules.ui_nav.coords import load_nav_coords
 
     mock_gui.return_value = SteamGuiLoginResult(ok=True, login="u1", detail="ok")
+    mock_load_coords.return_value = load_nav_coords("360x270")
     mock_dismiss.return_value = SteamPromoDismissResult(
         dismissed=1,
         found=1,
@@ -208,6 +214,8 @@ def test_launcher_calls_dismiss_between_login_ok_and_steam_ok(
     assert "dismissed 1 promo" in steam_ok_detail
 
 
+@patch("modules.ui_nav.window.wait_for_cs2_main_menu")
+@patch("modules.ui_nav.coords.load_nav_coords_for_hwnd")
 @patch("modules.ui_nav.window.wait_for_cs2_hwnd", return_value=12345)
 @patch("modules.launcher.proxy_check.check_proxy", return_value=(True, "ip ok"))
 @patch("modules.launcher.steam_promo_dismiss.dismiss_steam_promo")
@@ -224,6 +232,8 @@ def test_launcher_soft_fail_still_emits_steam_ok_and_cs2(
     mock_cs2: MagicMock,
     mock_dismiss: MagicMock,
     _proxy: MagicMock,
+    mock_load_coords: MagicMock,
+    _wait_menu: MagicMock,
     _wait_cs2: MagicMock,
     monkeypatch,
 ) -> None:
@@ -231,8 +241,10 @@ def test_launcher_soft_fail_still_emits_steam_ok_and_cs2(
     from modules.launcher.steam_gui_login import SteamGuiLoginResult
     from modules.launcher.steam_promo_dismiss import SteamPromoDismissResult
     from modules.launcher import run
+    from modules.ui_nav.coords import load_nav_coords
 
     mock_gui.return_value = SteamGuiLoginResult(ok=True, login="u1", detail="ok")
+    mock_load_coords.return_value = load_nav_coords("360x270")
     mock_dismiss.return_value = SteamPromoDismissResult(
         dismissed=0,
         found=1,

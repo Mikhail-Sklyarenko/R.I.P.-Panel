@@ -28,10 +28,30 @@ def _win32_ui_call(hwnd: int, action: str, fn) -> None:
 def focus_window(hwnd: int) -> None:
     if sys.platform != "win32":
         raise UiNavPlatformError("focus_window is Windows-only")
+    import win32api
+    import win32con
     import win32gui
+    import win32process
 
     def _do() -> None:
-        win32gui.SetForegroundWindow(hwnd)
+        if not is_valid_hwnd(hwnd):
+            raise UiNavError(f"window closed or invalid (hwnd={hwnd})")
+        foreground = win32gui.GetForegroundWindow()
+        if foreground == hwnd:
+            return
+        foreground_thread = win32process.GetWindowThreadProcessId(foreground)[0]
+        target_thread = win32process.GetWindowThreadProcessId(hwnd)[0]
+        attached = False
+        if foreground_thread and foreground_thread != target_thread:
+            win32api.AttachThreadInput(foreground_thread, target_thread, True)
+            attached = True
+        try:
+            win32gui.ShowWindow(hwnd, win32con.SW_SHOW)
+            win32gui.BringWindowToTop(hwnd)
+            win32gui.SetForegroundWindow(hwnd)
+        finally:
+            if attached:
+                win32api.AttachThreadInput(foreground_thread, target_thread, False)
         time.sleep(0.15)
 
     _win32_ui_call(hwnd, "focus_window", _do)

@@ -1,23 +1,25 @@
-# UI coords for CS2 @ 360x270 (FSM CS_RESOLUTION). Calibrate per docs/DM_NAV_COORDS.md
+# UI coords for CS2 @ 360x270 — Panorama RU (small window). Calibrate: docs/DM_NAV_COORDS.md
 meta:
   base_width: 360
   base_height: 270
-  cs2_build: "2025-06 (post-Armory, calibrate locally)"
+  cs2_build: "2025-06 Panorama RU @ 360x270"
 
 clicks:
-  main_menu_play: {x: 180, y: 235}
-  mode_deathmatch: {x: 95, y: 120}
-  start_search: {x: 280, y: 245}
+  main_menu_play: {x: 180, y: 28}
+  mode_deathmatch: {x: 72, y: 145}
+  start_search: {x: 268, y: 248}
   leave_match: {x: 340, y: 12}
 
 detectors:
   main_menu:
-    - {x: 180, y: 235, rgb: [200, 180, 40], tolerance: 55}
+    - {x: 180, y: 32, rgb: [240, 160, 50], tolerance: 65}
+    - {x: 180, y: 22, rgb: [210, 210, 210], tolerance: 55}
   searching:
-    - {x: 180, y: 135, rgb: [220, 220, 220], tolerance: 70}
+    - {x: 180, y: 135, rgb: [200, 200, 200], tolerance: 70}
+    - {x: 180, y: 100, rgb: [160, 160, 160], tolerance: 65}
   in_dm:
     - {x: 28, y: 248, rgb: [240, 200, 60], tolerance: 80}
-    - {x: 320, y: 18, rgb: [30, 30, 35], tolerance: 50}
+    - {x: 55, y: 248, rgb: [200, 180, 40], tolerance: 75}
   level_up:
     - {x: 180, y: 72, rgb: [255, 210, 60], tolerance: 70}
     - {x: 180, y: 95, rgb: [40, 120, 200], tolerance: 80}

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import sys
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -64,16 +66,11 @@ def _parse_resolution(resolution: str) -> tuple[int, int]:
     return int(w), int(h)
 
 
-def load_nav_coords(
-    resolution: str = "360x270",
-    path: Path | None = None,
-) -> NavCoords:
-    src = path or _default_coords_path()
+def _parse_coords_file(src: Path) -> tuple[int, int, dict[str, Point], dict[str, list[ColorProbe]]]:
     data = yaml.safe_load(src.read_text(encoding="utf-8"))
     meta = data.get("meta", {})
     base_w = int(meta.get("base_width", 360))
     base_h = int(meta.get("base_height", 270))
-    target_w, target_h = _parse_resolution(resolution)
 
     clicks: dict[str, Point] = {}
     for name, pt in data.get("clicks", {}).items():
@@ -90,6 +87,16 @@ def load_nav_coords(
             )
             for p in probes
         ]
+    return base_w, base_h, clicks, detectors
+
+
+def load_nav_coords(
+    resolution: str = "360x270",
+    path: Path | None = None,
+) -> NavCoords:
+    src = path or _default_coords_path()
+    base_w, base_h, clicks, detectors = _parse_coords_file(src)
+    target_w, target_h = _parse_resolution(resolution)
 
     return NavCoords(
         base_width=base_w,
@@ -98,4 +105,38 @@ def load_nav_coords(
         detectors=detectors,
         scale_x=target_w / base_w,
         scale_y=target_h / base_h,
+    )
+
+
+def load_nav_coords_for_hwnd(
+    hwnd: int | None,
+    resolution: str = "360x270",
+    path: Path | None = None,
+    *,
+    on_warn: Callable[[str], None] | None = None,
+) -> NavCoords:
+    """Scale yaml base coords to actual CS2 client rect (preferred on Windows)."""
+    src = path or _default_coords_path()
+    base_w, base_h, clicks, detectors = _parse_coords_file(src)
+
+    if hwnd is None or sys.platform != "win32":
+        return load_nav_coords(resolution, path)
+
+    from modules.ui_nav.window import client_size
+
+    client_w, client_h = client_size(hwnd)
+    cfg_w, cfg_h = _parse_resolution(resolution)
+    if on_warn and (abs(client_w - cfg_w) > 2 or abs(client_h - cfg_h) > 2):
+        on_warn(
+            f"CS2 client {client_w}x{client_h} differs from cs_resolution "
+            f"{cfg_w}x{cfg_h}; autoscaling coords to client"
+        )
+
+    return NavCoords(
+        base_width=base_w,
+        base_height=base_h,
+        clicks=clicks,
+        detectors=detectors,
+        scale_x=client_w / base_w if base_w else 1.0,
+        scale_y=client_h / base_h if base_h else 1.0,
     )

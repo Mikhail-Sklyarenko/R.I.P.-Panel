@@ -40,6 +40,8 @@ def test_wait_for_cs2_hwnd_timeout(monkeypatch) -> None:
 
 @patch("modules.launcher.proxy_check.check_proxy", return_value=(True, "ip ok"))
 @patch("modules.launcher.steam_promo_dismiss.dismiss_steam_promo")
+@patch("modules.ui_nav.window.wait_for_cs2_main_menu")
+@patch("modules.ui_nav.coords.load_nav_coords_for_hwnd")
 @patch("modules.ui_nav.window.wait_for_cs2_hwnd", return_value=9999)
 @patch("modules.launcher.cs2.launch_cs2")
 @patch("modules.launcher.steam.launch_steam")
@@ -53,6 +55,8 @@ def test_launcher_emits_cs2_ok_after_window_wait(
     mock_steam: MagicMock,
     mock_cs2: MagicMock,
     mock_wait: MagicMock,
+    mock_load_coords: MagicMock,
+    mock_wait_menu: MagicMock,
     mock_dismiss: MagicMock,
     _proxy: MagicMock,
     monkeypatch,
@@ -61,10 +65,14 @@ def test_launcher_emits_cs2_ok_after_window_wait(
     from modules.launcher.steam_gui_login import SteamGuiLoginResult
     from modules.launcher.steam_promo_dismiss import SteamPromoDismissResult
 
+    from modules.launcher.steam_promo_dismiss import SteamPromoDismissResult
+    from modules.ui_nav.coords import load_nav_coords
+
     mock_gui.return_value = SteamGuiLoginResult(ok=True, login="u1", detail="ok")
     mock_dismiss.return_value = SteamPromoDismissResult(
         dismissed=0, found=0, detail="main only — no promo"
     )
+    mock_load_coords.return_value = load_nav_coords("360x270")
     mock_cs2.return_value = MagicMock(poll=MagicMock(return_value=None))
     monkeypatch.setattr("sys.platform", "win32")
 
@@ -94,6 +102,7 @@ def test_launcher_emits_cs2_ok_after_window_wait(
     assert ctx.get("cs2_hwnd") == 9999
     assert EventType.CS2_OK in [e for e, _ in emitted]
     cs2_detail = next(d for e, d in emitted if e == EventType.CS2_OK)
+    assert "menu ready" in cs2_detail
     assert "hwnd=9999" in cs2_detail
 
 

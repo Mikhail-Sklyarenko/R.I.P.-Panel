@@ -188,16 +188,6 @@ class PanelView:
             text="Kill ALL CS & Steam",
             command=self.ctrl.kill_all_cs_steam,
         ).pack(fill="x", padx=8, pady=3)
-        cfg = self.ctrl.config
-        self._vars["utils_confirm_before_kill"] = ctk.BooleanVar(
-            value=cfg.utils_confirm_before_kill
-        )
-        ctk.CTkSwitch(
-            box,
-            text="Confirm before kill",
-            variable=self._vars["utils_confirm_before_kill"],
-            command=self._save_utils_confirm,
-        ).pack(anchor="w", padx=8, pady=4)
         ctk.CTkButton(
             box,
             text="Clear logs",
@@ -491,16 +481,6 @@ class PanelView:
 
     def _on_get_lvl(self) -> None:
         self.ctrl.get_lvl_selected()
-
-    def _save_utils_confirm(self) -> None:
-        if "utils_confirm_before_kill" in self._vars:
-            self.ctrl.save_config_from_ui(
-                {
-                    "utils_confirm_before_kill": bool(
-                        self._vars["utils_confirm_before_kill"].get()
-                    )
-                }
-            )
 
     def on_close(self) -> None:
         w, h = self.root.winfo_width(), self.root.winfo_height()

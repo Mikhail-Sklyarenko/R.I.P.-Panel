@@ -90,6 +90,11 @@ class AppConfig(BaseModel):
         ge=15,
         description="Таймаут ожидания окна CS2 после Popen",
     )
+    cs2_main_menu_wait_timeout_sec: int = Field(
+        default=120,
+        ge=15,
+        description="Таймаут ожидания главного меню CS2 после hwnd",
+    )
     search_retries: int = Field(
         default=5, ge=1, description="FSM SEARCH_RETRIES_BEFORE_SHUFFLE"
     )
@@ -116,10 +121,6 @@ class AppConfig(BaseModel):
     )
     panel_geometry: str = Field(
         default="1150x665", description="Размер окна WxH"
-    )
-    utils_confirm_before_kill: bool = Field(
-        default=True,
-        description="Confirm dialog перед Kill ALL CS & Steam",
     )
     fsm_import_enabled: bool = Field(
         default=True,

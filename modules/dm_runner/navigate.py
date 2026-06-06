@@ -8,8 +8,8 @@ from typing import Callable, Protocol
 from config.schema import AppConfig
 from core.events import EventType
 from modules.ui_nav.artifacts import ArtifactStore
-from modules.ui_nav.coords import load_nav_coords
-from modules.ui_nav.detectors import ScreenState, wait_for_state
+from modules.ui_nav.coords import load_nav_coords_for_hwnd
+from modules.ui_nav.detectors import ScreenState, detect_state, wait_for_state
 from modules.ui_nav.driver import NavDriver, SimDriver, create_driver
 from modules.ui_nav.errors import UiNavError, UiNavTimeoutError
 
@@ -33,18 +33,26 @@ class DmNavigator:
         login: str,
         emit: _Emit | None = None,
         hwnd: int | None = None,
+        on_nav_progress: Callable[[str], None] | None = None,
     ) -> None:
         self.config = config
         self.session_id = session_id
         self.login = login
         self.emit = emit
-        self.coords = load_nav_coords(config.cs_resolution)
+        self.hwnd = hwnd
+        self.on_nav_progress = on_nav_progress
+        self.coords = load_nav_coords_for_hwnd(
+            hwnd,
+            config.cs_resolution,
+            on_warn=self._nav_progress,
+        )
         self.artifacts = ArtifactStore(session_id)
         self.artifacts.save_json(
             "meta",
             {
                 "login": login,
                 "resolution": config.cs_resolution,
+                "hwnd": hwnd,
                 "game_search_timeout_sec": config.game_search_timeout_sec,
                 "map_load_delay_sec": config.map_load_delay_sec,
             },
@@ -54,6 +62,10 @@ class DmNavigator:
             self.artifacts,
             hwnd=hwnd,
         )
+
+    def _nav_progress(self, msg: str) -> None:
+        if self.on_nav_progress:
+            self.on_nav_progress(msg)
 
     def _set_sim_phase(self, state: ScreenState) -> None:
         if isinstance(self.driver, SimDriver):
@@ -69,6 +81,26 @@ class DmNavigator:
         if self.emit:
             self.emit(event, detail)
 
+    def _prepare_cs2_window(self) -> None:
+        if isinstance(self.driver, SimDriver):
+            return
+        try:
+            from modules.utils.windows import move_all_cs_windows
+
+            result = move_all_cs_windows(config=self.config)
+            if result.count:
+                self._nav_progress(
+                    f"dm layout: {result.count} CS window(s) → {result.width}x{result.height}"
+                )
+                if self.hwnd:
+                    self.coords = load_nav_coords_for_hwnd(
+                        self.hwnd,
+                        self.config.cs_resolution,
+                        on_warn=self._nav_progress,
+                    )
+        except Exception as exc:
+            self._nav_progress(f"dm layout skipped: {exc}")
+
     def wait_main_menu(self, timeout: float = 30.0) -> None:
         self._set_sim_phase(ScreenState.MAIN_MENU)
         wait_for_state(
@@ -79,11 +111,44 @@ class DmNavigator:
             timeout_sec=timeout,
         )
 
+    def _click_target(self, name: str) -> None:
+        before = self.driver.capture()
+        on_main_before = detect_state(before, ScreenState.MAIN_MENU, self.coords)
+        last_err: Exception | None = None
+        for attempt in range(1, 3):
+            pt = self.coords.click(name)
+            self._nav_progress(f"dm click {name} @({pt.x},{pt.y})")
+            try:
+                self.driver.click(pt)
+            except UiNavError as exc:
+                last_err = exc
+                time.sleep(0.3)
+                continue
+            time.sleep(0.55)
+            after = self.driver.capture()
+            self.artifacts.save_image(f"after_click_{name}_{attempt}", after)
+            self.artifacts.log_step(
+                "click",
+                target=name,
+                x=pt.x,
+                y=pt.y,
+                attempt=attempt,
+            )
+            if name == "main_menu_play" and on_main_before and not self.driver.sim:
+                if not detect_state(after, ScreenState.MAIN_MENU, self.coords):
+                    return
+                if attempt < 2:
+                    continue
+                raise UiNavError(f"click {name} did not leave main menu")
+            return
+        if last_err:
+            raise last_err
+        raise UiNavError(f"click {name} failed")
+
     def click_sequence_deathmatch(self) -> None:
         for name in ("main_menu_play", "mode_deathmatch", "start_search"):
-            pt = self.coords.click(name)
-            self.driver.click(pt)
-            self.artifacts.log_step("click", target=name, x=pt.x, y=pt.y)
+            self._click_target(name)
+            time.sleep(0.35)
 
     def navigate_to_dm(self) -> None:
         """Меню → поиск DM → in_dm (таймауты из config)."""
@@ -116,6 +181,7 @@ class DmNavigator:
         self._e(EventType.IN_DM, "dm_runner: in_dm")
 
     def navigate_to_dm_with_retries(self) -> None:
+        self._prepare_cs2_window()
         last_err: Exception | None = None
         for attempt in range(1, self.config.search_retries + 1):
             try:
@@ -147,6 +213,7 @@ class DmNavigator:
             )
         except UiNavTimeoutError:
             pt = self.coords.click("leave_match")
+            self._nav_progress(f"dm click leave_match @({pt.x},{pt.y})")
             self.driver.click(pt)
             self.artifacts.log_step("disconnect_click", target="leave_match")
         self._e(EventType.EXITED, "dm_runner: disconnected")

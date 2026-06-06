@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 import pytest
 
-from config.loader import ensure_config, load_config, save_config
+from config.loader import ensure_config
 from modules.utils import (
     kill_all_cs_and_steam,
     kill_all_with_confirm,
@@ -17,11 +17,15 @@ from modules.utils import (
 from modules.utils.errors import UtilsError, UtilsPlatformError
 
 
+@pytest.fixture(autouse=True)
+def _utils_sim(monkeypatch):
+    monkeypatch.setenv("UTILS_SIM", "1")
+
+
 @pytest.fixture
 def data_dir(tmp_path, monkeypatch):
     monkeypatch.setenv("FARM_PANEL_DATA_DIR", str(tmp_path))
     monkeypatch.setenv("UTILS_SIM", "1")
-    monkeypatch.setenv("UTILS_SKIP_CONFIRM", "1")
     ensure_config()
     return tmp_path
 
@@ -43,20 +47,8 @@ def test_kill_all_sim() -> None:
     assert result.simulated
 
 
-def test_kill_with_confirm_cancelled(data_dir, monkeypatch) -> None:
-    monkeypatch.delenv("UTILS_SKIP_CONFIRM", raising=False)
-    cfg = load_config()
-    cfg.utils_confirm_before_kill = True
-    save_config(cfg)
-    with patch("modules.utils.kill.confirm_kill", return_value=False):
-        result = kill_all_with_confirm(config=cfg)
-    assert result.cancelled
-    assert result.summary() == "cancelled"
-
-
-def test_kill_with_confirm_proceeds(data_dir) -> None:
-    with patch("modules.utils.kill.confirm_kill", return_value=True):
-        result = kill_all_with_confirm()
+def test_kill_with_confirm_proceeds_immediately(data_dir) -> None:
+    result = kill_all_with_confirm()
     assert not result.cancelled
     assert result.simulated
 
@@ -67,8 +59,7 @@ def test_recover_hang_calls_stop_callback(data_dir) -> None:
     def on_stop() -> None:
         stops.append("stopped")
 
-    with patch("modules.utils.kill.confirm_kill", return_value=True):
-        result = recover_hang(on_before_kill=on_stop)
+    result = recover_hang(on_before_kill=on_stop)
     assert stops == ["stopped"]
     assert result.ok
 
@@ -92,12 +83,3 @@ def test_kill_platform_without_sim(monkeypatch) -> None:
         pytest.skip("Windows uses real taskkill")
     with pytest.raises(UtilsPlatformError):
         kill_all_cs_and_steam()
-
-
-def test_should_confirm_respects_config(data_dir) -> None:
-    from modules.utils.confirm import should_confirm
-
-    cfg = load_config()
-    cfg.utils_confirm_before_kill = False
-    save_config(cfg)
-    assert should_confirm(cfg) is False
