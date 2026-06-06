@@ -28,7 +28,7 @@ cd dist\FarmPanel\vendor\looter
 npm install
 ```
 
-Опционально csgobot: см. `vendor/csgobot/README.md` (submodule + venv в **исходниках**, скопировать `vendor/csgobot` в dist при необходимости).
+Опционально csgobot: см. `docs/CSGOBOT_SETUP.md` (submodule + venv в **исходниках**, скопировать `vendor/csgobot` в dist при необходимости).
 
 ## Импорт аккаунтов (рекомендуется: import folder)
 

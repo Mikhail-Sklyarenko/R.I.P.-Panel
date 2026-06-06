@@ -55,10 +55,10 @@ Wrapper: `modules/looter/runner.py` (cwd `vendor/looter`, exit **1** = `loot_ok`
 
 ## vendor/csgobot (Git submodule, GPL)
 
-См. `vendor/csgobot/README.md`. Кратко:
+См. `docs/CSGOBOT_SETUP.md`. Кратко:
 
 ```bat
-git submodule add https://github.com/Priler/csgobot vendor/csgobot
+git submodule update --init --recursive vendor/csgobot
 cd vendor\csgobot
 python -m venv venv
 venv\Scripts\activate
