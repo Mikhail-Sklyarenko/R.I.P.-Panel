@@ -2,18 +2,18 @@
 meta:
   base_width: 360
   base_height: 270
-  cs2_build: "2025-06 Panorama RU @ 360x270 (ИГРАТЬ tab recalibrated)"
+  cs2_build: "2025-06 Panorama RU @ 360x270 (ИГРАТЬ tab x=217)"
 
 clicks:
-  main_menu_play: {x: 168, y: 16}
+  main_menu_play: {x: 217, y: 15}
   mode_deathmatch: {x: 72, y: 145}
   start_search: {x: 268, y: 248}
   leave_match: {x: 340, y: 12}
 
 detectors:
   main_menu:
-    - {x: 168, y: 28, rgb: [255, 176, 46], tolerance: 70}
-    - {x: 168, y: 14, rgb: [210, 210, 210], tolerance: 70}
+    - {x: 217, y: 28, rgb: [255, 176, 46], tolerance: 70}
+    - {x: 217, y: 14, rgb: [210, 210, 210], tolerance: 70}
   searching:
     - {x: 180, y: 135, rgb: [200, 200, 200], tolerance: 70}
     - {x: 180, y: 100, rgb: [160, 160, 160], tolerance: 65}

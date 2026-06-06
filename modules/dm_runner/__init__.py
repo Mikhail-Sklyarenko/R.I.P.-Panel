@@ -8,6 +8,7 @@ from typing import Any, Protocol
 from config.loader import load_config
 from config.schema import AppConfig
 from core.events import EventType
+from modules.dm_runner.errors import DmNavStopped
 from modules.dm_runner.navigate import DmNavigator
 from modules.ui_nav.errors import UiNavError, UiNavTimeoutError
 
@@ -47,6 +48,7 @@ def run(ctx: dict[str, Any] | None = None) -> bool:
             on_nav_progress=ctx.get("on_nav_progress"),
             menu_probe_warn=bool(ctx.get("cs2_menu_probe_warn")),
             menu_confirmed=bool(ctx.get("cs2_menu_confirmed")),
+            should_stop=lambda: bool(ctx.get("stop_requested")),
         )
     except UiNavError as exc:
         if emit:
@@ -55,6 +57,10 @@ def run(ctx: dict[str, Any] | None = None) -> bool:
     try:
         nav.navigate_to_dm_with_retries()
         return True
+    except DmNavStopped as exc:
+        if emit:
+            emit(EventType.EXITED, str(exc))
+        return False
     except (UiNavTimeoutError, UiNavError) as exc:
         if emit:
             emit(EventType.SESSION_FAILED, f"dm_runner: {exc}")

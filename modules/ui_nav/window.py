@@ -14,9 +14,15 @@ _CS2_TITLE_SUBSTRINGS = ("counter-strike 2", "counter-strike", "cs2")
 
 @dataclass(frozen=True)
 class MainMenuWaitResult:
-    ok: bool
+    """strict_ok: both main_menu probes matched (ИГРАТЬ tab, not Loadout)."""
+
+    strict_ok: bool
     timed_out: bool = False
     attempts: int = 0
+
+    @property
+    def ok(self) -> bool:
+        return self.strict_ok
 
 
 def _require_windows() -> None:
@@ -77,13 +83,17 @@ def wait_for_cs2_main_menu(
     poll_sec: float = 0.5,
     on_progress: Callable[[str], None] | None = None,
     artifacts=None,
-    min_match: int | None = 1,
+    min_match: int | None = None,
+    require_strict: bool = True,
 ) -> MainMenuWaitResult:
     """Poll until main_menu probes match. Timeout returns timed_out (no exception)."""
     _require_windows()
     from modules.ui_nav.capture import capture_client
     from modules.ui_nav.detectors import ScreenState, detect_state
 
+    probe_count = len(coords.probes("main_menu"))
+    strict_required = probe_count if probe_count else 1
+    soft_required = min_match if min_match is not None else 1
     deadline = time.monotonic() + timeout_sec
     last_log = 0.0
     attempt = 0
@@ -94,21 +104,43 @@ def wait_for_cs2_main_menu(
         attempt += 1
         img = capture_client(hwnd)
         last_img = img
+        strict = detect_state(
+            img,
+            ScreenState.MAIN_MENU,
+            coords,
+            min_match=strict_required,
+        )
         if artifacts is not None:
             artifacts.save_image(f"wait_main_menu_launch_{attempt}", img)
-            probe_count = len(coords.probes("main_menu"))
             artifacts.log_step(
                 "main_menu_probe",
                 attempt=attempt,
-                matched=int(detect_state(img, ScreenState.MAIN_MENU, coords, min_match=1)),
-                required=min_match if min_match is not None else probe_count,
+                matched=int(
+                    detect_state(img, ScreenState.MAIN_MENU, coords, min_match=1)
+                ),
+                strict=int(strict),
                 img_w=img.width,
                 img_h=img.height,
             )
-        if detect_state(img, ScreenState.MAIN_MENU, coords, min_match=min_match):
+        if require_strict:
+            if strict:
+                if artifacts is not None:
+                    artifacts.log_step(
+                        "main_menu_detect_ok",
+                        attempt=attempt,
+                        strict=True,
+                    )
+                return MainMenuWaitResult(strict_ok=True, attempts=attempt)
+        elif detect_state(
+            img, ScreenState.MAIN_MENU, coords, min_match=soft_required
+        ):
             if artifacts is not None:
-                artifacts.log_step("main_menu_detect_ok", attempt=attempt)
-            return MainMenuWaitResult(ok=True, attempts=attempt)
+                artifacts.log_step(
+                    "main_menu_detect_ok",
+                    attempt=attempt,
+                    strict=strict,
+                )
+            return MainMenuWaitResult(strict_ok=strict, attempts=attempt)
         now = time.monotonic()
         if on_progress and now - last_log >= 10.0:
             remaining = max(0, int(deadline - now))
@@ -122,7 +154,7 @@ def wait_for_cs2_main_menu(
             timeout_sec=timeout_sec,
             attempts=attempt,
         )
-    return MainMenuWaitResult(ok=False, timed_out=True, attempts=attempt)
+    return MainMenuWaitResult(strict_ok=False, timed_out=True, attempts=attempt)
 
 
 def is_valid_hwnd(hwnd: int) -> bool:

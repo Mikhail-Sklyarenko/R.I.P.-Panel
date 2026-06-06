@@ -124,9 +124,9 @@ def run(ctx: dict[str, Any] | None = None) -> bool:
             timeout_sec=float(menu_timeout),
             on_progress=on_cs2_progress,
             artifacts=artifacts,
-            min_match=1,
+            require_strict=True,
         )
-        if menu_result.ok:
+        if menu_result.strict_ok:
             ctx["cs2_menu_confirmed"] = True
             _emit(
                 EventType.CS2_OK,

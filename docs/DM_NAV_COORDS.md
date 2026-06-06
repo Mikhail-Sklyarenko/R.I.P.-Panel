@@ -14,6 +14,15 @@
 Если client area CS2 (например **375×308**) ≠ `cs_resolution`, в Main log:  
 `CS2 client … differs from cs_resolution …; autoscaling coords to client`
 
+## RU tab bar @ 360×270
+
+| Вкладка | ~X (центр) | Примечание |
+|---------|------------|------------|
+| ИНВЕНТАРЬ | ~115 | |
+| **СНАРЯЖЕНИЕ** | **~168** | **ложный main_menu** если probes сюда |
+| **ИГРАТЬ** | **~217** | `main_menu_play` + probes |
+| МАГАЗИН | ~255 | |
+
 ## Таймауты (config.yaml)
 
 | FSM `settings.json` | AppConfig | Default |
@@ -21,13 +30,13 @@
 | `GAME_SEARCH_TIMEOUT` | `game_search_timeout_sec` | 90 |
 | `MAP_LOAD_DELAY` | `map_load_delay_sec` | 65 |
 | `SEARCH_RETRIES_BEFORE_SHUFFLE` | `search_retries` | 5 |
-| — | `cs2_main_menu_wait_timeout_sec` | 120 |
+| — | `cs2_main_menu_wait_timeout_sec` | 120 (launcher strict + dm_runner pre-click) |
 
 ## Клики (база 360×270, Panorama RU)
 
 | ID | Назначение |
 |----|------------|
-| `main_menu_play` | Вкладка **ИГРАТЬ** (верх, центр) |
+| `main_menu_play` | Вкладка **ИГРАТЬ** @ **(217, 15)** |
 | `mode_deathmatch` | Режим Deathmatch на экране выбора |
 | `start_search` | GO / начать поиск |
 | `leave_match` | Запас: выход UI |
@@ -38,18 +47,18 @@ Main log при nav: `dm click main_menu_play @(x,y)` — если строк н
 
 | State | YAML key | Strict |
 |-------|----------|--------|
-| `main_menu` | `detectors.main_menu` | launcher: **1 из 2**; dm_runner pre-click: **soft 1/2** (или skip если launcher confirmed); `in_dm`: **все** |
+| `main_menu` | `detectors.main_menu` @ **x=217** | launcher + dm_runner confirmed: **2/2**; warn path: soft **1/2** |
 | `searching` | `detectors.searching` | N−1 из N |
-| `in_dm` | `detectors.in_dm` | **все** probes (HUD, не тёмный угол меню) |
+| `in_dm` | `detectors.in_dm` | **все** probes (HUD, не Loadout) |
 
-`in_dm` на чёрном меню **не** должен срабатывать.
+`cs2_menu_confirmed` в launcher — **только strict 2/2** на вкладке ИГРАТЬ.
 
 ## Launcher sequence
 
 1. `wait_for_cs2_hwnd` → `waiting for CS2 window…`
-2. `wait_for_cs2_main_menu` → `waiting for CS2 main menu…` (**soft**: min 1 of 2 probes; artifacts `wait_main_menu_launch_*.png`)
-3. `cs2_ok` → `cs2 menu ready (hwnd=…)` **или** `cs2 menu unconfirmed … trying dm nav` (timeout fallback, не `session_failed`)
-4. `dm_runner` → если launcher `cs2 menu ready`: **skip strict re-wait**, `dm click …` → `in_dm`
+2. `wait_for_cs2_main_menu` (**strict 2/2**, timeout 120s; artifacts `wait_main_menu_launch_*.png`)
+3. `cs2_ok` → `cs2 menu ready` **или** `cs2 menu unconfirmed … trying dm nav`
+4. `dm_runner` → strict wait before clicks if confirmed; `dm click …` → `in_dm`
 
 ## Artifacts
 
@@ -62,21 +71,19 @@ Main log при nav: `dm click main_menu_play @(x,y)` — если строк н
 ## Калибровка
 
 1. CS2 в **360×270** (`resources/cs2/cs2_video.txt`) или autoscale под фактический client.
-2. Скрины **client area** (не full desktop): меню, поиск, in_dm — `data/artifacts/{session_id}/wait_main_menu_*.png`.
-3. RGB pipette: `python scripts/sample_probe_rgb.py wait_main_menu_84.png X Y` → строка для yaml.
-4. Обновите `coords_360x270.yaml` (`main_menu` probes + `main_menu_play` click на вкладку **ИГРАТЬ**).
+2. Скрины **client area**: `wait_main_menu_*.png` с активной вкладкой **ИГРАТЬ**.
+3. RGB: `python scripts/sample_probe_rgb.py artifact.png 217 28` → yaml probe.
+4. Negative check: probes @ x=168 (СНАРЯЖЕНИЕ) **не** должны давать strict `main_menu`.
 5. Smoke: `set DM_NAV_SIM=0` → `python scripts/dm_nav_smoke.py --cycles 1`.
-
-Shared timeout: `cs2_main_menu_wait_timeout_sec` (launcher + dm_runner soft wait, default **120s**).
 
 ## Troubleshooting
 
 | Symptom | Check |
 |---------|--------|
-| Курсор не двигается | Main log: есть ли `dm click …`? Если нет — ложный `in_dm` или nav не стартовал |
-| `in_dm` на чёрном меню | Обновить build (strict `in_dm`); калибровать probes |
-| `timeout waiting for main_menu (45s)` при `cs2 menu ready` | Обновить build: dm_runner skip re-wait + soft probes; см. `wait_main_menu_*.png` |
-| Клики мимо | `load_nav_coords_for_hwnd` + Panorama coords (ИГРАТЬ сверху) |
+| `main_menu_play @(168,…)` на Loadout | Обновить yaml: **x=217** для ИГРАТЬ |
+| `wait_in_dm_*` на СНАРЯЖЕНИЕ | Клик не попал в ИГРАТЬ; см. `after_click_main_menu_play_1.png` |
+| `capture: invalid window handle` при Stop | Graceful: `dm nav: stopped or window closed` (без retry capture) |
+| Клики мимо | `sample_probe_rgb.py` + `coords_360x270.yaml` |
 
 ## Модули
 

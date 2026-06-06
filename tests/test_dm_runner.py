@@ -28,8 +28,8 @@ def data_dir(tmp_path, monkeypatch):
 def test_coords_load_and_scale() -> None:
     c = load_nav_coords("360x270")
     pt = c.click("main_menu_play")
-    assert pt.x == 180
-    assert pt.y == 28
+    assert pt.x == 217
+    assert pt.y == 15
 
 
 def test_sim_driver_detect_main_menu(data_dir) -> None:

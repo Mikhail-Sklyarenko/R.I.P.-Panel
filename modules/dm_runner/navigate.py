@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sys
 import time
 from typing import Callable, Protocol
 
@@ -11,6 +12,7 @@ from modules.ui_nav.artifacts import ArtifactStore
 from modules.ui_nav.coords import load_nav_coords_for_hwnd
 from modules.ui_nav.detectors import ScreenState, detect_state, wait_for_state
 from modules.ui_nav.driver import NavDriver, SimDriver, create_driver
+from modules.dm_runner.errors import DmNavStopped
 from modules.ui_nav.errors import UiNavError, UiNavTimeoutError
 
 
@@ -36,6 +38,7 @@ class DmNavigator:
         on_nav_progress: Callable[[str], None] | None = None,
         menu_probe_warn: bool = False,
         menu_confirmed: bool = False,
+        should_stop: Callable[[], bool] | None = None,
     ) -> None:
         self.config = config
         self.session_id = session_id
@@ -45,6 +48,7 @@ class DmNavigator:
         self.on_nav_progress = on_nav_progress
         self.menu_probe_warn = menu_probe_warn
         self.menu_confirmed = menu_confirmed
+        self.should_stop = should_stop
         self.coords = load_nav_coords_for_hwnd(
             hwnd,
             config.cs_resolution,
@@ -70,6 +74,19 @@ class DmNavigator:
     def _nav_progress(self, msg: str) -> None:
         if self.on_nav_progress:
             self.on_nav_progress(msg)
+
+    def _abort_if_stopped(self) -> None:
+        if self.should_stop and self.should_stop():
+            raise DmNavStopped("dm nav: stopped by operator")
+        if (
+            self.hwnd
+            and not isinstance(self.driver, SimDriver)
+            and sys.platform == "win32"
+        ):
+            from modules.ui_nav.window import is_valid_hwnd
+
+            if not is_valid_hwnd(self.hwnd):
+                raise DmNavStopped("dm nav: stopped or window closed")
 
     def _set_sim_phase(self, state: ScreenState) -> None:
         if isinstance(self.driver, SimDriver):
@@ -102,6 +119,8 @@ class DmNavigator:
                         self.config.cs_resolution,
                         on_warn=self._nav_progress,
                     )
+                if not isinstance(self.driver, SimDriver):
+                    time.sleep(0.5)
         except Exception as exc:
             self._nav_progress(f"dm layout skipped: {exc}")
 
@@ -129,17 +148,9 @@ class DmNavigator:
         menu_timeout = float(max(15, int(self.config.cs2_main_menu_wait_timeout_sec)))
         if self.menu_confirmed:
             self._nav_progress(
-                "dm nav: launcher confirmed main menu; proceeding to clicks"
+                "dm nav: launcher confirmed main menu (strict); waiting before clicks"
             )
-            if not isinstance(self.driver, SimDriver):
-                time.sleep(1.5)
-            try:
-                self.wait_main_menu(timeout=min(10.0, menu_timeout), min_match=1)
-            except UiNavTimeoutError:
-                self.artifacts.log_step(
-                    "main_menu_sanity_skip",
-                    detail="launcher confirmed",
-                )
+            self.wait_main_menu(timeout=menu_timeout, min_match=len(self.coords.probes("main_menu")))
             return
         if self.menu_probe_warn:
             self._nav_progress(
@@ -188,7 +199,9 @@ class DmNavigator:
 
     def navigate_to_dm(self) -> None:
         """Меню → поиск DM → in_dm (таймауты из config)."""
+        self._abort_if_stopped()
         self._pre_click_main_menu_wait()
+        self._abort_if_stopped()
         self._e(EventType.IN_MENU, "dm_runner: main menu")
 
         self.click_sequence_deathmatch()
@@ -221,9 +234,12 @@ class DmNavigator:
         last_err: Exception | None = None
         for attempt in range(1, self.config.search_retries + 1):
             try:
+                self._abort_if_stopped()
                 self.artifacts.log_step("dm_attempt", attempt=attempt)
                 self.navigate_to_dm()
                 return
+            except DmNavStopped:
+                raise
             except (UiNavTimeoutError, UiNavError) as exc:
                 last_err = exc
                 self.artifacts.log_step("dm_attempt_failed", attempt=attempt, err=str(exc))

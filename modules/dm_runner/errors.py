@@ -7,4 +7,9 @@ from modules.ui_nav.errors import UiNavError, UiNavTimeoutError
 DmRunnerError = UiNavError
 DmRunnerTimeoutError = UiNavTimeoutError
 
-__all__ = ["DmRunnerError", "DmRunnerTimeoutError"]
+
+class DmNavStopped(DmRunnerError):
+    """Navigation aborted (operator stop or CS2 window closed)."""
+
+
+__all__ = ["DmRunnerError", "DmRunnerTimeoutError", "DmNavStopped"]

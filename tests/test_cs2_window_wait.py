@@ -74,7 +74,7 @@ def test_launcher_emits_cs2_ok_after_window_wait(
         dismissed=0, found=0, detail="main only — no promo"
     )
     mock_load_coords.return_value = load_nav_coords("360x270")
-    mock_wait_menu.return_value = MainMenuWaitResult(ok=True, attempts=1)
+    mock_wait_menu.return_value = MainMenuWaitResult(strict_ok=True, attempts=1)
     mock_cs2.return_value = MagicMock(poll=MagicMock(return_value=None))
     monkeypatch.setattr("sys.platform", "win32")
 

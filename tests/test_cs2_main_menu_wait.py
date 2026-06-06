@@ -33,13 +33,15 @@ def test_wait_for_cs2_main_menu_ok_soft_probe(monkeypatch, tmp_path) -> None:
                 timeout_sec=2.0,
                 poll_sec=0.01,
                 artifacts=artifacts,
+                require_strict=False,
                 min_match=1,
             )
-    assert result == MainMenuWaitResult(ok=True, attempts=2)
+    assert result == MainMenuWaitResult(strict_ok=True, attempts=2)
     artifacts.save_image.assert_any_call("wait_main_menu_launch_1", img)
     artifacts.log_step.assert_any_call(
         "main_menu_detect_ok",
         attempt=2,
+        strict=True,
     )
 
 
@@ -61,6 +63,7 @@ def test_wait_for_cs2_main_menu_timeout_returns_result(monkeypatch, tmp_path) ->
                 min_match=1,
             )
     assert result.ok is False
+    assert result.strict_ok is False
     assert result.timed_out is True
     assert result.attempts >= 1
     artifacts.save_image.assert_any_call("wait_main_menu_launch_timeout", img)
@@ -105,7 +108,7 @@ def test_launcher_sets_menu_confirmed_on_ok(
         dismissed=0, found=0, detail="main only — no promo"
     )
     mock_load_coords.return_value = load_nav_coords("360x270")
-    mock_wait_menu.return_value = MainMenuWaitResult(ok=True, attempts=1)
+    mock_wait_menu.return_value = MainMenuWaitResult(strict_ok=True, attempts=1)
     monkeypatch.setattr("sys.platform", "win32")
 
     cfg = AppConfig(
@@ -153,7 +156,7 @@ def test_launcher_menu_timeout_emits_cs2_ok_with_warn(
         dismissed=0, found=0, detail="main only — no promo"
     )
     mock_load_coords.return_value = load_nav_coords("360x270")
-    mock_wait_menu.return_value = MainMenuWaitResult(ok=False, timed_out=True, attempts=10)
+    mock_wait_menu.return_value = MainMenuWaitResult(strict_ok=False, timed_out=True, attempts=10)
     monkeypatch.setattr("sys.platform", "win32")
 
     emitted: list[tuple[EventType, str]] = []
@@ -179,8 +182,61 @@ def test_launcher_menu_timeout_emits_cs2_ok_with_warn(
     cs2_detail = next(d for e, d in emitted if e == EventType.CS2_OK)
     assert "unconfirmed" in cs2_detail
     assert "trying dm nav" in cs2_detail
-    assert mock_wait_menu.call_args.kwargs.get("min_match") == 1
+    assert mock_wait_menu.call_args.kwargs.get("require_strict") is True
     assert mock_wait_menu.call_args.kwargs.get("artifacts") is not None
+
+
+@patch("modules.launcher.ArtifactStore")
+@patch("modules.launcher.proxy_check.check_proxy", return_value=(True, "ip ok"))
+@patch("modules.launcher.steam_promo_dismiss.dismiss_steam_promo")
+@patch("modules.ui_nav.window.wait_for_cs2_main_menu")
+@patch("modules.ui_nav.coords.load_nav_coords_for_hwnd")
+@patch("modules.ui_nav.window.wait_for_cs2_hwnd", return_value=9999)
+@patch("modules.launcher.cs2.launch_cs2")
+@patch("modules.launcher.steam.launch_steam")
+@patch("modules.launcher.steam_gui_login.login_steam_gui")
+@patch("modules.launcher.cleanup.kill_cs2")
+@patch("modules.launcher.cleanup.kill_all")
+def test_launcher_unconfirmed_when_not_strict(
+    _kill_all: MagicMock,
+    _kill_cs2: MagicMock,
+    mock_gui: MagicMock,
+    mock_steam: MagicMock,
+    mock_cs2: MagicMock,
+    mock_wait_hwnd: MagicMock,
+    mock_load_coords: MagicMock,
+    mock_wait_menu: MagicMock,
+    mock_dismiss: MagicMock,
+    _proxy: MagicMock,
+    _artifact_store: MagicMock,
+    monkeypatch,
+) -> None:
+    from modules.launcher import run
+    from modules.launcher.steam_gui_login import SteamGuiLoginResult
+    from modules.launcher.steam_promo_dismiss import SteamPromoDismissResult
+
+    mock_gui.return_value = SteamGuiLoginResult(ok=True, login="u1", detail="ok")
+    mock_dismiss.return_value = SteamPromoDismissResult(
+        dismissed=0, found=0, detail="main only — no promo"
+    )
+    mock_load_coords.return_value = load_nav_coords("360x270")
+    mock_wait_menu.return_value = MainMenuWaitResult(
+        strict_ok=False, timed_out=True, attempts=5
+    )
+    monkeypatch.setattr("sys.platform", "win32")
+
+    ctx: dict = {
+        "login": "u1",
+        "emit": lambda *a, **k: None,
+        "config": AppConfig(
+            steam_path=r"C:\Steam\steam.exe",
+            cs2_path=r"C:\CS2\cs2.exe",
+            steam_login_mode="gui",
+        ),
+    }
+    assert run(ctx) is True
+    assert ctx.get("cs2_menu_confirmed") is not True
+    assert ctx.get("cs2_menu_probe_warn") is True
 
 
 def test_dm_runner_logs_menu_probe_warn(tmp_path, monkeypatch) -> None:
