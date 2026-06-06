@@ -71,7 +71,9 @@ auto_collect_drop: true
 cooldown_between_accounts_sec: 180
 ```
 
-CS2: **оконный** режим, разрешение как в `cs_resolution`. Launcher копирует `resources/cs2/*` в cfg игры и exec `fsm.cfg` (Deathmatch).
+**AI Farm PC:** `cs_resolution: "1280x720"`, `bot_mode: ai` — см. `docs/AI_PC_PROFILE.md` и `docs/config.ai_pc.example.yaml`.
+
+CS2: **оконный** режим, разрешение как в `cs_resolution`. Launcher копирует `resources/cs2/profiles/{cs_resolution}/cs2_video.txt` (или default `cs2_video.txt` для 360×270) + convars в cfg игры и exec `fsm.cfg` (Deathmatch).
 
 ### Steam auto-login (B-STEAM-GUI, default)
 

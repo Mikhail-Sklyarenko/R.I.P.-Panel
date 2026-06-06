@@ -1,0 +1,26 @@
+# Weekly Care Package — 4 slots @ 1280x720 (draft_scaled_from_360)
+meta:
+  base_width: 1280
+  base_height: 720
+  calibration: draft_scaled_from_360
+
+detectors:
+  care_package:
+    - {x: 640, y: 106, rgb: [90, 140, 200], tolerance: 80}
+    - {x: 640, y: 533, rgb: [50, 55, 60], tolerance: 60}
+
+slots:
+  - id: 1
+    name_rect: {x: 99, y: 234, w: 256, h: 58}
+    click: {x: 227, y: 320}
+  - id: 2
+    name_rect: {x: 369, y: 234, w: 256, h: 58}
+    click: {x: 497, y: 320}
+  - id: 3
+    name_rect: {x: 640, y: 234, w: 256, h: 58}
+    click: {x: 768, y: 320}
+  - id: 4
+    name_rect: {x: 910, y: 234, w: 256, h: 58}
+    click: {x: 1038, y: 320}
+
+confirm_click: {x: 640, y: 608}

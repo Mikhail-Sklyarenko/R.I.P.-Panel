@@ -1,4 +1,4 @@
-"""Загрузка и масштабирование coords_360x270.yaml."""
+"""Загрузка и масштабирование CS2 ui_nav coords по cs_resolution профилю."""
 
 from __future__ import annotations
 
@@ -12,9 +12,32 @@ import yaml
 from config.paths import get_app_root
 from modules.ui_nav.errors import UiNavError
 
+_DEFAULT_RESOLUTION = "360x270"
 
-def _default_coords_path() -> Path:
-    return get_app_root() / "resources" / "ui_nav" / "coords_360x270.yaml"
+
+def _parse_resolution(resolution: str) -> tuple[int, int]:
+    raw = resolution.lower().replace(" ", "")
+    if "x" not in raw:
+        raise UiNavError(f"invalid cs_resolution: {resolution}")
+    w, h = raw.split("x", 1)
+    return int(w), int(h)
+
+
+def _resolution_profile(resolution: str) -> str:
+    w, h = _parse_resolution(resolution)
+    return f"{w}x{h}"
+
+
+def resolve_cs_coords_path(resolution: str = _DEFAULT_RESOLUTION) -> Path:
+    """Path to coords_{w}x{h}.yaml for cs_resolution (explicit profile, no silent fallback)."""
+    profile = _resolution_profile(resolution)
+    path = get_app_root() / "resources" / "ui_nav" / f"coords_{profile}.yaml"
+    if not path.is_file():
+        raise UiNavError(
+            f"CS2 coords profile missing: coords_{profile}.yaml "
+            f"(cs_resolution={profile}). See docs/AI_PC_PROFILE.md"
+        )
+    return path
 
 
 @dataclass(frozen=True)
@@ -39,6 +62,7 @@ class NavCoords:
     detectors: dict[str, list[ColorProbe]]
     scale_x: float = 1.0
     scale_y: float = 1.0
+    profile: str = _DEFAULT_RESOLUTION
 
     def click(self, name: str) -> Point:
         p = self.clicks[name]
@@ -56,14 +80,6 @@ class NavCoords:
                 )
             )
         return out
-
-
-def _parse_resolution(resolution: str) -> tuple[int, int]:
-    raw = resolution.lower().replace(" ", "")
-    if "x" not in raw:
-        raise UiNavError(f"invalid cs_resolution: {resolution}")
-    w, h = raw.split("x", 1)
-    return int(w), int(h)
 
 
 def _parse_coords_file(src: Path) -> tuple[int, int, dict[str, Point], dict[str, list[ColorProbe]]]:
@@ -91,33 +107,36 @@ def _parse_coords_file(src: Path) -> tuple[int, int, dict[str, Point], dict[str,
 
 
 def load_nav_coords(
-    resolution: str = "360x270",
+    resolution: str = _DEFAULT_RESOLUTION,
     path: Path | None = None,
 ) -> NavCoords:
-    src = path or _default_coords_path()
+    src = path or resolve_cs_coords_path(resolution)
     base_w, base_h, clicks, detectors = _parse_coords_file(src)
     target_w, target_h = _parse_resolution(resolution)
+    profile = _resolution_profile(resolution)
 
     return NavCoords(
         base_width=base_w,
         base_height=base_h,
         clicks=clicks,
         detectors=detectors,
-        scale_x=target_w / base_w,
-        scale_y=target_h / base_h,
+        scale_x=target_w / base_w if base_w else 1.0,
+        scale_y=target_h / base_h if base_h else 1.0,
+        profile=profile,
     )
 
 
 def load_nav_coords_for_hwnd(
     hwnd: int | None,
-    resolution: str = "360x270",
+    resolution: str = _DEFAULT_RESOLUTION,
     path: Path | None = None,
     *,
     on_warn: Callable[[str], None] | None = None,
 ) -> NavCoords:
     """Scale yaml base coords to actual CS2 client rect (preferred on Windows)."""
-    src = path or _default_coords_path()
+    src = path or resolve_cs_coords_path(resolution)
     base_w, base_h, clicks, detectors = _parse_coords_file(src)
+    profile = _resolution_profile(resolution)
 
     if hwnd is None or sys.platform != "win32":
         return load_nav_coords(resolution, path)
@@ -125,11 +144,10 @@ def load_nav_coords_for_hwnd(
     from modules.ui_nav.window import client_size
 
     client_w, client_h = client_size(hwnd)
-    cfg_w, cfg_h = _parse_resolution(resolution)
-    if on_warn and (abs(client_w - cfg_w) > 2 or abs(client_h - cfg_h) > 2):
+    if on_warn and (abs(client_w - base_w) > 2 or abs(client_h - base_h) > 2):
         on_warn(
-            f"CS2 client {client_w}x{client_h} differs from cs_resolution "
-            f"{cfg_w}x{cfg_h}; autoscaling coords to client"
+            f"CS2 client {client_w}x{client_h} differs from coords profile "
+            f"{profile} base {base_w}x{base_h}; autoscaling coords to client"
         )
 
     return NavCoords(
@@ -139,4 +157,5 @@ def load_nav_coords_for_hwnd(
         detectors=detectors,
         scale_x=client_w / base_w if base_w else 1.0,
         scale_y=client_h / base_h if base_h else 1.0,
+        profile=profile,
     )

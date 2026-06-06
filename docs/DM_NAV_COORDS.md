@@ -6,13 +6,14 @@
 
 | Параметр | Значение |
 |----------|----------|
-| CS2 build (калибровка) | **2025-06 Panorama RU** @ small window |
-| Базовое разрешение | **360×270** (`config.cs_resolution`, FSM `CS_RESOLUTION`) |
-| Файл coords | `resources/ui_nav/coords_360x270.yaml` |
-| Масштаб | `load_nav_coords_for_hwnd(hwnd)` — **autoscale от `GetClientRect`**, не только config |
+| CS2 build (калибровка) | **2025-06 Panorama RU** |
+| Default (lite / FSM) | **360×270** — `coords_360x270.yaml` |
+| AI Farm PC | **1280×720** windowed — `coords_1280x720.yaml` (см. `docs/AI_PC_PROFILE.md`) |
+| Выбор профиля | `config.cs_resolution` → `resolve_cs_coords_path()` |
+| Масштаб hwnd | `load_nav_coords_for_hwnd` — autoscale client rect к **base yaml**, не к 360 |
 
-Если client area CS2 (например **375×308**) ≠ `cs_resolution`, в Main log:  
-`CS2 client … differs from cs_resolution …; autoscaling coords to client`
+Если client area ≠ base профиля (например **375×308** при base 360×270), в Main log:  
+`CS2 client … differs from coords profile …; autoscaling coords to client`
 
 ## RU tab bar @ 360×270
 

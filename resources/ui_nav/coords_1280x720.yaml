@@ -1,0 +1,28 @@
+# UI coords for CS2 @ 1280x720 — Panorama RU windowed (AI Farm PC)
+# calibration: armoryfarm_screenshot_2025-06 (1024x600 window → client mapped to 1280x720)
+meta:
+  base_width: 1280
+  base_height: 720
+  calibration: armoryfarm_screenshot_2025-06
+  cs2_build: "2025-06 Panorama RU @ 1280x720 windowed (ИГРАТЬ + БОЙ НАСМЕРТЬ screen)"
+  note: "Mapped from operator screenshot; verify searching/in_dm on live grab"
+
+clicks:
+  main_menu_play: {x: 736, y: 20}
+  mode_deathmatch: {x: 358, y: 132}
+  start_search: {x: 1151, y: 685}
+  leave_match: {x: 1255, y: 19}
+
+detectors:
+  main_menu:
+    - {x: 736, y: 36, rgb: [204, 139, 61], tolerance: 70}
+    - {x: 736, y: 20, rgb: [248, 251, 252], tolerance: 70}
+  searching:
+    - {x: 640, y: 360, rgb: [200, 200, 200], tolerance: 70}
+    - {x: 640, y: 266, rgb: [160, 160, 160], tolerance: 65}
+  in_dm:
+    - {x: 99, y: 661, rgb: [240, 200, 60], tolerance: 80}
+    - {x: 195, y: 661, rgb: [200, 180, 40], tolerance: 75}
+  level_up:
+    - {x: 640, y: 192, rgb: [255, 210, 60], tolerance: 70}
+    - {x: 640, y: 253, rgb: [40, 120, 200], tolerance: 80}

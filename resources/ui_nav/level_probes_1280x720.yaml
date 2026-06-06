@@ -1,0 +1,9 @@
+# Level-up UI probes @ 1280x720 (draft_scaled_from_360)
+meta:
+  base_width: 1280
+  base_height: 720
+  calibration: draft_scaled_from_360
+
+level_up:
+  - {x: 640, y: 192, rgb: [255, 210, 60], tolerance: 70}
+  - {x: 640, y: 253, rgb: [40, 120, 200], tolerance: 80}

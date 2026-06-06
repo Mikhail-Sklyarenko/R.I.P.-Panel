@@ -1,0 +1,12 @@
+# Example config for dedicated AI Farm PC (copy to data/config.yaml)
+
+cs_resolution: "1280x720"
+bot_mode: ai
+
+# Set paths on your machine (Config #1 or edit here):
+steam_path: ""
+cs2_path: ""
+
+# Optional:
+# proxy_expected_ip: ""
+# combat_simple_minutes: 10

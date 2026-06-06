@@ -12,13 +12,26 @@ from config.paths import get_app_root
 from modules.ui_nav.coords import ColorProbe, load_nav_coords
 
 
-def _level_coords_path() -> Path:
-    return get_app_root() / "resources" / "ui_nav" / "level_probes.yaml"
+def _parse_res(resolution: str) -> tuple[int, int]:
+    w, h = resolution.lower().replace(" ", "").split("x", 1)
+    return int(w), int(h)
+
+
+def _level_coords_path(resolution: str = "360x270") -> Path | None:
+    w, h = _parse_res(resolution)
+    profile = f"{w}x{h}"
+    specific = get_app_root() / "resources" / "ui_nav" / f"level_probes_{profile}.yaml"
+    if specific.is_file():
+        return specific
+    default = get_app_root() / "resources" / "ui_nav" / "level_probes.yaml"
+    if default.is_file():
+        return default
+    return None
 
 
 def _load_level_probes(resolution: str) -> list[ColorProbe]:
-    level_path = _level_coords_path()
-    if level_path.is_file():
+    level_path = _level_coords_path(resolution)
+    if level_path is not None:
         data = yaml.safe_load(level_path.read_text(encoding="utf-8")) or {}
         base_w = int(data.get("meta", {}).get("base_width", 360))
         base_h = int(data.get("meta", {}).get("base_height", 270))
@@ -37,11 +50,6 @@ def _load_level_probes(resolution: str) -> list[ColorProbe]:
         return probes
     nav = load_nav_coords(resolution)
     return nav.probes("level_up") if "level_up" in nav.detectors else []
-
-
-def _parse_res(resolution: str) -> tuple[int, int]:
-    w, h = resolution.lower().split("x", 1)
-    return int(w), int(h)
 
 
 def _probe_match(img: Image.Image, probe: ColorProbe) -> bool:

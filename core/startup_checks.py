@@ -91,6 +91,26 @@ def collect_startup_warnings(config: AppConfig | None = None) -> list[str]:
     if not (root / "resources" / "cs2" / "fsm.cfg").is_file():
         warnings.append("resources/cs2/fsm.cfg missing")
 
+    cs_res = (cfg.cs_resolution or "360x270").lower().replace(" ", "")
+    if cs_res != "360x270":
+        coords_path = root / "resources" / "ui_nav" / f"coords_{cs_res}.yaml"
+        if not coords_path.is_file():
+            warnings.append(
+                f"coords_{cs_res}.yaml missing — set cs_resolution or add profile "
+                f"(see docs/AI_PC_PROFILE.md)"
+            )
+        drop_path = root / "resources" / "ui_nav" / f"drop_slots_{cs_res}.yaml"
+        if not drop_path.is_file():
+            warnings.append(
+                f"drop_slots_{cs_res}.yaml missing for cs_resolution={cs_res}"
+            )
+        video_profile = root / "resources" / "cs2" / "profiles" / cs_res / "cs2_video.txt"
+        if not video_profile.is_file():
+            warnings.append(
+                f"cs2 video profile missing: profiles/{cs_res}/cs2_video.txt "
+                f"(will fallback to 360x270 video.txt)"
+            )
+
     from modules.combat import csgobot_ai
 
     bot = cfg.bot_mode.value if hasattr(cfg.bot_mode, "value") else str(cfg.bot_mode)

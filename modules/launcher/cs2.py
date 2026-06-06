@@ -17,6 +17,24 @@ def _resources_cs2() -> Path:
     return get_resources_dir() / "cs2"
 
 
+def _parse_resolution(resolution: str) -> tuple[int, int]:
+    raw = resolution.lower().replace(" ", "")
+    w, h = raw.split("x", 1)
+    return int(w), int(h)
+
+
+def _video_profile_path(resolution: str) -> Path:
+    w, h = _parse_resolution(resolution)
+    profile = f"{w}x{h}"
+    profile_path = _resources_cs2() / "profiles" / profile / "cs2_video.txt"
+    if profile_path.is_file():
+        return profile_path
+    default = _resources_cs2() / "cs2_video.txt"
+    if not default.is_file():
+        raise LauncherError(f"missing resource: {default}")
+    return default
+
+
 def _require_windows() -> None:
     if sys.platform != "win32":
         raise LauncherPlatformError("cs2 launch is Windows-only")
@@ -60,16 +78,16 @@ def find_csgo_cfg_dir(cs2_exe: Path) -> Path:
     raise LauncherError(f"csgo/cfg not found near {cs2_exe}")
 
 
-def deploy_cs2_configs(cs2_exe: Path) -> Path:
+def deploy_cs2_configs(cs2_exe: Path, resolution: str = "360x270") -> Path:
     """Копировать video + convars; вернуть путь к exec fsm.cfg (в resources)."""
     cfg_dir = find_csgo_cfg_dir(cs2_exe)
     cfg_dir.mkdir(parents=True, exist_ok=True)
-    for name in ("cs2_video.txt", "cs2_machine_convars.vcfg"):
-        src = _resources_cs2() / name
-        if not src.is_file():
-            raise LauncherError(f"missing resource: {src}")
-        dest_name = "video.txt" if name == "cs2_video.txt" else name
-        shutil.copy2(src, cfg_dir / dest_name)
+    video_src = _video_profile_path(resolution)
+    shutil.copy2(video_src, cfg_dir / "video.txt")
+    convars_src = _resources_cs2() / "cs2_machine_convars.vcfg"
+    if not convars_src.is_file():
+        raise LauncherError(f"missing resource: {convars_src}")
+    shutil.copy2(convars_src, cfg_dir / convars_src.name)
     fsm_cfg = _resources_cs2() / "fsm.cfg"
     if not fsm_cfg.is_file():
         raise LauncherError(f"missing resource: {fsm_cfg}")
@@ -78,7 +96,7 @@ def deploy_cs2_configs(cs2_exe: Path) -> Path:
 
 def build_cs2_command(config: AppConfig) -> list[str]:
     exe = resolve_cs2_exe(config)
-    fsm_cfg = deploy_cs2_configs(exe)
+    fsm_cfg = deploy_cs2_configs(exe, config.cs_resolution)
     argv = [str(exe), *get_cs2_launch_argv(), "+exec", str(fsm_cfg)]
     return argv
 

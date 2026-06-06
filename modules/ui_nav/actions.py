@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
+import logging
 import sys
 import time
 
 from modules.ui_nav.coords import Point
 from modules.ui_nav.errors import UiNavError, UiNavPlatformError
 from modules.ui_nav.window import is_valid_hwnd
+
+_log = logging.getLogger(__name__)
+_attach_thread_input_warned = False
 
 
 def _require_live_hwnd(hwnd: int) -> None:
@@ -42,16 +46,32 @@ def focus_window(hwnd: int) -> None:
         foreground_thread = win32process.GetWindowThreadProcessId(foreground)[0]
         target_thread = win32process.GetWindowThreadProcessId(hwnd)[0]
         attached = False
-        if foreground_thread and foreground_thread != target_thread:
-            win32api.AttachThreadInput(foreground_thread, target_thread, True)
+        attach_fn = getattr(win32api, "AttachThreadInput", None)
+        if (
+            attach_fn is not None
+            and foreground_thread
+            and foreground_thread != target_thread
+        ):
+            attach_fn(foreground_thread, target_thread, True)
             attached = True
+        elif (
+            attach_fn is None
+            and foreground_thread
+            and foreground_thread != target_thread
+        ):
+            global _attach_thread_input_warned
+            if not _attach_thread_input_warned:
+                _log.warning(
+                    "focus_window: AttachThreadInput unavailable, using fallback"
+                )
+                _attach_thread_input_warned = True
         try:
             win32gui.ShowWindow(hwnd, win32con.SW_SHOW)
             win32gui.BringWindowToTop(hwnd)
             win32gui.SetForegroundWindow(hwnd)
         finally:
-            if attached:
-                win32api.AttachThreadInput(foreground_thread, target_thread, False)
+            if attached and attach_fn is not None:
+                attach_fn(foreground_thread, target_thread, False)
         time.sleep(0.15)
 
     _win32_ui_call(hwnd, "focus_window", _do)

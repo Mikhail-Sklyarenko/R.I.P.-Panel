@@ -12,8 +12,21 @@ from config.paths import get_app_root
 from modules.drop_picker.errors import DropPickerError
 
 
-def _slots_file() -> Path:
-    return get_app_root() / "resources" / "ui_nav" / "drop_slots_360x270.yaml"
+def _parse_resolution(resolution: str) -> tuple[int, int]:
+    w, h = resolution.lower().replace(" ", "").split("x", 1)
+    return int(w), int(h)
+
+
+def _slots_file(resolution: str = "360x270") -> Path:
+    w, h = _parse_resolution(resolution)
+    profile = f"{w}x{h}"
+    path = get_app_root() / "resources" / "ui_nav" / f"drop_slots_{profile}.yaml"
+    if not path.is_file():
+        raise DropPickerError(
+            f"drop slots profile missing: drop_slots_{profile}.yaml "
+            f"(cs_resolution={profile}). See docs/AI_PC_PROFILE.md"
+        )
+    return path
 
 
 @dataclass(frozen=True)
@@ -41,20 +54,18 @@ class DropLayout:
     care_package_probes: list[tuple[int, int, tuple[int, int, int], int]]
     scale_x: float = 1.0
     scale_y: float = 1.0
-
-
-def _parse_resolution(resolution: str) -> tuple[int, int]:
-    w, h = resolution.lower().split("x", 1)
-    return int(w), int(h)
+    profile: str = "360x270"
 
 
 def load_drop_layout(resolution: str = "360x270") -> DropLayout:
-    data = yaml.safe_load(_slots_file().read_text(encoding="utf-8"))
+    w, h = _parse_resolution(resolution)
+    profile = f"{w}x{h}"
+    data = yaml.safe_load(_slots_file(resolution).read_text(encoding="utf-8"))
     meta = data.get("meta", {})
-    base_w = int(meta.get("base_width", 360))
-    base_h = int(meta.get("base_height", 270))
-    tw, th = _parse_resolution(resolution)
-    sx, sy = tw / base_w, th / base_h
+    base_w = int(meta.get("base_width", w))
+    base_h = int(meta.get("base_height", h))
+    sx = w / base_w if base_w else 1.0
+    sy = h / base_h if base_h else 1.0
 
     slots: list[SlotLayout] = []
     for raw in data.get("slots", []):
@@ -95,6 +106,7 @@ def load_drop_layout(resolution: str = "360x270") -> DropLayout:
         care_package_probes=probes,
         scale_x=sx,
         scale_y=sy,
+        profile=profile,
     )
 
 
