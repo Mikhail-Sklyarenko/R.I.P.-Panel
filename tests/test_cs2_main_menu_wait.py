@@ -23,20 +23,39 @@ def test_wait_for_cs2_main_menu_ok_soft_probe(monkeypatch, tmp_path) -> None:
 
     def fake_detect(_img, _state, _coords, *, min_match=None):
         call["n"] += 1
-        return call["n"] >= 4
+        return call["n"] >= 5
+
+    def fake_probe_results(_img, _state, _coords):
+        from modules.ui_nav.detectors import ProbeMatchResult
+
+        call["n"] += 1
+        hit = call["n"] >= 4
+        return [
+            ProbeMatchResult(
+                matched=hit,
+                x=217,
+                y=26,
+                actual_rgb=(30, 30, 30),
+                expected_rgb=(238, 169, 41),
+            )
+        ]
 
     with patch("modules.ui_nav.capture.capture_client", return_value=img):
         with patch("modules.ui_nav.detectors.detect_state", side_effect=fake_detect):
-            result = wait_for_cs2_main_menu(
-                4242,
-                coords,
-                timeout_sec=2.0,
-                poll_sec=0.01,
-                artifacts=artifacts,
-                require_strict=False,
-                min_match=1,
-            )
-    assert result == MainMenuWaitResult(strict_ok=True, attempts=2)
+            with patch(
+                "modules.ui_nav.detectors.probe_match_results",
+                side_effect=fake_probe_results,
+            ):
+                result = wait_for_cs2_main_menu(
+                    4242,
+                    coords,
+                    timeout_sec=2.0,
+                    poll_sec=0.01,
+                    artifacts=artifacts,
+                    require_strict=False,
+                    min_match=1,
+                )
+    assert result == MainMenuWaitResult(strict_ok=True, attempts=2, soft_peek=True)
     artifacts.save_image.assert_any_call("wait_main_menu_launch_1", img)
     artifacts.log_step.assert_any_call(
         "main_menu_detect_ok",
@@ -221,7 +240,7 @@ def test_launcher_unconfirmed_when_not_strict(
     )
     mock_load_coords.return_value = load_nav_coords("360x270")
     mock_wait_menu.return_value = MainMenuWaitResult(
-        strict_ok=False, timed_out=True, attempts=5
+        strict_ok=False, timed_out=True, attempts=5, soft_peek=True
     )
     monkeypatch.setattr("sys.platform", "win32")
 
@@ -237,6 +256,7 @@ def test_launcher_unconfirmed_when_not_strict(
     assert run(ctx) is True
     assert ctx.get("cs2_menu_confirmed") is not True
     assert ctx.get("cs2_menu_probe_warn") is True
+    assert ctx.get("cs2_menu_soft_peek") is True
 
 
 def test_dm_runner_logs_menu_probe_warn(tmp_path, monkeypatch) -> None:

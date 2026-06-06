@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -11,7 +14,57 @@ from config.schema import AppConfig
 from core.events import EventType
 from modules.ui_nav.coords import load_nav_coords, load_nav_coords_for_hwnd
 from modules.ui_nav.detectors import ScreenState, detect_state
+from modules.ui_nav.errors import UiNavTimeoutError
 from modules.ui_nav.window import MainMenuWaitResult
+
+FIXTURES = Path(__file__).resolve().parent / "fixtures" / "armoryfarm" / "z3l9272eg3"
+
+
+def test_armoryfarm_timeout_png_strict_main_menu() -> None:
+    coords = load_nav_coords("360x270")
+    img = Image.open(FIXTURES / "wait_main_menu_launch_timeout.png").convert("RGB")
+    assert img.size == (360, 270)
+    assert detect_state(img, ScreenState.MAIN_MENU, coords, min_match=2) is True
+    assert detect_state(img, ScreenState.MAIN_MENU, coords, min_match=1) is True
+
+
+def test_steps_jsonl_pattern_soft_peek_only_early() -> None:
+    lines = (FIXTURES / "steps.jsonl").read_text(encoding="utf-8").strip().splitlines()
+    probes = [json.loads(line) for line in lines if '"main_menu_probe"' in line]
+    assert len(probes) == 223
+    assert all(p.get("strict") == 0 for p in probes)
+    soft_hits = [p for p in probes if p.get("matched") == 1]
+    assert [p["attempt"] for p in soft_hits] == [10, 11, 12, 14]
+    assert probes[-1]["attempt"] == 223
+    assert probes[-1]["matched"] == 0
+
+
+def test_dm_runner_fallback_after_menu_timeout(data_dir, monkeypatch) -> None:
+    monkeypatch.setenv("DM_NAV_SIM", "1")
+    from modules.dm_runner.navigate import DmNavigator
+
+    coords = load_nav_coords("360x270")
+    progress: list[str] = []
+    nav = DmNavigator(
+        config=AppConfig(
+            map_load_delay_sec=10,
+            game_search_timeout_sec=10,
+            search_retries=1,
+            cs2_main_menu_wait_timeout_sec=120,
+        ),
+        session_id="fallback1",
+        login="u1",
+        menu_probe_warn=True,
+        on_nav_progress=progress.append,
+    )
+
+    with patch.object(nav, "wait_main_menu", side_effect=UiNavTimeoutError("timeout")):
+        with patch.object(nav, "_click_target") as mock_click:
+            assert nav._pre_click_main_menu_wait() is True
+            mock_click.assert_called_once_with("main_menu_play")
+    pt = coords.click("main_menu_play")
+    assert pt.x == 217
+    assert any("controlled click ИГРАТЬ @(217,14)" in line for line in progress)
 
 
 def test_strict_in_dm_rejects_black_image() -> None:
@@ -52,7 +105,7 @@ def test_autoscale_client_375x308(monkeypatch) -> None:
         coords = load_nav_coords_for_hwnd(12345, "360x270")
     pt = coords.click("main_menu_play")
     assert pt.x == pytest.approx(226, abs=1)
-    assert pt.y == pytest.approx(17, abs=1)
+    assert pt.y == pytest.approx(16, abs=1)
 
 
 def test_load_nav_coords_for_hwnd_warns_on_mismatch(monkeypatch) -> None:

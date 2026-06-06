@@ -29,7 +29,7 @@ def test_coords_load_and_scale() -> None:
     c = load_nav_coords("360x270")
     pt = c.click("main_menu_play")
     assert pt.x == 217
-    assert pt.y == 15
+    assert pt.y == 14
 
 
 def test_sim_driver_detect_main_menu(data_dir) -> None:

@@ -134,6 +134,8 @@ def run(ctx: dict[str, Any] | None = None) -> bool:
             )
         else:
             ctx["cs2_menu_probe_warn"] = True
+            if menu_result.soft_peek:
+                ctx["cs2_menu_soft_peek"] = True
             _emit(
                 EventType.CS2_OK,
                 f"cs2 menu unconfirmed after {menu_timeout}s (hwnd={cs2_hwnd}); trying dm nav",

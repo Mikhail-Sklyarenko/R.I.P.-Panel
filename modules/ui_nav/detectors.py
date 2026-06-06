@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import time
+from dataclasses import dataclass
 from enum import Enum
 
 from PIL import Image
@@ -28,16 +29,54 @@ _STATE_MAP = {
 _STRICT_STATES = frozenset({ScreenState.MAIN_MENU, ScreenState.IN_DM})
 
 
-def _probe_match(img: Image.Image, probe: ColorProbe) -> bool:
+@dataclass(frozen=True)
+class ProbeMatchResult:
+    matched: bool
+    x: int
+    y: int
+    actual_rgb: tuple[int, int, int]
+    expected_rgb: tuple[int, int, int]
+
+
+def _probe_pixel(img: Image.Image, probe: ColorProbe) -> tuple[int, int, int] | None:
     x, y = probe.x, probe.y
     if x >= img.width or y >= img.height:
+        return None
+    return img.getpixel((x, y))[:3]
+
+
+def _probe_match(img: Image.Image, probe: ColorProbe) -> bool:
+    px = _probe_pixel(img, probe)
+    if px is None:
         return False
-    r, g, b = img.getpixel((x, y))[:3]
+    r, g, b = px
     tr, tg, tb = probe.rgb
     tol = probe.tolerance
     return (
         abs(r - tr) <= tol and abs(g - tg) <= tol and abs(b - tb) <= tol
     )
+
+
+def probe_match_results(
+    img: Image.Image,
+    state: ScreenState,
+    coords: NavCoords,
+) -> list[ProbeMatchResult]:
+    key = _STATE_MAP[state]
+    out: list[ProbeMatchResult] = []
+    for probe in coords.probes(key):
+        px = _probe_pixel(img, probe)
+        actual = px if px is not None else (0, 0, 0)
+        out.append(
+            ProbeMatchResult(
+                matched=_probe_match(img, probe) if px is not None else False,
+                x=probe.x,
+                y=probe.y,
+                actual_rgb=actual,
+                expected_rgb=probe.rgb,
+            )
+        )
+    return out
 
 
 def _required_matches(state: ScreenState, probe_count: int, min_match: int | None) -> int:

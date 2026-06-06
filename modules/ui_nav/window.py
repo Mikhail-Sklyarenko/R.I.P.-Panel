@@ -19,6 +19,7 @@ class MainMenuWaitResult:
     strict_ok: bool
     timed_out: bool = False
     attempts: int = 0
+    soft_peek: bool = False
 
     @property
     def ok(self) -> bool:
@@ -89,7 +90,7 @@ def wait_for_cs2_main_menu(
     """Poll until main_menu probes match. Timeout returns timed_out (no exception)."""
     _require_windows()
     from modules.ui_nav.capture import capture_client
-    from modules.ui_nav.detectors import ScreenState, detect_state
+    from modules.ui_nav.detectors import ScreenState, detect_state, probe_match_results
 
     probe_count = len(coords.probes("main_menu"))
     strict_required = probe_count if probe_count else 1
@@ -98,12 +99,18 @@ def wait_for_cs2_main_menu(
     last_log = 0.0
     attempt = 0
     last_img = None
+    last_probe_results = []
+    soft_peek = False
     if on_progress:
         on_progress("waiting for CS2 main menu…")
     while time.monotonic() < deadline:
         attempt += 1
         img = capture_client(hwnd)
         last_img = img
+        probe_results = probe_match_results(img, ScreenState.MAIN_MENU, coords)
+        last_probe_results = probe_results
+        soft_hit = sum(1 for r in probe_results if r.matched) >= 1
+        soft_peek = soft_peek or soft_hit
         strict = detect_state(
             img,
             ScreenState.MAIN_MENU,
@@ -112,16 +119,18 @@ def wait_for_cs2_main_menu(
         )
         if artifacts is not None:
             artifacts.save_image(f"wait_main_menu_launch_{attempt}", img)
-            artifacts.log_step(
-                "main_menu_probe",
-                attempt=attempt,
-                matched=int(
-                    detect_state(img, ScreenState.MAIN_MENU, coords, min_match=1)
-                ),
-                strict=int(strict),
-                img_w=img.width,
-                img_h=img.height,
-            )
+            probe_kwargs: dict = {
+                "attempt": attempt,
+                "matched": int(soft_hit),
+                "strict": int(strict),
+                "img_w": img.width,
+                "img_h": img.height,
+            }
+            for idx, result in enumerate(probe_results[:2]):
+                probe_kwargs[f"p{idx}"] = int(result.matched)
+                probe_kwargs[f"rgb{idx}"] = list(result.actual_rgb)
+                probe_kwargs[f"exp{idx}"] = list(result.expected_rgb)
+            artifacts.log_step("main_menu_probe", **probe_kwargs)
         if require_strict:
             if strict:
                 if artifacts is not None:
@@ -130,7 +139,11 @@ def wait_for_cs2_main_menu(
                         attempt=attempt,
                         strict=True,
                     )
-                return MainMenuWaitResult(strict_ok=True, attempts=attempt)
+                return MainMenuWaitResult(
+                    strict_ok=True,
+                    attempts=attempt,
+                    soft_peek=soft_peek,
+                )
         elif detect_state(
             img, ScreenState.MAIN_MENU, coords, min_match=soft_required
         ):
@@ -140,7 +153,11 @@ def wait_for_cs2_main_menu(
                     attempt=attempt,
                     strict=strict,
                 )
-            return MainMenuWaitResult(strict_ok=strict, attempts=attempt)
+            return MainMenuWaitResult(
+                strict_ok=strict,
+                attempts=attempt,
+                soft_peek=soft_peek or soft_hit,
+            )
         now = time.monotonic()
         if on_progress and now - last_log >= 10.0:
             remaining = max(0, int(deadline - now))
@@ -154,7 +171,21 @@ def wait_for_cs2_main_menu(
             timeout_sec=timeout_sec,
             attempts=attempt,
         )
-    return MainMenuWaitResult(strict_ok=False, timed_out=True, attempts=attempt)
+    if on_progress and last_probe_results:
+        r0 = last_probe_results[0]
+        p1 = int(last_probe_results[1].matched) if len(last_probe_results) > 1 else 0
+        on_progress(
+            "main_menu timeout: "
+            f"p0={int(r0.matched)} p1={p1} "
+            f"last@({r0.x},{r0.y})={list(r0.actual_rgb)} "
+            f"expected={list(r0.expected_rgb)}"
+        )
+    return MainMenuWaitResult(
+        strict_ok=False,
+        timed_out=True,
+        attempts=attempt,
+        soft_peek=soft_peek,
+    )
 
 
 def is_valid_hwnd(hwnd: int) -> bool:
