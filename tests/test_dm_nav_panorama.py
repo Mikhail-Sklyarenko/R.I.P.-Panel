@@ -11,6 +11,7 @@ from config.schema import AppConfig
 from core.events import EventType
 from modules.ui_nav.coords import load_nav_coords, load_nav_coords_for_hwnd
 from modules.ui_nav.detectors import ScreenState, detect_state
+from modules.ui_nav.window import MainMenuWaitResult
 
 
 def test_strict_in_dm_rejects_black_image() -> None:
@@ -25,13 +26,21 @@ def test_strict_main_menu_rejects_black_image() -> None:
     assert detect_state(img, ScreenState.MAIN_MENU, coords) is False
 
 
+def test_main_menu_detects_synthetic_probe_colors() -> None:
+    coords = load_nav_coords("360x270")
+    img = Image.new("RGB", (360, 270), (0, 0, 0))
+    for probe in coords.probes("main_menu"):
+        img.putpixel((probe.x, probe.y), probe.rgb)
+    assert detect_state(img, ScreenState.MAIN_MENU, coords) is True
+
+
 def test_autoscale_client_375x308(monkeypatch) -> None:
     monkeypatch.setattr("sys.platform", "win32")
     with patch("modules.ui_nav.window.client_size", return_value=(375, 308)):
         coords = load_nav_coords_for_hwnd(12345, "360x270")
     pt = coords.click("main_menu_play")
-    assert pt.x == pytest.approx(187, abs=1)
-    assert pt.y == pytest.approx(32, abs=1)
+    assert pt.x == pytest.approx(175, abs=1)
+    assert pt.y == pytest.approx(18, abs=1)
 
 
 def test_load_nav_coords_for_hwnd_warns_on_mismatch(monkeypatch) -> None:
@@ -76,6 +85,7 @@ def test_launcher_waits_main_menu_before_cs2_ok(
         dismissed=0, found=0, detail="main only — no promo"
     )
     mock_load_coords.return_value = load_nav_coords("360x270")
+    mock_wait_menu.return_value = MainMenuWaitResult(ok=True, attempts=1)
     monkeypatch.setattr("sys.platform", "win32")
 
     emitted: list[tuple[EventType, str]] = []
@@ -92,6 +102,48 @@ def test_launcher_waits_main_menu_before_cs2_ok(
     mock_wait_menu.assert_called_once()
     cs2_detail = next(d for e, d in emitted if e == EventType.CS2_OK)
     assert "menu ready" in cs2_detail
+
+
+def test_menu_confirmed_skips_long_pre_click_wait(data_dir, monkeypatch) -> None:
+    monkeypatch.setenv("DM_NAV_SIM", "1")
+    from modules.dm_runner.navigate import DmNavigator
+
+    nav = DmNavigator(
+        config=AppConfig(
+            map_load_delay_sec=10,
+            game_search_timeout_sec=10,
+            search_retries=1,
+            cs2_main_menu_wait_timeout_sec=120,
+        ),
+        session_id="confirmed1",
+        login="u1",
+        menu_confirmed=True,
+    )
+    progress: list[str] = []
+
+    with patch.object(nav, "wait_main_menu") as mock_wait:
+        with patch.object(nav, "click_sequence_deathmatch") as mock_clicks:
+            nav.navigate_to_dm_with_retries()
+            mock_wait.assert_called_once()
+            assert mock_wait.call_args.kwargs.get("timeout") == 10.0
+            assert mock_wait.call_args.kwargs.get("min_match") == 1
+            mock_clicks.assert_called_once()
+
+    nav2 = DmNavigator(
+        config=AppConfig(
+            map_load_delay_sec=10,
+            game_search_timeout_sec=10,
+            search_retries=1,
+        ),
+        session_id="warn1",
+        login="u1",
+        menu_probe_warn=True,
+    )
+    with patch.object(nav2, "wait_main_menu") as mock_wait:
+        with patch.object(nav2, "click_sequence_deathmatch"):
+            nav2._pre_click_main_menu_wait()
+            mock_wait.assert_called_once()
+            assert mock_wait.call_args.kwargs.get("min_match") == 1
 
 
 @pytest.fixture

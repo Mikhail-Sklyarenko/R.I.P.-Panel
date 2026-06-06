@@ -46,6 +46,7 @@ def run(ctx: dict[str, Any] | None = None) -> bool:
             hwnd=ctx.get("hwnd"),
             on_nav_progress=ctx.get("on_nav_progress"),
             menu_probe_warn=bool(ctx.get("cs2_menu_probe_warn")),
+            menu_confirmed=bool(ctx.get("cs2_menu_confirmed")),
         )
     except UiNavError as exc:
         if emit:

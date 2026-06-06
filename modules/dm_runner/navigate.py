@@ -35,6 +35,7 @@ class DmNavigator:
         hwnd: int | None = None,
         on_nav_progress: Callable[[str], None] | None = None,
         menu_probe_warn: bool = False,
+        menu_confirmed: bool = False,
     ) -> None:
         self.config = config
         self.session_id = session_id
@@ -43,6 +44,7 @@ class DmNavigator:
         self.hwnd = hwnd
         self.on_nav_progress = on_nav_progress
         self.menu_probe_warn = menu_probe_warn
+        self.menu_confirmed = menu_confirmed
         self.coords = load_nav_coords_for_hwnd(
             hwnd,
             config.cs_resolution,
@@ -103,16 +105,47 @@ class DmNavigator:
         except Exception as exc:
             self._nav_progress(f"dm layout skipped: {exc}")
 
-    def wait_main_menu(self, timeout: float = 30.0) -> None:
+    def wait_main_menu(
+        self,
+        timeout: float | None = None,
+        *,
+        min_match: int | None = None,
+    ) -> None:
         self._set_sim_phase(ScreenState.MAIN_MENU)
+        if timeout is None:
+            timeout = float(self.config.cs2_main_menu_wait_timeout_sec)
+        if min_match is None:
+            min_match = len(self.coords.probes("main_menu"))
         wait_for_state(
             self.driver,
             ScreenState.MAIN_MENU,
             self.coords,
             self.artifacts,
             timeout_sec=timeout,
-            min_match=len(self.coords.probes("main_menu")),
+            min_match=min_match,
         )
+
+    def _pre_click_main_menu_wait(self) -> None:
+        menu_timeout = float(max(15, int(self.config.cs2_main_menu_wait_timeout_sec)))
+        if self.menu_confirmed:
+            self._nav_progress(
+                "dm nav: launcher confirmed main menu; proceeding to clicks"
+            )
+            if not isinstance(self.driver, SimDriver):
+                time.sleep(1.5)
+            try:
+                self.wait_main_menu(timeout=min(10.0, menu_timeout), min_match=1)
+            except UiNavTimeoutError:
+                self.artifacts.log_step(
+                    "main_menu_sanity_skip",
+                    detail="launcher confirmed",
+                )
+            return
+        if self.menu_probe_warn:
+            self._nav_progress(
+                "dm nav: main menu was not confirmed at launch; soft probe wait"
+            )
+        self.wait_main_menu(timeout=menu_timeout, min_match=1)
 
     def _click_target(self, name: str) -> None:
         before = self.driver.capture()
@@ -155,7 +188,7 @@ class DmNavigator:
 
     def navigate_to_dm(self) -> None:
         """Меню → поиск DM → in_dm (таймауты из config)."""
-        self.wait_main_menu(timeout=45.0)
+        self._pre_click_main_menu_wait()
         self._e(EventType.IN_MENU, "dm_runner: main menu")
 
         self.click_sequence_deathmatch()
@@ -185,10 +218,6 @@ class DmNavigator:
 
     def navigate_to_dm_with_retries(self) -> None:
         self._prepare_cs2_window()
-        if self.menu_probe_warn:
-            self._nav_progress(
-                "dm nav: main menu was not confirmed at launch; strict probe wait"
-            )
         last_err: Exception | None = None
         for attempt in range(1, self.config.search_retries + 1):
             try:

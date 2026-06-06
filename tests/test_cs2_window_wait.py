@@ -102,6 +102,7 @@ def test_launcher_emits_cs2_ok_after_window_wait(
     on_progress("waiting for CS2 window…")
     assert progress == ["waiting for CS2 window…"]
     assert ctx.get("cs2_hwnd") == 9999
+    assert ctx.get("cs2_menu_confirmed") is True
     assert EventType.CS2_OK in [e for e, _ in emitted]
     cs2_detail = next(d for e, d in emitted if e == EventType.CS2_OK)
     assert "menu ready" in cs2_detail

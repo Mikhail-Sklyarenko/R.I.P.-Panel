@@ -127,6 +127,7 @@ def run(ctx: dict[str, Any] | None = None) -> bool:
             min_match=1,
         )
         if menu_result.ok:
+            ctx["cs2_menu_confirmed"] = True
             _emit(
                 EventType.CS2_OK,
                 f"cs2 menu ready (hwnd={cs2_hwnd})",

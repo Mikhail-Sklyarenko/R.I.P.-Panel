@@ -29,6 +29,7 @@ class SessionContext:
     only_launch_steam: bool = False
     cs2_hwnd: int | None = None
     cs2_menu_probe_warn: bool = False
+    cs2_menu_confirmed: bool = False
 
     def emit(
         self,
@@ -104,6 +105,7 @@ def _hook_launcher(ctx: SessionContext) -> bool:
         return False
     ctx.cs2_hwnd = run_ctx.get("cs2_hwnd")
     ctx.cs2_menu_probe_warn = bool(run_ctx.get("cs2_menu_probe_warn"))
+    ctx.cs2_menu_confirmed = bool(run_ctx.get("cs2_menu_confirmed"))
     if run_ctx.get("stop_after_steam"):
         ctx.only_launch_steam = True
         ctx.state = advance(ctx.state, SessionState.CLEANUP)
@@ -137,6 +139,8 @@ def _dm_ctx(ctx: SessionContext) -> dict:
         dm["hwnd"] = ctx.cs2_hwnd
     if ctx.cs2_menu_probe_warn:
         dm["cs2_menu_probe_warn"] = True
+    if ctx.cs2_menu_confirmed:
+        dm["cs2_menu_confirmed"] = True
     return dm
 
 

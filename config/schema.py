@@ -93,7 +93,7 @@ class AppConfig(BaseModel):
     cs2_main_menu_wait_timeout_sec: int = Field(
         default=120,
         ge=15,
-        description="Таймаут ожидания главного меню CS2 после hwnd",
+        description="Launcher + dm_runner main-menu wait (shared timeout, default 120s)",
     )
     search_retries: int = Field(
         default=5, ge=1, description="FSM SEARCH_RETRIES_BEFORE_SHUFFLE"
