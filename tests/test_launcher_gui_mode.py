@@ -11,6 +11,7 @@ from modules.launcher.steam_auth import SteamAuthResult
 from modules.launcher.steam_gui_login import SteamGuiLoginResult
 
 
+@patch("modules.launcher.ArtifactStore")
 @patch("modules.ui_nav.window.wait_for_cs2_main_menu")
 @patch("modules.ui_nav.coords.load_nav_coords_for_hwnd")
 @patch("modules.ui_nav.window.wait_for_cs2_hwnd", return_value=12345)
@@ -32,6 +33,7 @@ def test_launcher_gui_mode(
     mock_load_coords: MagicMock,
     _wait_menu: MagicMock,
     _wait_cs2: MagicMock,
+    _artifact_store: MagicMock,
     monkeypatch,
 ) -> None:
     from modules.launcher.steam_promo_dismiss import SteamPromoDismissResult
@@ -63,6 +65,7 @@ def test_launcher_gui_mode(
     assert EventType.STEAM_LOGIN_OK in [e for e, _ in emitted]
 
 
+@patch("modules.launcher.ArtifactStore")
 @patch("modules.ui_nav.window.wait_for_cs2_main_menu")
 @patch("modules.ui_nav.coords.load_nav_coords_for_hwnd")
 @patch("modules.ui_nav.window.wait_for_cs2_hwnd", return_value=12345)
@@ -84,6 +87,7 @@ def test_launcher_gui_then_api_fallback(
     mock_load_coords: MagicMock,
     _wait_menu: MagicMock,
     _wait_cs2: MagicMock,
+    _artifact_store: MagicMock,
     monkeypatch,
 ) -> None:
     from modules.launcher.steam_promo_dismiss import SteamPromoDismissResult

@@ -38,7 +38,7 @@ Main log при nav: `dm click main_menu_play @(x,y)` — если строк н
 
 | State | YAML key | Strict |
 |-------|----------|--------|
-| `main_menu` | `detectors.main_menu` | **все** probes |
+| `main_menu` | `detectors.main_menu` | launcher: **1 из 2**; dm_runner: **все** probes |
 | `searching` | `detectors.searching` | N−1 из N |
 | `in_dm` | `detectors.in_dm` | **все** probes (HUD, не тёмный угол меню) |
 
@@ -47,15 +47,16 @@ Main log при nav: `dm click main_menu_play @(x,y)` — если строк н
 ## Launcher sequence
 
 1. `wait_for_cs2_hwnd` → `waiting for CS2 window…`
-2. `wait_for_cs2_main_menu` → `waiting for CS2 main menu…`
-3. `cs2_ok` → `cs2 menu ready (hwnd=…)`
-4. `dm_runner` → клики + `in_dm`
+2. `wait_for_cs2_main_menu` → `waiting for CS2 main menu…` (**soft**: min 1 of 2 probes; artifacts `wait_main_menu_launch_*.png`)
+3. `cs2_ok` → `cs2 menu ready (hwnd=…)` **или** `cs2 menu unconfirmed … trying dm nav` (timeout fallback, не `session_failed`)
+4. `dm_runner` → strict main menu wait + клики + `in_dm`
 
 ## Artifacts
 
 Каждая сессия: `data/artifacts/{session_id}/`
 
-- `wait_main_menu_*.png`, `after_click_*.png`
+- `wait_main_menu_launch_*.png`, `wait_main_menu_launch_timeout.png` (launcher)
+- `wait_main_menu_*.png`, `after_click_*.png` (dm_runner)
 - `steps.jsonl` — клики, детекты
 
 ## Калибровка
@@ -71,6 +72,7 @@ Main log при nav: `dm click main_menu_play @(x,y)` — если строк н
 |---------|--------|
 | Курсор не двигается | Main log: есть ли `dm click …`? Если нет — ложный `in_dm` или nav не стартовал |
 | `in_dm` на чёрном меню | Обновить build (strict `in_dm`); калибровать probes |
+| `session_failed: CS2 main menu` | Timeout → `cs2_ok unconfirmed` + dm nav; см. `wait_main_menu_launch_*.png` |
 | Клики мимо | `load_nav_coords_for_hwnd` + Panorama coords (ИГРАТЬ сверху) |
 
 ## Модули

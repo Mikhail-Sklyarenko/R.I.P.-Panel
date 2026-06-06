@@ -127,6 +127,7 @@ def test_wait_for_ready_parses_json_line() -> None:
     assert result.ok is True
 
 
+@patch("modules.launcher.ArtifactStore")
 @patch("modules.ui_nav.window.wait_for_cs2_main_menu")
 @patch("modules.ui_nav.coords.load_nav_coords_for_hwnd")
 @patch("modules.ui_nav.window.wait_for_cs2_hwnd", return_value=12345)
@@ -146,6 +147,7 @@ def test_launcher_run_steam_auth_flow(
     mock_load_coords: MagicMock,
     _wait_menu: MagicMock,
     _wait_cs2: MagicMock,
+    _artifact_store: MagicMock,
     monkeypatch,
 ) -> None:
     from modules.launcher.steam_promo_dismiss import SteamPromoDismissResult

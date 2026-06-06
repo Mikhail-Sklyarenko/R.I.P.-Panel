@@ -12,8 +12,8 @@ clicks:
 
 detectors:
   main_menu:
-    - {x: 180, y: 32, rgb: [240, 160, 50], tolerance: 65}
-    - {x: 180, y: 22, rgb: [210, 210, 210], tolerance: 55}
+    - {x: 180, y: 34, rgb: [230, 145, 40], tolerance: 70}
+    - {x: 180, y: 20, rgb: [200, 200, 200], tolerance: 60}
   searching:
     - {x: 180, y: 135, rgb: [200, 200, 200], tolerance: 70}
     - {x: 180, y: 100, rgb: [160, 160, 160], tolerance: 65}

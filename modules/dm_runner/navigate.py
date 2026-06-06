@@ -34,6 +34,7 @@ class DmNavigator:
         emit: _Emit | None = None,
         hwnd: int | None = None,
         on_nav_progress: Callable[[str], None] | None = None,
+        menu_probe_warn: bool = False,
     ) -> None:
         self.config = config
         self.session_id = session_id
@@ -41,6 +42,7 @@ class DmNavigator:
         self.emit = emit
         self.hwnd = hwnd
         self.on_nav_progress = on_nav_progress
+        self.menu_probe_warn = menu_probe_warn
         self.coords = load_nav_coords_for_hwnd(
             hwnd,
             config.cs_resolution,
@@ -109,6 +111,7 @@ class DmNavigator:
             self.coords,
             self.artifacts,
             timeout_sec=timeout,
+            min_match=len(self.coords.probes("main_menu")),
         )
 
     def _click_target(self, name: str) -> None:
@@ -182,6 +185,10 @@ class DmNavigator:
 
     def navigate_to_dm_with_retries(self) -> None:
         self._prepare_cs2_window()
+        if self.menu_probe_warn:
+            self._nav_progress(
+                "dm nav: main menu was not confirmed at launch; strict probe wait"
+            )
         last_err: Exception | None = None
         for attempt in range(1, self.config.search_retries + 1):
             try:

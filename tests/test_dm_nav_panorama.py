@@ -42,6 +42,7 @@ def test_load_nav_coords_for_hwnd_warns_on_mismatch(monkeypatch) -> None:
     assert any("375x308" in w for w in warnings)
 
 
+@patch("modules.launcher.ArtifactStore")
 @patch("modules.launcher.proxy_check.check_proxy", return_value=(True, "ip ok"))
 @patch("modules.launcher.steam_promo_dismiss.dismiss_steam_promo")
 @patch("modules.ui_nav.window.wait_for_cs2_main_menu")
@@ -63,6 +64,7 @@ def test_launcher_waits_main_menu_before_cs2_ok(
     mock_wait_menu: MagicMock,
     mock_dismiss: MagicMock,
     _proxy: MagicMock,
+    _artifact_store: MagicMock,
     monkeypatch,
 ) -> None:
     from modules.launcher import run

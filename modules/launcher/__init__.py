@@ -11,6 +11,7 @@ from modules.launcher import cleanup, cs2, proxy_check, steam, steam_auth, steam
 from modules.launcher.errors import LauncherError
 from modules.launcher.steam_auth import SteamAuthResult
 from modules.launcher.steam_gui_login import SteamGuiLoginResult
+from modules.ui_nav.artifacts import ArtifactStore
 from modules.ui_nav.errors import UiNavError
 
 __all__ = [
@@ -109,32 +110,39 @@ def run(ctx: dict[str, Any] | None = None) -> bool:
         from modules.ui_nav.coords import load_nav_coords_for_hwnd
         from modules.ui_nav.window import wait_for_cs2_main_menu
 
+        session_id = str(ctx.get("session_id") or login or "launch")
+        artifacts = ArtifactStore(session_id)
         coords = load_nav_coords_for_hwnd(
             cs2_hwnd,
             config.cs_resolution,
             on_warn=on_cs2_progress,
         )
         menu_timeout = max(15, int(config.cs2_main_menu_wait_timeout_sec))
-        try:
-            wait_for_cs2_main_menu(
-                cs2_hwnd,
-                coords,
-                timeout_sec=float(menu_timeout),
-                on_progress=on_cs2_progress,
-            )
-        except UiNavError as exc:
-            raise LauncherError(f"CS2 main menu wait: {exc}") from exc
-
-        _emit(
-            EventType.CS2_OK,
-            f"cs2 menu ready (hwnd={cs2_hwnd})",
+        menu_result = wait_for_cs2_main_menu(
+            cs2_hwnd,
+            coords,
+            timeout_sec=float(menu_timeout),
+            on_progress=on_cs2_progress,
+            artifacts=artifacts,
+            min_match=1,
         )
+        if menu_result.ok:
+            _emit(
+                EventType.CS2_OK,
+                f"cs2 menu ready (hwnd={cs2_hwnd})",
+            )
+        else:
+            ctx["cs2_menu_probe_warn"] = True
+            _emit(
+                EventType.CS2_OK,
+                f"cs2 menu unconfirmed after {menu_timeout}s (hwnd={cs2_hwnd}); trying dm nav",
+            )
         return True
     except LauncherError as exc:
         steam_auth.stop_steam_auth()
         if emit:
             msg = str(exc)
-            if msg.startswith("CS2 window wait:") or msg.startswith("CS2 main menu wait:"):
+            if msg.startswith("CS2 window wait:"):
                 emit(EventType.SESSION_FAILED, msg)
             else:
                 emit(EventType.STEAM_LOGIN_FAILED, msg)

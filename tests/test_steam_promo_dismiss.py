@@ -151,6 +151,7 @@ def test_soft_fail_still_returns_detail(monkeypatch) -> None:
     assert "promo still visible" in result.detail
 
 
+@patch("modules.launcher.ArtifactStore")
 @patch("modules.ui_nav.window.wait_for_cs2_main_menu")
 @patch("modules.ui_nav.coords.load_nav_coords_for_hwnd")
 @patch("modules.ui_nav.window.wait_for_cs2_hwnd", return_value=12345)
@@ -172,6 +173,7 @@ def test_launcher_calls_dismiss_between_login_ok_and_steam_ok(
     mock_load_coords: MagicMock,
     _wait_menu: MagicMock,
     _wait_cs2: MagicMock,
+    _artifact_store: MagicMock,
     monkeypatch,
 ) -> None:
     from core.events import EventType
@@ -214,6 +216,7 @@ def test_launcher_calls_dismiss_between_login_ok_and_steam_ok(
     assert "dismissed 1 promo" in steam_ok_detail
 
 
+@patch("modules.launcher.ArtifactStore")
 @patch("modules.ui_nav.window.wait_for_cs2_main_menu")
 @patch("modules.ui_nav.coords.load_nav_coords_for_hwnd")
 @patch("modules.ui_nav.window.wait_for_cs2_hwnd", return_value=12345)
@@ -235,6 +238,7 @@ def test_launcher_soft_fail_still_emits_steam_ok_and_cs2(
     mock_load_coords: MagicMock,
     _wait_menu: MagicMock,
     _wait_cs2: MagicMock,
+    _artifact_store: MagicMock,
     monkeypatch,
 ) -> None:
     from core.events import EventType
