@@ -56,7 +56,7 @@ If `False`: reinstall pywin32 for the same Python as the panel. Code falls back 
 ## csgobot
 
 ```bat
-git submodule update --init --recursive vendor/csgobot
+dir vendor\csgobot\run.py
 cd vendor\csgobot
 python -m venv venv
 venv\Scripts\pip install -r requirements.txt

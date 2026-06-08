@@ -13,7 +13,7 @@ Desktop farm panel prototype (CustomTkinter + Python core), separated from the o
 | `core/` | Orchestrator, session FSM |
 | `modules/` | launcher, dm_runner, combat, drop_picker, looter, telegram, vault |
 | `vendor/looter/` | Node trade helper (copied from FSM `looter/`) |
-| `vendor/csgobot/` | GPL bot submodule (subprocess, own venv) |
+| `vendor/csgobot/` | GPL bot vendored (subprocess, own venv) |
 | `resources/cs2/` | CS2 configs adapted for Deathmatch (from FSM `settings/`) |
 | `docs/reference/` | Optional copies of FSM business docs |
 | `data/` | Gitignored: vault, local config, logs |
@@ -53,12 +53,11 @@ npm install
 
 Wrapper: `modules/looter/runner.py` (cwd `vendor/looter`, exit **1** = `loot_ok`). См. `docs/reference/LOOTER.md`.
 
-## vendor/csgobot (Git submodule, GPL)
+## vendor/csgobot (vendored, GPL)
 
-См. `docs/CSGOBOT_SETUP.md`. Кратко:
+См. `docs/CSGOBOT_SETUP.md`. Кратко (после `git pull` — `run.py` уже в репо):
 
 ```bat
-git submodule update --init --recursive vendor/csgobot
 cd vendor\csgobot
 python -m venv venv
 venv\Scripts\activate
@@ -67,7 +66,7 @@ pip install -r requirements.txt
 
 Панель запускает `venv\Scripts\python.exe run.py` через **subprocess** (`modules/combat/csgobot_ai.py`). **Не** импортируйте csgobot в `panel/` или `core/`.
 
-`bot_mode`: `auto` (AI если submodule+venv есть) | `ai` | `simple` (10 min).
+`bot_mode`: `auto` (AI если run.py + venv есть) | `ai` | `simple` (10 min).
 
 ## Utils (B12)
 

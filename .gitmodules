@@ -1,3 +1,0 @@
-[submodule "vendor/csgobot"]
-	path = vendor/csgobot
-	url = https://github.com/Priler/csgobot

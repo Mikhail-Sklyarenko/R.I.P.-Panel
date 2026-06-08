@@ -1,0 +1,4 @@
+Vendored copy of https://github.com/Priler/csgobot
+Upstream commit: 4d99d5e5ccd7ca70bb9882fee6619cc85abde8d0
+License: GPL-3.0 (see LICENSE)
+Panel runs via subprocess only — modules/combat/csgobot_ai.py

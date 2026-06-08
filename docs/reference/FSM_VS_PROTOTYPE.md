@@ -37,6 +37,6 @@
 
 ## Дальше (не FSM)
 
-- `vendor/csgobot/` submodule (GPL), subprocess
+- `vendor/csgobot/` vendored (GPL), subprocess
 - Proxy check → `proxy_expected_ip`
 - Реальные `modules/*` вместо `_fakes` при `test_mode: false`

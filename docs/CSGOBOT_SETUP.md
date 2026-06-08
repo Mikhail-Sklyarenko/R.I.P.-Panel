@@ -1,15 +1,13 @@
 # csgobot (GPL-3.0) — subprocess only
 
-Upstream: https://github.com/Priler/csgobot (git submodule `vendor/csgobot`).
+Upstream: https://github.com/Priler/csgobot — **vendored** in `vendor/csgobot/` (plain files in repo, no submodule).
 
 Панель **не импортирует** код csgobot в `panel/` или `core/`. Запуск только через `modules/combat/csgobot_ai.py` → subprocess.
 
-## Clone / update submodule
-
-Из корня `farm-panel-prototype/`:
+После `git pull` проверка:
 
 ```bat
-git submodule update --init --recursive vendor/csgobot
+dir vendor\csgobot\run.py
 ```
 
 ## Отдельный venv (обязательно)
