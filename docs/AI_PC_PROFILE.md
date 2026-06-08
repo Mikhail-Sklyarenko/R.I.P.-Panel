@@ -89,7 +89,7 @@ PNG must be **1280×720 client area only** — game content without title bar / 
 ```bat
 python scripts/sample_probe_rgb.py main_menu_play.png 663 43
 python scripts/sample_probe_rgb.py main_menu_play.png 663 20
-python scripts/sample_probe_rgb.py play_dm.png 656 114
+python scripts/sample_probe_rgb.py play_dm.png 667 114
 python scripts/sample_probe_rgb.py play_dm.png 1125 691
 python scripts/sample_probe_rgb.py in_dm.png 99 661
 ```
@@ -101,7 +101,7 @@ Paste output → update `resources/ui_nav/coords_1280x720.yaml`.
 | Action | Click (1280×720) |
 |--------|------------------|
 | main_menu_play | 663, 20 (was 736 — hit МАГАЗИН) |
-| mode_deathmatch | 656, 114 |
+| mode_deathmatch | 667, 114 (center of «БОЙ НАСМЕРТЬ» text) |
 | start_search | 1125, 691 |
 
 If manual test click misses ИГРАТЬ — send PNG, we recalibrate.

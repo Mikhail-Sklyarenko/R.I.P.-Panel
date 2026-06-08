@@ -37,7 +37,7 @@ def test_1280_play_dm_fixture_click_targets() -> None:
     coords = load_nav_coords("1280x720")
     dm = coords.click("mode_deathmatch")
     start = coords.click("start_search")
-    assert dm.y < 130
+    assert dm.x == 667 and dm.y == 114
     assert start.x > 1100 and start.y > 680
 
 

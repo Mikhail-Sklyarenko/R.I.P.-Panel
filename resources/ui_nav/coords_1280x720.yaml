@@ -9,7 +9,7 @@ meta:
 
 clicks:
   main_menu_play: {x: 663, y: 20}
-  mode_deathmatch: {x: 656, y: 114}
+  mode_deathmatch: {x: 667, y: 114}
   start_search: {x: 1125, y: 691}
   leave_match: {x: 1255, y: 19}
 
