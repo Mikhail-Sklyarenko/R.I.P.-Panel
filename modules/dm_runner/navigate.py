@@ -198,9 +198,10 @@ class DmNavigator:
             self.click_sequence_deathmatch()
         self._menu_nav_done = True
 
-    def _wait_search_and_in_dm(self) -> None:
+    def _confirm_search_started(self) -> None:
+        """Emit searching_dm only after searching probes match (or fast in_dm load)."""
         self._set_sim_phase(ScreenState.SEARCHING)
-        self._e(EventType.SEARCHING_DM, "dm_runner: search started")
+        search_timeout = float(self.config.game_search_timeout_sec)
 
         try:
             wait_for_state(
@@ -208,10 +209,40 @@ class DmNavigator:
                 ScreenState.SEARCHING,
                 self.coords,
                 self.artifacts,
-                timeout_sec=min(15.0, self.config.game_search_timeout_sec),
+                timeout_sec=search_timeout,
             )
+            self._e(EventType.SEARCHING_DM, "dm_runner: search started")
+            return
         except UiNavTimeoutError:
-            self.artifacts.log_step("searching_skip", detail="probe optional")
+            img = self.driver.capture()
+            if detect_state(img, ScreenState.IN_DM, self.coords):
+                self._nav_progress(
+                    "dm nav: searching screen skipped; in_dm probes already match"
+                )
+                self._e(
+                    EventType.SEARCHING_DM,
+                    "dm_runner: search started (fast load, searching screen skipped)",
+                )
+                return
+            if detect_state(img, ScreenState.MAIN_MENU, self.coords):
+                self._nav_progress(
+                    "dm nav: still on main_menu after start_search; click likely missed"
+                )
+            else:
+                self._nav_progress(
+                    "dm nav: searching not confirmed after clicks; match search likely not started"
+                )
+            self.artifacts.log_step(
+                "search_not_confirmed",
+                timeout_sec=search_timeout,
+            )
+            raise UiNavTimeoutError(
+                f"timeout waiting for searching ({search_timeout}s); "
+                "start_search not confirmed"
+            ) from None
+
+    def _wait_search_and_in_dm(self) -> None:
+        self._confirm_search_started()
 
         self._set_sim_phase(ScreenState.IN_DM)
         wait_for_state(

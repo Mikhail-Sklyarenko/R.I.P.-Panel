@@ -48,10 +48,63 @@ Missing profile → startup warning + `UiNavError` at runtime.
 
 ```bat
 pip show pywin32
-python -c "import win32api; print(hasattr(win32api,'AttachThreadInput'))"
+python -c "import win32process; print(hasattr(win32process,'AttachThreadInput'))"
 ```
 
-If `False`: reinstall pywin32 for the same Python as the panel. Code falls back without `AttachThreadInput`, but fix env for reliable focus/capture.
+Should print `True`. (`AttachThreadInput` is in **win32process**, not win32api.)
+
+## Calibration workflow @ 1280×720 (operator)
+
+### Before screenshots
+
+1. `data/config.yaml`: `cs_resolution: "1280x720"`
+2. CS2: **В ОКНЕ**, **1280×720**, **16:9**, RU
+3. Panel `git pull` (includes client-area window layout fix)
+
+Verify client size (CS2 running, windowed 1280×720):
+
+```bat
+python -c "import win32gui; f=[]; e=lambda h,_: f.append(h) if win32gui.IsWindowVisible(h) and 'counter' in (win32gui.GetWindowText(h) or '').lower() else None; win32gui.EnumWindows(e,None); h=f[0]; r=win32gui.GetClientRect(h); print(r[2], 'x', r[3])"
+```
+
+Expect `1280 x 720`.
+
+### Screens to send (4 files)
+
+PNG must be **1280×720 client area only** — game content without title bar / desktop.
+
+**Option A — panel artifact:** after manual menu wait, copy `artifacts/<session>/wait_main_menu_launch_*.png` if `img_w=1280`.
+
+**Option B — Win+Shift+S:** crop exactly the game interior (not Steam, not taskbar).
+
+| File name | When to capture |
+|-----------|-----------------|
+| `main_menu_play.png` | Main menu, tab **ИГРАТЬ** active (orange underline) |
+| `play_dm.png` | After ИГРАТЬ: **Бой насмерть** visible + green **Начать** bottom-right |
+| `searching.png` | After Начать: matchmaking / «Поиск…» |
+| `in_dm.png` | Inside DM: HUD (HP/ammo) visible |
+
+### Sample probe pixels
+
+```bat
+python scripts/sample_probe_rgb.py main_menu_play.png 736 36
+python scripts/sample_probe_rgb.py main_menu_play.png 736 20
+python scripts/sample_probe_rgb.py play_dm.png 358 132
+python scripts/sample_probe_rgb.py play_dm.png 1151 685
+python scripts/sample_probe_rgb.py in_dm.png 99 661
+```
+
+Paste output → update `resources/ui_nav/coords_1280x720.yaml`.
+
+### Click targets (current draft — verify on your PNG)
+
+| Action | Click (1280×720) |
+|--------|------------------|
+| main_menu_play | 736, 20 |
+| mode_deathmatch | 358, 132 |
+| start_search | 1151, 685 |
+
+If manual test click misses ИГРАТЬ — send PNG, we recalibrate.
 
 ## csgobot
 

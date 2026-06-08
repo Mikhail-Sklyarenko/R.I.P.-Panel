@@ -46,7 +46,7 @@ def focus_window(hwnd: int) -> None:
         foreground_thread = win32process.GetWindowThreadProcessId(foreground)[0]
         target_thread = win32process.GetWindowThreadProcessId(hwnd)[0]
         attached = False
-        attach_fn = getattr(win32api, "AttachThreadInput", None)
+        attach_fn = getattr(win32process, "AttachThreadInput", None)
         if (
             attach_fn is not None
             and foreground_thread

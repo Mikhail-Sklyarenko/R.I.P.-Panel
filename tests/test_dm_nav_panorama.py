@@ -331,6 +331,106 @@ def test_dm_retry_skips_menu_wait_after_clicks(data_dir, monkeypatch) -> None:
     assert mock_in_dm.call_count == 2
 
 
+def test_searching_dm_not_emitted_when_search_unconfirmed(data_dir, monkeypatch) -> None:
+    monkeypatch.setenv("DM_NAV_SIM", "1")
+    from modules.dm_runner.navigate import DmNavigator
+
+    emitted: list[EventType] = []
+
+    def emit(event: EventType, detail: str = "", **kwargs) -> None:
+        emitted.append(event)
+
+    nav = DmNavigator(
+        config=AppConfig(
+            map_load_delay_sec=10,
+            game_search_timeout_sec=10,
+            search_retries=1,
+        ),
+        session_id="search1",
+        login="u1",
+        emit=emit,
+    )
+
+    with patch(
+        "modules.dm_runner.navigate.wait_for_state",
+        side_effect=UiNavTimeoutError("timeout waiting for searching"),
+    ):
+        with patch(
+            "modules.dm_runner.navigate.detect_state",
+            return_value=False,
+        ):
+            with pytest.raises(UiNavTimeoutError, match="start_search not confirmed"):
+                nav._confirm_search_started()
+
+    assert EventType.SEARCHING_DM not in emitted
+
+
+def test_searching_dm_emitted_after_searching_probe(data_dir, monkeypatch) -> None:
+    monkeypatch.setenv("DM_NAV_SIM", "1")
+    from modules.dm_runner.navigate import DmNavigator
+
+    emitted: list[EventType] = []
+
+    def emit(event: EventType, detail: str = "", **kwargs) -> None:
+        emitted.append(event)
+
+    nav = DmNavigator(
+        config=AppConfig(
+            map_load_delay_sec=10,
+            game_search_timeout_sec=10,
+            search_retries=1,
+        ),
+        session_id="search2",
+        login="u1",
+        emit=emit,
+    )
+
+    with patch("modules.dm_runner.navigate.wait_for_state") as mock_wait:
+        nav._confirm_search_started()
+        mock_wait.assert_called_once()
+        assert mock_wait.call_args.args[1] == ScreenState.SEARCHING
+
+    assert EventType.SEARCHING_DM in emitted
+
+
+def test_searching_dm_fast_path_when_in_dm_before_searching_probe(
+    data_dir, monkeypatch
+) -> None:
+    monkeypatch.setenv("DM_NAV_SIM", "1")
+    from modules.dm_runner.navigate import DmNavigator
+
+    emitted: list[EventType] = []
+
+    def emit(event: EventType, detail: str = "", **kwargs) -> None:
+        emitted.append(event)
+
+    nav = DmNavigator(
+        config=AppConfig(
+            map_load_delay_sec=10,
+            game_search_timeout_sec=10,
+            search_retries=1,
+        ),
+        session_id="search3",
+        login="u1",
+        emit=emit,
+    )
+
+    def detect_side_effect(img, state, coords, *, min_match=None):
+        return state == ScreenState.IN_DM
+
+    with patch(
+        "modules.dm_runner.navigate.wait_for_state",
+        side_effect=UiNavTimeoutError("timeout waiting for searching"),
+    ):
+        with patch(
+            "modules.dm_runner.navigate.detect_state",
+            side_effect=detect_side_effect,
+        ):
+            nav._confirm_search_started()
+
+    assert EventType.SEARCHING_DM in emitted
+
+
 @pytest.fixture
 def data_dir(tmp_path, monkeypatch):
     monkeypatch.setenv("FARM_PANEL_DATA_DIR", str(tmp_path))

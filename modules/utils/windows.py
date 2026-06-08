@@ -46,6 +46,24 @@ def parse_resolution(resolution: str) -> tuple[int, int]:
     return int(parts[0]), int(parts[1])
 
 
+def outer_size_for_client(hwnd: int, client_w: int, client_h: int) -> tuple[int, int]:
+    """MoveWindow size so client rect matches client_w x client_h (not outer frame)."""
+    _require_windows()
+    import ctypes
+    import win32con
+    import win32gui
+    from ctypes import wintypes
+
+    style = win32gui.GetWindowLong(hwnd, win32con.GWL_STYLE)
+    ex_style = win32gui.GetWindowLong(hwnd, win32con.GWL_EXSTYLE)
+    rect = wintypes.RECT(0, 0, int(client_w), int(client_h))
+    if not ctypes.windll.user32.AdjustWindowRectEx(
+        ctypes.byref(rect), style, False, ex_style
+    ):
+        raise UtilsError("AdjustWindowRectEx failed")
+    return rect.right - rect.left, rect.bottom - rect.top
+
+
 def list_cs_windows() -> list[CsWindow]:
     """Все видимые окна CS2/CSGO (не только первое)."""
     if _sim_enabled():
@@ -81,7 +99,7 @@ def move_all_cs_windows(
 ) -> MoveResult:
     """
     Раскладка окон каскадом (recovery после наложения/зависания UI).
-    Размер из config.cs_resolution.
+    cs_resolution = client area (совпадает с coords yaml base).
     """
     if config is None:
         from config.loader import load_config
@@ -111,7 +129,8 @@ def move_all_cs_windows(
         y = start_y + idx * step_y
         try:
             win32gui.ShowWindow(win.hwnd, win32con.SW_RESTORE)
-            win32gui.MoveWindow(win.hwnd, x, y, width, height, True)
+            outer_w, outer_h = outer_size_for_client(win.hwnd, width, height)
+            win32gui.MoveWindow(win.hwnd, x, y, outer_w, outer_h, True)
             moved.append(win)
         except Exception as exc:
             raise UtilsError(f"MoveWindow failed for {win.title!r}: {exc}") from exc
