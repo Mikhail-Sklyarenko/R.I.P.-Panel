@@ -10,6 +10,15 @@ Upstream: https://github.com/Priler/csgobot — **vendored** in `vendor/csgobot/
 dir vendor\csgobot\run.py
 ```
 
+## YOLO weights (не в git)
+
+Файлы `*.pt` **не хранятся** в репозитории (слишком большие). Для `bot_mode: ai` скачайте веса вручную в `vendor\csgobot\yolov8\`:
+
+- Основной файл из upstream: `cs2_yolov8m_640_augmented_v4.pt` (см. [Priler/csgobot](https://github.com/Priler/csgobot) releases / README)
+- `run.py` ожидает: `vendor\csgobot\yolov8\cs2_yolov8m_640_augmented_v4.pt`
+
+Для `bot_mode: simple` веса **не нужны**.
+
 ## Отдельный venv (обязательно)
 
 ```bat
