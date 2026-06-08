@@ -1,22 +1,22 @@
 # UI coords for CS2 @ 1280x720 — Panorama RU windowed (AI Farm PC)
-# calibration: armoryfarm_screenshot_2025-06 (1024x600 window → client mapped to 1280x720)
+# calibration: operator screenshots 2026-06 (1024x599 client → mapped to 1280x720 base)
 meta:
   base_width: 1280
   base_height: 720
-  calibration: armoryfarm_screenshot_2025-06
-  cs2_build: "2025-06 Panorama RU @ 1280x720 windowed (ИГРАТЬ + БОЙ НАСМЕРТЬ screen)"
-  note: "Mapped from operator screenshot; verify searching/in_dm on live grab"
+  calibration: armoryfarm_operator_2026-06
+  cs2_build: "2025-06 Panorama RU @ 1280x720 windowed (ИГРАТЬ + БОЙ НАСМЕРТЬ)"
+  note: "736,20 was МАГАЗИН — recalibrated to ИГРАТЬ @663,20; searching/in_dm still draft"
 
 clicks:
-  main_menu_play: {x: 736, y: 20}
-  mode_deathmatch: {x: 358, y: 132}
-  start_search: {x: 1151, y: 685}
+  main_menu_play: {x: 663, y: 20}
+  mode_deathmatch: {x: 656, y: 114}
+  start_search: {x: 1125, y: 691}
   leave_match: {x: 1255, y: 19}
 
 detectors:
   main_menu:
-    - {x: 736, y: 36, rgb: [204, 139, 61], tolerance: 70}
-    - {x: 736, y: 20, rgb: [248, 251, 252], tolerance: 70}
+    - {x: 663, y: 43, rgb: [160, 205, 224], tolerance: 70}
+    - {x: 663, y: 20, rgb: [255, 254, 255], tolerance: 70}
   searching:
     - {x: 640, y: 360, rgb: [200, 200, 200], tolerance: 70}
     - {x: 640, y: 266, rgb: [160, 160, 160], tolerance: 65}

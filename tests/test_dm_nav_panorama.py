@@ -18,6 +18,27 @@ from modules.ui_nav.errors import UiNavTimeoutError
 from modules.ui_nav.window import MainMenuWaitResult
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures" / "armoryfarm" / "z3l9272eg3"
+AI_PC_1280 = Path(__file__).resolve().parent / "fixtures" / "ai_pc" / "1280x720"
+
+
+def test_1280_main_menu_play_fixture_detects_and_clicks_play_not_shop() -> None:
+    coords = load_nav_coords("1280x720")
+    img = Image.open(AI_PC_1280 / "main_menu_play.png").convert("RGB")
+    img720 = img.resize((1280, 720), Image.Resampling.LANCZOS)
+    assert detect_state(img720, ScreenState.MAIN_MENU, coords, min_match=2) is True
+    play = coords.click("main_menu_play")
+    shop_x = 736
+    assert play.x < shop_x
+    assert img720.getpixel((play.x, play.y))[0] > 200
+    assert img720.getpixel((shop_x, 43))[2] < 120
+
+
+def test_1280_play_dm_fixture_click_targets() -> None:
+    coords = load_nav_coords("1280x720")
+    dm = coords.click("mode_deathmatch")
+    start = coords.click("start_search")
+    assert dm.y < 130
+    assert start.x > 1100 and start.y > 680
 
 
 def test_armoryfarm_timeout_png_strict_main_menu() -> None:
