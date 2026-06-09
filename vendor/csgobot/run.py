@@ -30,7 +30,7 @@ WINDOW_TITLE = "Counter-Strike 2"
 # Screen capture method
 # Options: "mss", "obs_vc", "dxcam", "dxcam_capture", "win32"
 # - "mss": Cross-platform, good performance
-# - "obs_vc": Uses OBS Virtual Camera (requires OBS setup) * should be best perf
+# - "obs_vc": OBS Virtual Camera (see docs/CSGOBOT_SETUP.md)
 # - "dxcam": Windows only, GPU accelerated (fastest in theory, but mixed results)
 GRABBER_TYPE = "obs_vc"
 
@@ -42,6 +42,9 @@ OBS_DEVICE_NAME = "OBS Virtual Camera"
 YOLO_WEIGHTS = "./yolov8/cs2_yolov8m_640_augmented_v4.pt"
 CONFIDENCE_THRESHOLD = 0.7
 IOU_THRESHOLD = 0.2
+YOLO_IMGSZ = 640  # must match weights name; do not raise without retraining
+DETECTOR_DEVICE = ""  # "" = auto, "cuda", or "cpu"
+TORCH_NUM_THREADS = 0  # 0 = default; try 4-8 on CPU-only PCs
 
 # FOV settings (CS2 defaults for 16:9)
 # These are the field of view angles in degrees
@@ -71,10 +74,10 @@ ACTIVATION_HOTKEY = 58  # CAPS LOCK
 TEAM_CHANGE_HOTKEY = "ctrl+t"
 EXIT_HOTKEY = "ctrl+q"
 
-# Preview window
-SHOW_PREVIEW = True
-PREVIEW_WIDTH = 1280
-PREVIEW_HEIGHT = 720
+# Preview window (disable for farming — saves CPU/GPU and raises FPS)
+SHOW_PREVIEW = False
+PREVIEW_WIDTH = 640
+PREVIEW_HEIGHT = 360
 
 
 # ===========================
@@ -101,6 +104,9 @@ def create_config() -> AppConfig:
         weights_path=YOLO_WEIGHTS,
         confidence_threshold=CONFIDENCE_THRESHOLD,
         iou_threshold=IOU_THRESHOLD,
+        imgsz=YOLO_IMGSZ,
+        device=DETECTOR_DEVICE,
+        torch_num_threads=TORCH_NUM_THREADS,
     )
 
     aim_config = AimConfig(
@@ -189,6 +195,18 @@ def main() -> int:
     logger.info(f"FOV: {config.fov.horizontal}° x {config.fov.vertical}°")
     logger.info(f"x360: {config.fov.x360}")
     logger.info(f"Team: {config.aim.current_team.value.upper()}")
+    try:
+        import torch
+        if torch.cuda.is_available():
+            logger.info(f"PyTorch: cuda ({torch.cuda.get_device_name(0)})")
+        else:
+            logger.info(
+                "PyTorch: cpu — for 30+ FPS install CUDA torch "
+                "(see docs/CSGOBOT_SETUP.md)"
+            )
+    except ImportError:
+        pass
+    logger.info(f"Preview: {'on' if config.preview.enabled else 'off'}")
     logger.info("=" * 50)
     logger.info(f"Activation: CAPS LOCK")
     logger.info(f"Change Team: Ctrl+T")

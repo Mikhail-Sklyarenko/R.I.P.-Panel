@@ -239,6 +239,12 @@ def detection_process(
     logger = logging.getLogger("DetectionProcess")
     logger.info("Starting...")
 
+    import torch
+
+    if config.detector.torch_num_threads > 0:
+        torch.set_num_threads(config.detector.torch_num_threads)
+
+    device = config.detector.device or None
     # Initialize detector
     try:
         detector = YOLOv8Detector(
@@ -246,8 +252,16 @@ def detection_process(
             weights_path=config.detector.weights_path,
             confidence_threshold=config.detector.confidence_threshold,
             iou_threshold=config.detector.iou_threshold,
+            device=device,
+            half_precision=config.detector.half_precision,
+            imgsz=config.detector.imgsz,
+            max_det=config.detector.max_det,
         )
         detector.set_colors(config.detector.class_colors)
+        logger.info(
+            f"Detector: {config.detector.weights_path} "
+            f"imgsz={config.detector.imgsz} device={detector.device}"
+        )
     except Exception as e:
         logger.error(f"Failed to initialize detector: {e}")
         stop_event.set()

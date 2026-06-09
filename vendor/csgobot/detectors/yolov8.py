@@ -23,6 +23,8 @@ class YOLOv8Detector(BaseDetector):
         iou_threshold: float = 0.45,
         device: Optional[str] = None,
         half_precision: Optional[bool] = None,
+        imgsz: int = 640,
+        max_det: int = 20,
     ):
         """
         Initialize YOLOv8 detector.
@@ -50,15 +52,18 @@ class YOLOv8Detector(BaseDetector):
                 "Install with: pip install ultralytics"
             )
 
-        if device is None:
+        if device is None or device == "":
             self.device = "cuda" if torch.cuda.is_available() else "cpu"
         else:
             self.device = device
 
         if half_precision is None:
-            self.half_precision = (self.device == "cuda")
+            self.half_precision = self.device.startswith("cuda")
         else:
             self.half_precision = half_precision
+
+        self.imgsz = imgsz
+        self.max_det = max_det
 
         self.model = YOLO(weights_path)
         self.model.to(self.device)
@@ -103,6 +108,9 @@ class YOLOv8Detector(BaseDetector):
             half=self.half_precision,
             conf=self.confidence_threshold,
             iou=self.iou_threshold,
+            imgsz=self.imgsz,
+            device=self.device,
+            max_det=self.max_det,
         )
 
         # Parse results

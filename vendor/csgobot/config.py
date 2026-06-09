@@ -72,6 +72,11 @@ class DetectorConfig:
     weights_path: str = "./yolov8/best.pt"
     confidence_threshold: float = 0.7
     iou_threshold: float = 0.2
+    imgsz: int = 640
+    device: str = ""  # "" = auto (cuda if available else cpu)
+    half_precision: Optional[bool] = None
+    max_det: int = 20
+    torch_num_threads: int = 0  # 0 = PyTorch default
 
     # Class names in order of class index
     class_names: List[str] = field(default_factory=lambda: ["c", "ch", "t", "th"])
