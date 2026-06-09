@@ -26,7 +26,7 @@ Convars производительности; копируется в `game/csgo
 ## Запуск
 
 ```
-cs2.exe <ADDITIONAL_LAUNCH_OPTIONS из resources/launch_options.txt> +exec <abs>/resources/cs2/fsm.cfg
+steam.exe -applaunch 730 <ADDITIONAL_LAUNCH_OPTIONS из resources/launch_options.txt> +exec <abs>/resources/cs2/fsm.cfg
 ```
 
 Пути Steam/CS2 — только `data/config.yaml` (`steam_path`, `cs2_path`).

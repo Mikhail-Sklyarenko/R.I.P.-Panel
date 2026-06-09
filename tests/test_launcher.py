@@ -29,8 +29,31 @@ def test_launch_options_match_fsm_defaults() -> None:
     assert "-noreactlogin" not in classic
     assert "-language" in steam
     assert "english" in steam
+    assert "-noverifyfiles" not in steam
+    assert "-norepairfiles" not in steam
     assert "-windowed" in cs2
     assert "+violence_hblood" in cs2 or "0" in cs2
+
+
+def test_build_cs2_command_uses_steam_applaunch(tmp_path) -> None:
+    from modules.launcher.cs2 import build_cs2_command
+
+    win64 = tmp_path / "CS2" / "game" / "bin" / "win64"
+    win64.mkdir(parents=True)
+    cs2_exe = win64 / "cs2.exe"
+    cs2_exe.write_bytes(b"")
+    steam_exe = tmp_path / "steam.exe"
+    steam_exe.write_bytes(b"")
+    cfg = AppConfig(
+        steam_path=str(steam_exe),
+        cs2_path=str(cs2_exe),
+        cs_resolution="360x270",
+    )
+    cmd = build_cs2_command(cfg)
+    assert cmd[0] == str(steam_exe.resolve())
+    assert cmd[1:3] == ["-applaunch", "730"]
+    assert "+exec" in cmd
+    assert str(FSM_CFG.resolve()) in cmd
 
 
 def test_fsm_cfg_deathmatch_adaptation() -> None:

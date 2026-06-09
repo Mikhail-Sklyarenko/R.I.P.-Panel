@@ -44,6 +44,14 @@ Missing profile → startup warning + `UiNavError` at runtime.
 
 **Current 1280×720 coords:** `calibration: armoryfarm_screenshot_2025-06` from operator screenshots (ИГРАТЬ + БОЙ НАСМЕРТЬ + НАЧАТЬ). Fixture: `tests/fixtures/ai_pc/1280x720/main_menu_play_dm.png`. Still **draft** for `searching` / `in_dm` / drop — send live grabs.
 
+## VAC / matchmaking
+
+If DM search works **manually** via Steam but fails through the panel (unsigned files / VAC dialog):
+
+1. `git pull` — panel uses **VAC-safe** Steam flags (no `-norepairfiles`) and starts CS2 via `steam.exe -applaunch 730` (same as Play in library).
+2. CS2 **launch options** in Steam must be **empty** (no `-insecure`).
+3. One-time: integrity verify CS2 with **normal** Steam (not via farm), then farm run.
+
 ## pywin32 (ArmoryFarm)
 
 ```bat

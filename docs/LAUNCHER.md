@@ -28,7 +28,7 @@ sequenceDiagram
   UI->>UI: TOTP (steam-totp via node, vault shared_secret)
   UI-->>Panel: main Steam / logged in as login
   Panel->>Panel: dismiss promo (best-effort, if banner)
-  Panel->>CS2: deploy cfg + Popen cs2.exe
+  Panel->>CS2: deploy cfg + steam.exe -applaunch 730 (VAC-safe)
   Panel->>Panel: dm_runner → combat → looter
 ```
 

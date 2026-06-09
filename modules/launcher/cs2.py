@@ -11,6 +11,7 @@ from config.paths import get_resources_dir
 from config.schema import AppConfig
 from modules.launcher.errors import LauncherError, LauncherPlatformError
 from modules.launcher.options import get_cs2_launch_argv
+from modules.launcher.steam import resolve_steam_exe
 
 
 def _resources_cs2() -> Path:
@@ -95,10 +96,12 @@ def deploy_cs2_configs(cs2_exe: Path, resolution: str = "360x270") -> Path:
 
 
 def build_cs2_command(config: AppConfig) -> list[str]:
+    """Deploy cfg, then start CS2 via steam -applaunch 730 (VAC-safe, same as manual Play)."""
     exe = resolve_cs2_exe(config)
     fsm_cfg = deploy_cs2_configs(exe, config.cs_resolution)
-    argv = [str(exe), *get_cs2_launch_argv(), "+exec", str(fsm_cfg)]
-    return argv
+    steam_exe = resolve_steam_exe(config)
+    cs2_argv = [*get_cs2_launch_argv(), "+exec", str(fsm_cfg)]
+    return [str(steam_exe), "-applaunch", "730", *cs2_argv]
 
 
 def launch_cs2(config: AppConfig) -> subprocess.Popen[str]:
