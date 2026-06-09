@@ -1,6 +1,7 @@
 # Example config for dedicated AI Farm PC (copy to data/config.yaml)
 
 cs_resolution: "1280x720"
+cs2_vac_safe_launch: true
 bot_mode: ai
 
 # Set paths on your machine (Config #1 or edit here):

@@ -36,6 +36,8 @@ def get_steam_launch_argv(*, classic_ui: bool = False) -> list[str]:
     return argv
 
 
-def get_cs2_launch_argv() -> list[str]:
+def get_cs2_launch_argv(*, vac_safe: bool = False) -> list[str]:
+    if vac_safe:
+        return []
     raw = _parse_launch_options_file().get("cs2", "")
     return shlex.split(raw, posix=False) if raw else []

@@ -35,11 +35,13 @@ def test_launch_options_match_fsm_defaults() -> None:
     assert "+violence_hblood" in cs2 or "0" in cs2
 
 
-def test_build_cs2_command_uses_steam_applaunch(tmp_path) -> None:
-    from modules.launcher.cs2 import build_cs2_command
+def test_build_cs2_command_uses_steam_applaunch_vac_safe(tmp_path) -> None:
+    from modules.launcher.cs2 import FARM_PANEL_CFG, build_cs2_command
 
     win64 = tmp_path / "CS2" / "game" / "bin" / "win64"
+    cfg_dir = tmp_path / "CS2" / "game" / "csgo" / "cfg"
     win64.mkdir(parents=True)
+    cfg_dir.mkdir(parents=True)
     cs2_exe = win64 / "cs2.exe"
     cs2_exe.write_bytes(b"")
     steam_exe = tmp_path / "steam.exe"
@@ -48,12 +50,37 @@ def test_build_cs2_command_uses_steam_applaunch(tmp_path) -> None:
         steam_path=str(steam_exe),
         cs2_path=str(cs2_exe),
         cs_resolution="360x270",
+        cs2_vac_safe_launch=True,
     )
     cmd = build_cs2_command(cfg)
     assert cmd[0] == str(steam_exe.resolve())
     assert cmd[1:3] == ["-applaunch", "730"]
-    assert "+exec" in cmd
+    assert cmd[-1] == FARM_PANEL_CFG
+    assert (cfg_dir / FARM_PANEL_CFG).is_file()
+    assert "-windowed" not in cmd
+    assert not (cfg_dir / "video.txt").exists()
+
+
+def test_build_cs2_command_legacy_deploy_when_vac_safe_off(tmp_path) -> None:
+    from modules.launcher.cs2 import build_cs2_command
+
+    win64 = tmp_path / "CS2" / "game" / "bin" / "win64"
+    cfg_dir = tmp_path / "CS2" / "game" / "csgo" / "cfg"
+    win64.mkdir(parents=True)
+    cfg_dir.mkdir(parents=True)
+    cs2_exe = win64 / "cs2.exe"
+    cs2_exe.write_bytes(b"")
+    steam_exe = tmp_path / "steam.exe"
+    steam_exe.write_bytes(b"")
+    cfg = AppConfig(
+        steam_path=str(steam_exe),
+        cs2_path=str(cs2_exe),
+        cs_resolution="360x270",
+        cs2_vac_safe_launch=False,
+    )
+    cmd = build_cs2_command(cfg)
     assert str(FSM_CFG.resolve()) in cmd
+    assert (cfg_dir / "video.txt").is_file()
 
 
 def test_fsm_cfg_deathmatch_adaptation() -> None:

@@ -91,8 +91,8 @@ def run(ctx: dict[str, Any] | None = None) -> bool:
             cleanup.kill_cs2()
             return True
 
-        cs2.launch_cs2(config)
         on_cs2_progress = ctx.get("on_cs2_progress")
+        cs2.launch_cs2(config, on_log=on_cs2_progress)
 
         from modules.ui_nav.window import wait_for_cs2_hwnd
 

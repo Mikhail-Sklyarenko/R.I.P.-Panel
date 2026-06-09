@@ -6,12 +6,15 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
+from typing import Callable
 
 from config.paths import get_resources_dir
 from config.schema import AppConfig
 from modules.launcher.errors import LauncherError, LauncherPlatformError
 from modules.launcher.options import get_cs2_launch_argv
 from modules.launcher.steam import resolve_steam_exe
+
+FARM_PANEL_CFG = "farm_panel.cfg"
 
 
 def _resources_cs2() -> Path:
@@ -79,41 +82,58 @@ def find_csgo_cfg_dir(cs2_exe: Path) -> Path:
     raise LauncherError(f"csgo/cfg not found near {cs2_exe}")
 
 
-def deploy_cs2_configs(cs2_exe: Path, resolution: str = "360x270") -> Path:
-    """Копировать video + convars; вернуть путь к exec fsm.cfg (в resources)."""
+def deploy_cs2_configs(
+    cs2_exe: Path,
+    resolution: str = "360x270",
+    *,
+    vac_safe: bool = False,
+) -> str:
+    """Deploy farm cfg; return +exec target (relative cfg name when vac_safe)."""
     cfg_dir = find_csgo_cfg_dir(cs2_exe)
     cfg_dir.mkdir(parents=True, exist_ok=True)
+    fsm_cfg = _resources_cs2() / "fsm.cfg"
+    if not fsm_cfg.is_file():
+        raise LauncherError(f"missing resource: {fsm_cfg}")
+    farm_cfg_path = cfg_dir / FARM_PANEL_CFG
+    shutil.copy2(fsm_cfg, farm_cfg_path)
+
+    if vac_safe:
+        return FARM_PANEL_CFG
+
     video_src = _video_profile_path(resolution)
     shutil.copy2(video_src, cfg_dir / "video.txt")
     convars_src = _resources_cs2() / "cs2_machine_convars.vcfg"
     if not convars_src.is_file():
         raise LauncherError(f"missing resource: {convars_src}")
     shutil.copy2(convars_src, cfg_dir / convars_src.name)
-    fsm_cfg = _resources_cs2() / "fsm.cfg"
-    if not fsm_cfg.is_file():
-        raise LauncherError(f"missing resource: {fsm_cfg}")
-    return fsm_cfg.resolve()
+    return str(fsm_cfg.resolve())
 
 
 def build_cs2_command(config: AppConfig) -> list[str]:
     """Deploy cfg, then start CS2 via steam -applaunch 730 (VAC-safe, same as manual Play)."""
+    vac_safe = bool(config.cs2_vac_safe_launch)
     exe = resolve_cs2_exe(config)
-    fsm_cfg = deploy_cs2_configs(exe, config.cs_resolution)
+    exec_target = deploy_cs2_configs(exe, config.cs_resolution, vac_safe=vac_safe)
     steam_exe = resolve_steam_exe(config)
-    cs2_argv = [*get_cs2_launch_argv(), "+exec", str(fsm_cfg)]
+    cs2_argv = [*get_cs2_launch_argv(vac_safe=vac_safe), "+exec", exec_target]
     return [str(steam_exe), "-applaunch", "730", *cs2_argv]
 
 
-def launch_cs2(config: AppConfig) -> subprocess.Popen[str]:
+def format_cs2_launch_log(cmd: list[str]) -> str:
+    return "cs2 launch: " + " ".join(cmd)
+
+
+def launch_cs2(
+    config: AppConfig,
+    *,
+    on_log: Callable[[str], None] | None = None,
+) -> subprocess.Popen[str]:
     _require_windows()
     cmd = build_cs2_command(config)
+    if on_log:
+        on_log(format_cs2_launch_log(cmd))
     try:
-        proc = subprocess.Popen(
-            cmd,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, "CREATE_NO_WINDOW") else 0,
-        )
+        proc = subprocess.Popen(cmd)
     except OSError as exc:
         raise LauncherError(f"failed to start CS2: {exc}") from exc
     if proc.poll() is not None:

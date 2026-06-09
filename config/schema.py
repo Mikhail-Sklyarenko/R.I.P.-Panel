@@ -101,6 +101,10 @@ class AppConfig(BaseModel):
     cs_resolution: str = Field(
         default="360x270", description="Разрешение CS2 для ui_nav coords"
     )
+    cs2_vac_safe_launch: bool = Field(
+        default=True,
+        description="VAC-safe CS2: applaunch 730, minimal flags, farm_panel.cfg only (no video.txt overwrite)",
+    )
     bot_mode: BotMode = Field(
         default=BotMode.AUTO, description="auto | ai | simple"
     )

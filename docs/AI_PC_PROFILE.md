@@ -48,9 +48,11 @@ Missing profile → startup warning + `UiNavError` at runtime.
 
 If DM search works **manually** via Steam but fails through the panel (unsigned files / VAC dialog):
 
-1. `git pull` — panel uses **VAC-safe** Steam flags (no `-norepairfiles`) and starts CS2 via `steam.exe -applaunch 730` (same as Play in library).
+1. `git pull` — `cs2_vac_safe_launch: true` (default): `steam -applaunch 730`, **no** FSM `-nosound`/`-novid` flags, **no** overwrite of `game/csgo/cfg/video.txt`, only `farm_panel.cfg` for binds/DM.
 2. CS2 **launch options** in Steam must be **empty** (no `-insecure`).
-3. One-time: integrity verify CS2 with **normal** Steam (not via farm), then farm run.
+3. Set **1280×720 in-game** manually (VAC-safe mode does not push `video.txt`).
+4. Main log shows `cs2 launch: ...` — copy line if VAC persists.
+5. One-time: integrity verify CS2 with **normal** Steam, then farm run.
 
 ## pywin32 (ArmoryFarm)
 
