@@ -78,10 +78,12 @@ class OBSVirtualCameraGrabber(BaseGrabber):
         frame = np.ascontiguousarray(frame[:, :, ::-1])
 
         fh, fw = frame.shape[:2]
-        if fw < width or fh < height:
-            return None
+        if fw != width or fh != height:
+            frame = cv2.resize(
+                frame, (width, height), interpolation=cv2.INTER_LINEAR,
+            )
 
-        return frame[0:height, 0:width]
+        return frame
 
     def cleanup(self) -> None:
         if self._device is not None:

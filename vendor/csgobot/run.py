@@ -37,6 +37,9 @@ GRABBER_TYPE = "obs_vc"
 # OBS Virtual Camera settings (only for GRABBER_TYPE == "obs_vc")
 OBS_DEVICE_INDEX = -1  # -1 to use device name instead
 OBS_DEVICE_NAME = "OBS Virtual Camera"
+# Must match OBS Settings → Video → Base resolution (and CS2 windowed size)
+OBS_CANVAS_WIDTH = 1280
+OBS_CANVAS_HEIGHT = 720
 
 # YOLO model settings
 YOLO_WEIGHTS = "./yolov8/cs2_yolov8m_640_augmented_v4.pt"
@@ -64,9 +67,9 @@ X360 = 7792  # Default for CS2 at sensitivity 1.0
 CURRENT_TEAM = Team.CT  # Your starting team
 PRIORITIZE_HEADS = True  # Prefer headshots
 MAX_ASSIST_DISTANCE = 300  # Max pixel distance to engage
-SMOOTHING = 1.0  # 1.0 = instant, 2.0 = half speed, etc.
+SMOOTHING = 3.0  # higher = smoother aim; raise if mouse overshoots at high FPS
 AUTO_SHOOT = False  # Automatic shooting (not recommended)
-DEAD_ZONE = 5.0  # Minimum pixel distance to move
+DEAD_ZONE = 12.0  # stop micro-corrections near crosshair (reduces circular jitter)
 ONE_SHOT = False  # Only move once per activation
 
 # Hotkeys
@@ -74,8 +77,8 @@ ACTIVATION_HOTKEY = 58  # CAPS LOCK
 TEAM_CHANGE_HOTKEY = "ctrl+t"
 EXIT_HOTKEY = "ctrl+q"
 
-# Preview window (disable for farming — saves CPU/GPU and raises FPS)
-SHOW_PREVIEW = False
+# Preview window (False = max FPS for farming; True = debug boxes on enemies)
+SHOW_PREVIEW = True
 PREVIEW_WIDTH = 640
 PREVIEW_HEIGHT = 360
 
@@ -164,25 +167,36 @@ def main() -> int:
     # Create configuration
     config = create_config()
 
-    # Try to get window rect
-    try:
-        from utils.win32 import get_window_rect
-        rect = get_window_rect(
-            config.window_title,
-            config.border_offsets,
-        )
+    # Capture region: OBS scene coords vs desktop window coords (mss/dxcam)
+    if config.grabber_type == "obs_vc":
         config.capture_region = CaptureRegion(
-            left=rect[0],
-            top=rect[1],
-            width=rect[2],
-            height=rect[3],
+            left=0,
+            top=0,
+            width=OBS_CANVAS_WIDTH,
+            height=OBS_CANVAS_HEIGHT,
         )
-        config.capture_region = adjust_region_to_multiple(config.capture_region, 32)
-        logger.info(f"Capture region: {config.capture_region}")
-    except Exception as e:
-        logger.warning(f"Could not get window rect: {e}")
-        logger.info("Using default capture region (1920x1080)")
-        config.capture_region = CaptureRegion()
+        logger.info(f"Capture region (OBS canvas): {config.capture_region}")
+    else:
+        try:
+            from utils.win32 import get_window_rect
+            rect = get_window_rect(
+                config.window_title,
+                config.border_offsets,
+            )
+            config.capture_region = CaptureRegion(
+                left=rect[0],
+                top=rect[1],
+                width=rect[2],
+                height=rect[3],
+            )
+            config.capture_region = adjust_region_to_multiple(
+                config.capture_region, 32,
+            )
+            logger.info(f"Capture region: {config.capture_region}")
+        except Exception as e:
+            logger.warning(f"Could not get window rect: {e}")
+            logger.info("Using default capture region (1920x1080)")
+            config.capture_region = CaptureRegion()
 
     # Import and run
     from main import CS2Bot

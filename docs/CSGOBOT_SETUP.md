@@ -66,6 +66,17 @@ venv\Scripts\pip.exe install torch torchvision --index-url https://download.pyto
 
 В логе `run.py` должно быть `PyTorch: cuda (...)` и `Detector: ... device=cuda`.
 
+## Наводка крутит по кругу
+
+Частые причины:
+
+1. **OBS** — в логе должно быть `Capture region (OBS canvas): ... 1280 x 720`, не `704`.
+2. **Высокий FPS + перелёт** — в `run.py`: `SMOOTHING = 3.0`, `DEAD_ZONE = 12.0`.
+3. **Неверная команда** — **Ctrl+T** (CT / T).
+4. **Чувствительность** — подстройте `X360` в `run.py` под вашу sens в CS2.
+
+Окно с рамками: `SHOW_PREVIEW = True` (для фарма можно `False`).
+
 ## Отдельный venv (обязательно)
 
 ```bat
