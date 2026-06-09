@@ -68,7 +68,9 @@ CURRENT_TEAM = Team.CT  # Your starting team
 PRIORITIZE_HEADS = True  # Prefer headshots
 MAX_ASSIST_DISTANCE = 300  # Max pixel distance to engage
 SMOOTHING = 3.0  # higher = smoother aim; raise if mouse overshoots at high FPS
-AUTO_SHOOT = False  # Automatic shooting (not recommended)
+AUTO_SHOOT = False  # not wired yet in main.py
+AUTO_MOVE = True  # random WASD while Caps Lock active (like panel simple bot)
+MOVE_INTERVAL_SEC = 8.0  # seconds between key taps
 DEAD_ZONE = 12.0  # stop micro-corrections near crosshair (reduces circular jitter)
 ONE_SHOT = False  # Only move once per activation
 
@@ -118,6 +120,8 @@ def create_config() -> AppConfig:
         max_assist_distance=MAX_ASSIST_DISTANCE,
         smoothing_factor=SMOOTHING,
         auto_shoot=AUTO_SHOOT,
+        auto_move=AUTO_MOVE,
+        move_interval_sec=MOVE_INTERVAL_SEC,
         dead_zone=DEAD_ZONE,
         one_shot=ONE_SHOT,
     )

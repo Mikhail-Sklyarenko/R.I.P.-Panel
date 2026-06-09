@@ -124,6 +124,10 @@ class AimConfig:
     # Auto-shoot settings
     auto_shoot: bool = False
 
+    # WASD movement while bot is active (csgobot has no pathfinding)
+    auto_move: bool = False
+    move_interval_sec: float = 8.0
+
     # Recoil compensation
     recoil: RecoilConfig = field(default_factory=RecoilConfig)
 

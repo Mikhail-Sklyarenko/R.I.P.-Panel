@@ -6,6 +6,7 @@ Architecture: [Grab Process] --queue--> [Detection Process] --queue--> [Preview 
 
 import logging
 import multiprocessing
+import random
 import signal
 import sys
 import time
@@ -287,6 +288,7 @@ def detection_process(
         return
 
     fps = FPSCounter()
+    last_move_time = 0.0
 
     while not stop_event.is_set():
         try:
@@ -300,6 +302,19 @@ def detection_process(
 
         # Run detection
         detections = detector.detect(img, verbose=False)
+
+        if (
+            activated.is_set()
+            and config.aim.auto_move
+            and time.monotonic() - last_move_time >= config.aim.move_interval_sec
+        ):
+            try:
+                import pydirectinput
+
+                pydirectinput.press(random.choice(["w", "a", "s", "d"]))
+                last_move_time = time.monotonic()
+            except Exception as e:
+                logger.debug(f"auto_move failed: {e}")
 
         # Process if activated
         if activated.is_set() and detections:
