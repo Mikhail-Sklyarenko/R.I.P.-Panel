@@ -83,10 +83,13 @@ def start_ai(ctx: dict[str, Any]) -> bool:
         if hasattr(subprocess, "CREATE_NO_WINDOW")
         else 0
     )
+    child_env = os.environ.copy()
+    child_env["CSGOBOT_AUTO_ACTIVATE"] = "1"
     try:
         _PROCESS = subprocess.Popen(
             cmd,
             cwd=str(_csgobot_dir()),
+            env=child_env,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.PIPE,
             creationflags=creationflags,
@@ -96,7 +99,10 @@ def start_ai(ctx: dict[str, Any]) -> bool:
         return False
 
     if emit:
-        emit(EventType.COMBAT_AI_STARTED, "csgobot: subprocess started")
+        emit(
+            EventType.COMBAT_AI_STARTED,
+            "csgobot: subprocess started (auto_activate)",
+        )
 
     timeout = _max_runtime_sec(ctx)
     if os.environ.get("COMBAT_AI_SECONDS"):

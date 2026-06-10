@@ -2,6 +2,7 @@
 Entry point for configuring and running the bot.
 """
 
+import os
 import sys
 import logging
 
@@ -85,6 +86,7 @@ ONE_SHOT = False  # Only move once per activation
 
 # Hotkeys
 ACTIVATION_HOTKEY = 58  # CAPS LOCK
+AUTO_ACTIVATE = False  # panel sets CSGOBOT_AUTO_ACTIVATE=1; manual run keeps Caps Lock
 TEAM_CHANGE_HOTKEY = "ctrl+t"
 EXIT_HOTKEY = "ctrl+q"
 
@@ -141,10 +143,15 @@ def create_config() -> AppConfig:
         size=(PREVIEW_WIDTH, PREVIEW_HEIGHT),
     )
 
+    auto_activate = AUTO_ACTIVATE or os.environ.get(
+        "CSGOBOT_AUTO_ACTIVATE", "",
+    ).lower() in ("1", "true", "yes")
+
     hotkey_config = HotkeyConfig(
         activation=ACTIVATION_HOTKEY,
         change_team=TEAM_CHANGE_HOTKEY,
         exit=EXIT_HOTKEY,
+        auto_activate=auto_activate,
     )
 
     patrol_config = PatrolConfig(
@@ -247,7 +254,10 @@ def main() -> int:
         pass
     logger.info(f"Preview: {'on' if config.preview.enabled else 'off'}")
     logger.info("=" * 50)
-    logger.info(f"Activation: CAPS LOCK")
+    if config.hotkeys.auto_activate:
+        logger.info("Activation: auto (panel / CSGOBOT_AUTO_ACTIVATE)")
+    else:
+        logger.info("Activation: CAPS LOCK")
     logger.info(f"Change Team: Ctrl+T")
     logger.info(f"Exit: Ctrl+Q")
     logger.info("=" * 50)

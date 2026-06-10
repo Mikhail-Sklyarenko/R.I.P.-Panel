@@ -165,4 +165,12 @@ venv\Scripts\python.exe run.py
 - `bot_mode: simple` — `modules/combat/simple.py` (10 min, без GPL)
 - `bot_mode: auto` — AI если есть `run.py` + venv, иначе simple; при падении AI → `combat_fallback` + simple
 
+### Авто-активация (фаза 3)
+
+Панель передаёт `CSGOBOT_AUTO_ACTIVATE=1` в subprocess → **Caps Lock не нужен** после `combat_ai_started`.
+
+В логе панели: `csgobot: subprocess started (auto_activate)`. В логе csgobot: `auto_activate: bot enabled`.
+
+Ручной `run.py` без env — по-прежнему **Caps Lock**. Для ручного теста с авто: `set CSGOBOT_AUTO_ACTIVATE=1` или `AUTO_ACTIVATE = True` в `run.py`.
+
 См. также `docs/AI_PC_PROFILE.md`.

@@ -156,9 +156,11 @@ dm click main_menu_play @(…,…)
 dm click mode_deathmatch @(…,…)
 dm click start_search @(…,…)
 in_dm
-combat_ai_started
+combat_ai_started (auto_activate)
 farming
 ```
+
+Caps Lock **не нужен** при запуске из панели (`CSGOBOT_AUTO_ACTIVATE=1`). Ручной `run.py` — Caps Lock по-прежнему.
 
 Level detect: первые **10 min** в DM UI level up не проверяется (`level_detect_grace_minutes`); нужны **все** пробы + 3 опроса подряд. Ложный `level_up` сразу после `combat_ai_started` → откалибруйте `level_probes_1280x720.yaml`.
 

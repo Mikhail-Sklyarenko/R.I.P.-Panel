@@ -176,6 +176,7 @@ class HotkeyConfig:
     activation: int = 58  # CAPS LOCK
     change_team: str = "ctrl+t"
     exit: str = "ctrl+q"
+    auto_activate: bool = False  # True = skip Caps Lock (panel subprocess sets env)
 
 
 @dataclass

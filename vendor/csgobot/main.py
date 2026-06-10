@@ -165,6 +165,10 @@ class CS2Bot:
             p.start()
             logger.info(f"Started {p.name}")
 
+        if self.config.hotkeys.auto_activate:
+            self.activated.set()
+            logger.info("auto_activate: bot enabled (Caps Lock not required)")
+
         # Main loop
         try:
             while not self.stop_event.is_set():
