@@ -31,8 +31,18 @@ Invoke-WebRequest -Uri https://media.githubusercontent.com/media/Priler/csgobot/
 В `vendor\csgobot\run.py` по умолчанию `GRABBER_TYPE = "obs_vc"`.
 
 1. OBS → источник **«Захват окна»** → Counter-Strike 2
-2. **Настройки → Видео** → базовое разрешение **1280×720**
-3. **Запустить виртуальную камеру** до старта бота
+2. Settings → Video → Base **1280×720**
+3. **Start Virtual Camera** (можно держать включённой между сессиями)
+
+Проверка из csgobot venv:
+
+```powershell
+cd vendor\csgobot
+.\venv\Scripts\python tools\check_obs_vc.py
+```
+
+Панель при старте и перед `combat_ai_started` предупреждает, если VC недоступна.
+
 4. `pip install pygrabber` в venv csgobot
 
 Исправление grabber (уже в репо): виртуальная камера отдаёт сцену OBS без смещения `left/top` экрана — файл `grabbers/obs_vc_grabber.py`.
@@ -68,14 +78,18 @@ venv\Scripts\pip.exe install torch torchvision --index-url https://download.pyto
 
 ## Наводка крутит по кругу
 
+Полная инструкция: **`docs/AIM_TUNING.md`**.
+
 Частые причины:
 
 1. **OBS** — в логе должно быть `Capture region (OBS canvas): ... 1280 x 720`, не `704`.
 2. **Высокий FPS + перелёт** — в `run.py`: `SMOOTHING = 3.0`, `DEAD_ZONE = 12.0`.
 3. **Неверная команда** — **Ctrl+T** (CT / T).
-4. **Чувствительность** — подстройте `X360` в `run.py` под вашу sens в CS2.
+4. **Чувствительность** — `X360` / `CS2_SENSITIVITY` / `CSGOBOT_X360` (см. AIM_TUNING.md).
 
-Окно с рамками: `SHOW_PREVIEW = True` (для фарма можно `False`).
+Env без правки `run.py`: `CS2_SENSITIVITY`, `CSGOBOT_X360`, `CSGOBOT_SMOOTHING`, `CSGOBOT_DEAD_ZONE`, `CSGOBOT_AIM_DEBUG=1`.
+
+Окно с рамками: `SHOW_PREVIEW = True` (для фарма по умолчанию **False**).
 
 ## Автострельба (AUTO_SHOOT)
 

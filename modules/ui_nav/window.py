@@ -80,12 +80,13 @@ def wait_for_cs2_main_menu(
     hwnd: int,
     coords,
     *,
-    timeout_sec: float = 120.0,
+    timeout_sec: float = 60.0,
     poll_sec: float = 0.5,
     on_progress: Callable[[str], None] | None = None,
     artifacts=None,
     min_match: int | None = None,
     require_strict: bool = True,
+    soft_peek_polls: int = 3,
 ) -> MainMenuWaitResult:
     """Poll until main_menu probes match. Timeout returns timed_out (no exception)."""
     _require_windows()
@@ -101,6 +102,7 @@ def wait_for_cs2_main_menu(
     last_img = None
     last_probe_results = []
     soft_peek = False
+    consecutive_soft = 0
     if on_progress:
         on_progress("waiting for CS2 main menu…")
     while time.monotonic() < deadline:
@@ -116,6 +118,10 @@ def wait_for_cs2_main_menu(
         last_probe_results = probe_results
         soft_hit = sum(1 for r in probe_results if r.matched) >= 1
         soft_peek = soft_peek or soft_hit
+        if soft_hit:
+            consecutive_soft += 1
+        else:
+            consecutive_soft = 0
         strict = detect_state(
             img,
             ScreenState.MAIN_MENU,
@@ -148,6 +154,26 @@ def wait_for_cs2_main_menu(
                     strict_ok=True,
                     attempts=attempt,
                     soft_peek=soft_peek,
+                )
+            if (
+                soft_hit
+                and consecutive_soft >= max(1, soft_peek_polls)
+                and not strict
+            ):
+                if artifacts is not None:
+                    artifacts.log_step(
+                        "main_menu_soft_peek_ok",
+                        attempt=attempt,
+                        consecutive=consecutive_soft,
+                    )
+                if on_progress:
+                    on_progress(
+                        f"main_menu soft_peek confirmed after {consecutive_soft} polls"
+                    )
+                return MainMenuWaitResult(
+                    strict_ok=False,
+                    attempts=attempt,
+                    soft_peek=True,
                 )
         elif detect_state(
             img, ScreenState.MAIN_MENU, coords, min_match=soft_required

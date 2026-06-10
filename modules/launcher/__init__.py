@@ -147,6 +147,13 @@ def run(ctx: dict[str, Any] | None = None) -> bool:
                 EventType.CS2_OK,
                 f"cs2 menu ready (hwnd={cs2_hwnd})",
             )
+        elif menu_result.soft_peek and not menu_result.timed_out:
+            ctx["cs2_menu_probe_warn"] = True
+            ctx["cs2_menu_soft_peek"] = True
+            _emit(
+                EventType.CS2_OK,
+                f"cs2 menu soft_peek (hwnd={cs2_hwnd}); trying dm nav",
+            )
         else:
             ctx["cs2_menu_probe_warn"] = True
             if menu_result.soft_peek:

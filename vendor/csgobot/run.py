@@ -91,7 +91,7 @@ TEAM_CHANGE_HOTKEY = "ctrl+t"
 EXIT_HOTKEY = "ctrl+q"
 
 # Preview window (False = max FPS for farming; True = debug boxes on enemies)
-SHOW_PREVIEW = True
+SHOW_PREVIEW = False
 PREVIEW_WIDTH = 640
 PREVIEW_HEIGHT = 360
 
@@ -102,6 +102,11 @@ PREVIEW_HEIGHT = 360
 
 def create_config() -> AppConfig:
     """Create application configuration from settings above."""
+    from aim_tuning import resolve_dead_zone, resolve_smoothing, resolve_x360
+
+    x360 = resolve_x360(X360)
+    smoothing = resolve_smoothing(SMOOTHING)
+    dead_zone = resolve_dead_zone(DEAD_ZONE)
 
     # Create sub-configs
     obs_config = OBSConfig(
@@ -112,7 +117,7 @@ def create_config() -> AppConfig:
     fov_config = FOVConfig(
         horizontal=FOV_HORIZONTAL,
         vertical=FOV_VERTICAL,
-        x360=X360,
+        x360=x360,
     )
 
     detector_config = DetectorConfig(
@@ -129,12 +134,12 @@ def create_config() -> AppConfig:
         current_team=CURRENT_TEAM,
         prioritize_heads=PRIORITIZE_HEADS,
         max_assist_distance=MAX_ASSIST_DISTANCE,
-        smoothing_factor=SMOOTHING,
+        smoothing_factor=smoothing,
         auto_shoot=AUTO_SHOOT,
         shoot_cooldown_sec=SHOOT_COOLDOWN_SEC,
         auto_move=AUTO_MOVE,
         move_interval_sec=MOVE_INTERVAL_SEC,
-        dead_zone=DEAD_ZONE,
+        dead_zone=dead_zone,
         one_shot=ONE_SHOT,
     )
 
@@ -239,7 +244,10 @@ def main() -> int:
     logger.info(f"Window: {config.window_title}")
     logger.info(f"Grabber: {config.grabber_type}")
     logger.info(f"FOV: {config.fov.horizontal}° x {config.fov.vertical}°")
-    logger.info(f"x360: {config.fov.x360}")
+    logger.info(
+        f"Aim: x360={config.fov.x360} smoothing={config.aim.smoothing_factor} "
+        f"dead_zone={config.aim.dead_zone} max_dist={config.aim.max_assist_distance}"
+    )
     logger.info(f"Team: {config.aim.current_team.value.upper()}")
     try:
         import torch

@@ -127,6 +127,8 @@ venv\Scripts\pip install -r requirements.txt
 
 `bot_mode: ai` → subprocess; `auto` falls back to simple if venv missing.
 
+**Aim (Level 1):** calibrate `X360` to in-game sens — see `docs/AIM_TUNING.md`. Defaults: `SHOW_PREVIEW=False`, `SMOOTHING=3`, `DEAD_ZONE=12`. Env: `CS2_SENSITIVITY`, `CSGOBOT_X360`.
+
 ## Calibration checklist
 
 PNG must be **exactly 1280×720 client area** (not full desktop 1920×1080).

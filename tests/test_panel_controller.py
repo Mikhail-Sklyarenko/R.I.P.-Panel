@@ -111,3 +111,34 @@ def test_start_farm_queues_orchestrator(data_dir) -> None:
     joined = "".join(buf)
     assert "orchestrator: queued" in joined
     ctrl.stop_farm()
+
+
+def test_start_farm_warns_empty_trade_link(data_dir) -> None:
+    _seed_three(data_dir)
+    from config.loader import load_config, save_config
+
+    cfg = load_config()
+    cfg.test_mode = True
+    cfg.auto_collect_drop = True
+    cfg.trade_offer_link = ""
+    save_config(cfg)
+    ctrl = PanelController(None, test_mode=False)
+    buf: list[str] = []
+
+    class FakeLog:
+        def configure(self, **kwargs) -> None:
+            pass
+
+        def insert(self, _pos: str, text: str) -> None:
+            buf.append(text)
+
+        def see(self, _pos: str) -> None:
+            pass
+
+    ctrl.bind_log_widgets(FakeLog(), FakeLog())
+    ctrl.start_farm()
+    ctrl._drain_log_queue()
+    joined = "".join(buf)
+    assert "trade_offer_link empty" in joined
+    assert "LOOT WILL FAIL" in joined
+    ctrl.stop_farm()

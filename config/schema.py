@@ -101,9 +101,9 @@ class AppConfig(BaseModel):
         description="Таймаут ожидания окна CS2 после Popen",
     )
     cs2_main_menu_wait_timeout_sec: int = Field(
-        default=120,
+        default=60,
         ge=15,
-        description="Launcher + dm_runner main-menu wait (shared timeout, default 120s)",
+        description="Launcher + dm_runner main-menu wait (shared timeout, default 60s)",
     )
     search_retries: int = Field(
         default=5, ge=1, description="FSM SEARCH_RETRIES_BEFORE_SHUFFLE"

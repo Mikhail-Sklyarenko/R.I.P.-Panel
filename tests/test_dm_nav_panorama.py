@@ -279,6 +279,7 @@ def test_menu_confirmed_waits_strict_before_clicks(data_dir, monkeypatch) -> Non
             nav2._pre_click_main_menu_wait()
             mock_wait.assert_called_once()
             assert mock_wait.call_args.kwargs.get("min_match") == 1
+            assert mock_wait.call_args.kwargs.get("timeout") == 15.0
 
 
 def test_dm_retry_aborts_on_invalid_hwnd(data_dir, monkeypatch) -> None:

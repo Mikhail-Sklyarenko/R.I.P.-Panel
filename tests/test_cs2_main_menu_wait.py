@@ -13,6 +13,64 @@ from modules.ui_nav.coords import load_nav_coords
 from modules.ui_nav.window import MainMenuWaitResult, wait_for_cs2_main_menu
 
 
+def test_wait_for_cs2_main_menu_strict_early_soft_peek(monkeypatch, tmp_path) -> None:
+    """require_strict: 1/2 probes × 3 polls → early exit without full timeout."""
+    monkeypatch.setattr("sys.platform", "win32")
+    monkeypatch.setenv("FARM_PANEL_DATA_DIR", str(tmp_path))
+    coords = load_nav_coords("360x270")
+    img = Image.new("RGB", (360, 270), color=(30, 30, 30))
+    artifacts = MagicMock()
+    call = {"n": 0}
+
+    def fake_strict(_img, _state, _coords, *, min_match=None):
+        return False
+
+    def fake_probe_results(_img, _state, _coords):
+        from modules.ui_nav.detectors import ProbeMatchResult
+
+        call["n"] += 1
+        return [
+            ProbeMatchResult(
+                matched=False,
+                x=217,
+                y=26,
+                actual_rgb=(30, 30, 30),
+                expected_rgb=(238, 169, 41),
+            ),
+            ProbeMatchResult(
+                matched=True,
+                x=217,
+                y=13,
+                actual_rgb=(255, 255, 255),
+                expected_rgb=(255, 254, 255),
+            ),
+        ]
+
+    with patch("modules.ui_nav.capture.capture_client_with_black_retry", return_value=img):
+        with patch("modules.ui_nav.detectors.detect_state", side_effect=fake_strict):
+            with patch(
+                "modules.ui_nav.detectors.probe_match_results",
+                side_effect=fake_probe_results,
+            ):
+                result = wait_for_cs2_main_menu(
+                    4242,
+                    coords,
+                    timeout_sec=30.0,
+                    poll_sec=0.01,
+                    artifacts=artifacts,
+                    require_strict=True,
+                    soft_peek_polls=3,
+                )
+    assert result == MainMenuWaitResult(
+        strict_ok=False, attempts=3, soft_peek=True, timed_out=False
+    )
+    artifacts.log_step.assert_any_call(
+        "main_menu_soft_peek_ok",
+        attempt=3,
+        consecutive=3,
+    )
+
+
 def test_wait_for_cs2_main_menu_ok_soft_probe(monkeypatch, tmp_path) -> None:
     monkeypatch.setattr("sys.platform", "win32")
     monkeypatch.setenv("FARM_PANEL_DATA_DIR", str(tmp_path))
@@ -203,6 +261,66 @@ def test_launcher_menu_timeout_emits_cs2_ok_with_warn(
     assert "trying dm nav" in cs2_detail
     assert mock_wait_menu.call_args.kwargs.get("require_strict") is True
     assert mock_wait_menu.call_args.kwargs.get("artifacts") is not None
+
+
+@patch("modules.launcher.ArtifactStore")
+@patch("modules.launcher.proxy_check.check_proxy", return_value=(True, "ip ok"))
+@patch("modules.launcher.steam_promo_dismiss.dismiss_steam_promo")
+@patch("modules.ui_nav.window.wait_for_cs2_main_menu")
+@patch("modules.ui_nav.coords.load_nav_coords_for_hwnd")
+@patch("modules.ui_nav.window.wait_for_cs2_hwnd", return_value=9999)
+@patch("modules.launcher.cs2.launch_cs2")
+@patch("modules.launcher.steam.launch_steam")
+@patch("modules.launcher.steam_gui_login.login_steam_gui")
+@patch("modules.launcher.cleanup.kill_cs2")
+@patch("modules.launcher.cleanup.kill_all")
+def test_launcher_soft_peek_early_exit(
+    _kill_all: MagicMock,
+    _kill_cs2: MagicMock,
+    mock_gui: MagicMock,
+    mock_steam: MagicMock,
+    mock_cs2: MagicMock,
+    mock_wait_hwnd: MagicMock,
+    mock_load_coords: MagicMock,
+    mock_wait_menu: MagicMock,
+    mock_dismiss: MagicMock,
+    _proxy: MagicMock,
+    _artifact_store: MagicMock,
+    monkeypatch,
+) -> None:
+    from modules.launcher import run
+    from modules.launcher.steam_gui_login import SteamGuiLoginResult
+    from modules.launcher.steam_promo_dismiss import SteamPromoDismissResult
+
+    mock_gui.return_value = SteamGuiLoginResult(ok=True, login="u1", detail="ok")
+    mock_dismiss.return_value = SteamPromoDismissResult(
+        dismissed=0, found=0, detail="main only — no promo"
+    )
+    mock_load_coords.return_value = load_nav_coords("360x270")
+    mock_wait_menu.return_value = MainMenuWaitResult(
+        strict_ok=False, attempts=3, soft_peek=True, timed_out=False
+    )
+    monkeypatch.setattr("sys.platform", "win32")
+
+    emitted: list[tuple[EventType, str]] = []
+
+    def emit(event: EventType, detail: str = "", **kwargs) -> None:
+        emitted.append((event, detail))
+
+    ctx: dict = {
+        "login": "u1",
+        "emit": emit,
+        "config": AppConfig(
+            steam_path=r"C:\Steam\steam.exe",
+            cs2_path=r"C:\CS2\cs2.exe",
+            steam_login_mode="gui",
+        ),
+    }
+    assert run(ctx) is True
+    assert ctx.get("cs2_menu_soft_peek") is True
+    assert ctx.get("cs2_menu_confirmed") is not True
+    cs2_detail = next(d for e, d in emitted if e == EventType.CS2_OK)
+    assert "soft_peek" in cs2_detail
 
 
 @patch("modules.launcher.ArtifactStore")

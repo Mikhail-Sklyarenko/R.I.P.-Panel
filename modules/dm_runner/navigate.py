@@ -145,6 +145,8 @@ class DmNavigator:
             min_match=min_match,
         )
 
+    _SOFT_MENU_WAIT_SEC = 15.0
+
     def _pre_click_main_menu_wait(self) -> bool:
         """Wait for main_menu probes. Returns True if main_menu_play already clicked."""
         menu_timeout = float(max(15, int(self.config.cs2_main_menu_wait_timeout_sec)))
@@ -154,14 +156,18 @@ class DmNavigator:
                 "dm nav: launcher confirmed main menu (strict); waiting before clicks"
             )
             min_match = strict_count
+            wait_timeout = menu_timeout
         else:
             if self.menu_probe_warn:
                 self._nav_progress(
                     "dm nav: main menu was not confirmed at launch; soft probe wait"
                 )
+                wait_timeout = min(menu_timeout, self._SOFT_MENU_WAIT_SEC)
+            else:
+                wait_timeout = menu_timeout
             min_match = 1
         try:
-            self.wait_main_menu(timeout=menu_timeout, min_match=min_match)
+            self.wait_main_menu(timeout=wait_timeout, min_match=min_match)
             return False
         except UiNavTimeoutError:
             img = self.driver.capture()

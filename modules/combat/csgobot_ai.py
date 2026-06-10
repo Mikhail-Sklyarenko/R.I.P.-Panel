@@ -50,6 +50,35 @@ def python_executable() -> Path | None:
     return candidate if candidate.is_file() else None
 
 
+def check_obs_virtual_camera() -> tuple[bool, str]:
+    """True if OBS Virtual Camera is available to csgobot grabber."""
+    if sys.platform != "win32":
+        return True, ""
+    py = python_executable()
+    script = _csgobot_dir() / "tools" / "check_obs_vc.py"
+    if py is None or not script.is_file():
+        return True, ""
+    try:
+        result = subprocess.run(
+            [str(py), str(script)],
+            cwd=str(_csgobot_dir()),
+            capture_output=True,
+            text=True,
+            timeout=15.0,
+            creationflags=(
+                subprocess.CREATE_NO_WINDOW
+                if hasattr(subprocess, "CREATE_NO_WINDOW")
+                else 0
+            ),
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        return False, str(exc)
+    if result.returncode == 0:
+        return True, ""
+    detail = (result.stderr or result.stdout or "").strip()
+    return False, detail or "OBS Virtual Camera not found"
+
+
 def _max_runtime_sec(ctx: dict[str, Any]) -> int:
     config = ctx.get("config")
     if config is not None:
@@ -71,6 +100,15 @@ def start_ai(ctx: dict[str, Any]) -> bool:
         return False
     py = python_executable()
     if py is None:
+        return False
+
+    obs_ok, obs_detail = check_obs_virtual_camera()
+    if not obs_ok:
+        if emit:
+            emit(
+                EventType.COMBAT_FALLBACK,
+                f"csgobot: OBS Virtual Camera not found — {obs_detail}",
+            )
         return False
 
     if _PROCESS is not None and _PROCESS.poll() is None:

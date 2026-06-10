@@ -133,7 +133,7 @@ Config: `steam_dismiss_promo` (default `true`), `steam_promo_dismiss_timeout_sec
 | `steam_dismiss_promo` | `true` | Close promo banner after login OK (best-effort) |
 | `steam_promo_dismiss_timeout_sec` | `10` | Promo detect/dismiss timeout |
 | `cs2_window_wait_timeout_sec` | `90` | Wait for CS2 window after Popen |
-| `cs2_main_menu_wait_timeout_sec` | `120` | Soft main-menu probe wait before `cs2_ok`; timeout → unconfirmed + dm nav (not hard fail) |
+| `cs2_main_menu_wait_timeout_sec` | `60` | Soft main-menu probe wait before `cs2_ok`; timeout → unconfirmed + dm nav (not hard fail) |
 | `only_launch_steam` | `false` | Skip CS2; cleanup keeps Steam |
 
 ## Events (Main log)

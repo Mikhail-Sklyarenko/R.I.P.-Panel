@@ -119,6 +119,31 @@ def collect_startup_warnings(config: AppConfig | None = None) -> list[str]:
             warnings.append("csgobot not installed — AI mode will use simple bot")
         elif csgobot_ai.python_executable() is None:
             warnings.append("csgobot venv missing — run setup in vendor/csgobot")
+        else:
+            weights = (
+                root
+                / "vendor"
+                / "csgobot"
+                / "yolov8"
+                / "cs2_yolov8m_640_augmented_v4.pt"
+            )
+            if not weights.is_file():
+                warnings.append(
+                    f"YOLO weights missing: {weights.name} "
+                    f"(see docs/FARM_PC_CHECKLIST.md)"
+                )
+            if sys.platform == "win32" and not cfg.test_mode:
+                obs_ok, obs_detail = csgobot_ai.check_obs_virtual_camera()
+                if not obs_ok:
+                    warnings.append(
+                        "OBS Virtual Camera not found — start OBS and enable VC "
+                        f"({obs_detail[:120]})"
+                    )
+
+    if cfg.auto_collect_drop and not (cfg.trade_offer_link or "").strip():
+        warnings.append(
+            "trade_offer_link empty — looter will fail at end (set in Config #1)"
+        )
 
     if not get_data_dir().exists():
         warnings.append("data/ will be created on first config save")

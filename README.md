@@ -35,6 +35,7 @@ powershell -ExecutionPolicy Bypass -File build\build_windows.ps1
 Output: `dist/FarmPanel/FarmPanel.exe`, `resources/`, `vendor/looter/`, writable `data/`.
 
 - **First run:** `docs/WINDOWS_FIRST_RUN.md`
+- **Farm PC setup:** `docs/FARM_PC_CHECKLIST.md`
 - **Accounts:** `data/import/logpass.txt` + `maFiles/` → UI **Import from logpass** (see `docs/FSM_ACCOUNT_IMPORT.md`)
 - **Vault CLI:** `vault_cli.bat import-fsm` or `FarmPanel.exe --vault-cli list`
 - **Dev launcher:** `FarmPanel.bat` (pythonw + source tree)

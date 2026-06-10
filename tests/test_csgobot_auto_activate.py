@@ -48,6 +48,11 @@ def test_start_ai_passes_auto_activate_env(monkeypatch) -> None:
         "python_executable",
         lambda: Path("C:/fake/venv/Scripts/python.exe"),
     )
+    monkeypatch.setattr(
+        csgobot_ai,
+        "check_obs_virtual_camera",
+        lambda: (True, ""),
+    )
 
     proc = MagicMock()
     proc.poll.return_value = 0
@@ -59,3 +64,34 @@ def test_start_ai_passes_auto_activate_env(monkeypatch) -> None:
     assert ok is True
     _, kwargs = popen.call_args
     assert kwargs["env"]["CSGOBOT_AUTO_ACTIVATE"] == "1"
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="csgobot panel launch is Windows-only")
+def test_start_ai_obs_missing_returns_fallback(monkeypatch) -> None:
+    from core.events import EventType
+    from modules.combat import csgobot_ai
+
+    monkeypatch.setattr(csgobot_ai, "is_installed", lambda: True)
+    monkeypatch.setattr(
+        csgobot_ai,
+        "python_executable",
+        lambda: Path("C:/fake/venv/Scripts/python.exe"),
+    )
+    monkeypatch.setattr(
+        csgobot_ai,
+        "check_obs_virtual_camera",
+        lambda: (False, "OBS Virtual Camera not found"),
+    )
+
+    emitted: list[tuple[EventType, str]] = []
+
+    def emit(event: EventType, detail: str = "", **kwargs) -> None:
+        emitted.append((event, detail))
+
+    with patch("modules.combat.csgobot_ai.subprocess.Popen") as popen:
+        ok = csgobot_ai.start_ai({"emit": emit})
+
+    assert ok is False
+    popen.assert_not_called()
+    assert any(e == EventType.COMBAT_FALLBACK for e, _ in emitted)
+    assert any("OBS Virtual Camera" in d for _, d in emitted)

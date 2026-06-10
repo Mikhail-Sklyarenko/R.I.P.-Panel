@@ -33,7 +33,7 @@
 - `capture_client` использует **`focus_window`** (как клики), не голый `SetForegroundWindow`
 - Launcher: **`move_all_cs_windows` до** `wait_for_cs2_main_menu` → `launcher layout: …`
 - Black frame: `capture_suspect_black` + refocus retry (1× per poll)
-- dm retry после clicks: **`dm nav: retry in_dm wait`** — без повторного 120s menu wait
+- dm retry после clicks: **`dm nav: retry in_dm wait`** — без повторного 60s menu wait
 
 **Probes ≠ mouse:** gate читает RGB; курсор — после wait или controlled fallback @217.
 
@@ -44,7 +44,7 @@
 | `GAME_SEARCH_TIMEOUT` | `game_search_timeout_sec` | 90 |
 | `MAP_LOAD_DELAY` | `map_load_delay_sec` | 65 |
 | `SEARCH_RETRIES_BEFORE_SHUFFLE` | `search_retries` | 5 |
-| — | `cs2_main_menu_wait_timeout_sec` | 120 (launcher strict + dm_runner pre-click) |
+| — | `cs2_main_menu_wait_timeout_sec` | 60 (launcher strict + dm_runner pre-click; 15s if menu unconfirmed) |
 
 ## Клики (база 360×270, Panorama RU)
 

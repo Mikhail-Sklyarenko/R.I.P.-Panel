@@ -31,6 +31,7 @@ from utils.win32 import get_window_rect
 from detectors import YOLOv8Detector
 from aiming import FOVMouseMovement, TargetSelector
 from aiming.auto_shoot import should_auto_shoot_target
+from aim_tuning import aim_debug_enabled
 from patrol import (
     PatrolMode,
     PatrolRunner,
@@ -315,6 +316,8 @@ def detection_process(
     last_enemy_seen = 0.0
     stuck_since: Optional[float] = None
     last_unstuck_time = 0.0
+    aim_debug = aim_debug_enabled()
+    last_aim_debug_log = 0.0
 
     if config.patrol.enabled:
         try:
@@ -485,6 +488,18 @@ def detection_process(
 
                     if config.aim.one_shot:
                         activated.clear()
+
+                if aim_debug and now - last_aim_debug_log >= 2.0:
+                    logger.info(
+                        "aim: fps=%.0f dist=%.1f mouse=(%d,%d) target=(%.0f,%.0f)",
+                        fps(),
+                        aim_result.pixel_distance,
+                        aim_result.mouse_x,
+                        aim_result.mouse_y,
+                        target.aim_x,
+                        target.aim_y,
+                    )
+                    last_aim_debug_log = now
 
                 if should_auto_shoot_target(
                     config.aim,

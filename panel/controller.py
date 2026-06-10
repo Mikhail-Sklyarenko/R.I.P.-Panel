@@ -316,6 +316,11 @@ class PanelController:
         self._notify_counters()
 
     def _enqueue_farm(self, logins: list[str], *, force_farm: bool = True) -> None:
+        cfg = load_config()
+        if cfg.auto_collect_drop and not (cfg.trade_offer_link or "").strip():
+            self.append_log(
+                "WARN: trade_offer_link empty — LOOT WILL FAIL at end; set in Config #1"
+            )
         self._mark_status(logins, "farming")
         self._orchestrator.enqueue(
             logins,
