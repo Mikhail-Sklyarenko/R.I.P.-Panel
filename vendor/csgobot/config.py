@@ -123,6 +123,7 @@ class AimConfig:
 
     # Auto-shoot settings
     auto_shoot: bool = False
+    shoot_cooldown_sec: float = 0.1  # min seconds between LMB clicks (0.08–0.15)
 
     # WASD movement while bot is active (csgobot has no pathfinding)
     auto_move: bool = False

@@ -29,6 +29,7 @@ from utils.win32 import get_window_rect
 
 from detectors import YOLOv8Detector
 from aiming import FOVMouseMovement, TargetSelector
+from aiming.auto_shoot import should_auto_shoot_target
 
 # Logging setup
 logging.basicConfig(
@@ -289,6 +290,8 @@ def detection_process(
 
     fps = FPSCounter()
     last_move_time = 0.0
+    last_shot_time = 0.0
+    auto_shoot_announced = False
 
     while not stop_event.is_set():
         try:
@@ -331,12 +334,31 @@ def detection_process(
                     smoothing=config.aim.smoothing_factor,
                 )
 
-                # only move if outside ded zone (prevents over-aiming hopefully)
+                # only move if outside dead zone (prevents over-aiming hopefully)
                 if aim_result.pixel_distance > config.aim.dead_zone:
                     mouse.move_relative(aim_result.mouse_x, aim_result.mouse_y)
 
                     if config.aim.one_shot:
                         activated.clear()
+
+                now = time.monotonic()
+                if should_auto_shoot_target(
+                    config.aim,
+                    target,
+                    aim_result.pixel_distance,
+                    now,
+                    last_shot_time,
+                ):
+                    try:
+                        mouse.click("left")
+                    except Exception:
+                        import pydirectinput
+
+                        pydirectinput.click(button="left")
+                    last_shot_time = now
+                    if not auto_shoot_announced:
+                        logger.info("auto_shoot: enabled (first shot fired)")
+                        auto_shoot_announced = True
 
                 # draw aim point on preview
                 if config.preview.enabled:
