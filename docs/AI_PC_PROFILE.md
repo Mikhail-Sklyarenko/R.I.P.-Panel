@@ -160,7 +160,9 @@ combat_ai_started
 farming
 ```
 
-**Must NOT:** clicks on МАГАЗИН / IEM Cologne; persistent `[0,0,0]` probes; `AttachThreadInput` crash.
+Level detect: первые **10 min** в DM UI level up не проверяется (`level_detect_grace_minutes`); нужны **все** пробы + 3 опроса подряд. Ложный `level_up` сразу после `combat_ai_started` → откалибруйте `level_probes_1280x720.yaml`.
+
+**Must NOT:** clicks on МАГАЗИН / IEM Cologne; persistent `[0,0,0]` probes; `AttachThreadInput` crash; `level_up` в первые секунды DM.
 
 ## Upgrade to 1080p
 

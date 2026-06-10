@@ -79,6 +79,16 @@ class AppConfig(BaseModel):
     max_dm_minutes: int = Field(
         default=90, ge=1, description="Таймаут в DM без level up"
     )
+    level_detect_grace_minutes: int = Field(
+        default=10,
+        ge=0,
+        description="Не проверять level up первые N минут в DM (ложные срабатывания на HUD)",
+    )
+    level_detect_consecutive_hits: int = Field(
+        default=3,
+        ge=1,
+        description="Сколько опросов подряд должны совпасть все пробы level up",
+    )
     game_search_timeout_sec: int = Field(
         default=90, ge=10, description="FSM GAME_SEARCH_TIMEOUT — поиск DM"
     )

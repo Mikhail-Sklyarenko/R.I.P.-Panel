@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+from dataclasses import dataclass
 from pathlib import Path
 
 import yaml
@@ -10,6 +11,12 @@ from PIL import Image
 
 from config.paths import get_app_root
 from modules.ui_nav.coords import ColorProbe, load_nav_coords
+
+
+@dataclass(frozen=True)
+class LevelProbeConfig:
+    probes: list[ColorProbe]
+    min_matches: int
 
 
 def _parse_res(resolution: str) -> tuple[int, int]:
@@ -29,7 +36,7 @@ def _level_coords_path(resolution: str = "360x270") -> Path | None:
     return None
 
 
-def _load_level_probes(resolution: str) -> list[ColorProbe]:
+def load_level_probe_config(resolution: str) -> LevelProbeConfig:
     level_path = _level_coords_path(resolution)
     if level_path is not None:
         data = yaml.safe_load(level_path.read_text(encoding="utf-8")) or {}
@@ -47,9 +54,16 @@ def _load_level_probes(resolution: str) -> list[ColorProbe]:
                     int(p.get("tolerance", 50)),
                 )
             )
-        return probes
+        meta_min = data.get("meta", {}).get("min_matches")
+        min_matches = int(meta_min) if meta_min is not None else len(probes)
+        return LevelProbeConfig(
+            probes=probes,
+            min_matches=max(1, min(min_matches, len(probes))) if probes else 0,
+        )
+
     nav = load_nav_coords(resolution)
-    return nav.probes("level_up") if "level_up" in nav.detectors else []
+    probes = nav.probes("level_up") if "level_up" in nav.detectors else []
+    return LevelProbeConfig(probes=probes, min_matches=len(probes))
 
 
 def _probe_match(img: Image.Image, probe: ColorProbe) -> bool:
@@ -63,16 +77,30 @@ def _probe_match(img: Image.Image, probe: ColorProbe) -> bool:
     )
 
 
+def count_level_up_matches(
+    image: Image.Image,
+    *,
+    resolution: str = "360x270",
+) -> tuple[int, int, int]:
+    """Return (matched, required, total_probes)."""
+    cfg = load_level_probe_config(resolution)
+    if not cfg.probes:
+        return 0, 0, 0
+    matched = sum(1 for p in cfg.probes if _probe_match(image, p))
+    return matched, cfg.min_matches, len(cfg.probes)
+
+
 def detect_level_up(
     image: Image.Image,
     *,
     resolution: str = "360x270",
+    min_matches: int | None = None,
 ) -> bool:
-    probes = _load_level_probes(resolution)
-    if not probes:
+    matched, required, total = count_level_up_matches(image, resolution=resolution)
+    if total == 0:
         return False
-    matched = sum(1 for p in probes if _probe_match(image, p))
-    return matched >= max(1, len(probes) - 1)
+    need = required if min_matches is None else max(1, min(min_matches, total))
+    return matched >= need
 
 
 def sim_level_up_elapsed() -> bool:

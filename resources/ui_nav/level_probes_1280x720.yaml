@@ -1,9 +1,10 @@
-# Level-up UI probes @ 1280x720 (draft_scaled_from_360)
+# Level-up UI probes @ 1280x720 — calibrate from real rank-up banner (sample_probe_rgb)
 meta:
   base_width: 1280
   base_height: 720
   calibration: draft_scaled_from_360
+  min_matches: 2  # all probes must match (was 1-of-2 → false positives in DM HUD)
 
 level_up:
-  - {x: 640, y: 192, rgb: [255, 210, 60], tolerance: 70}
-  - {x: 640, y: 253, rgb: [40, 120, 200], tolerance: 80}
+  - {x: 640, y: 192, rgb: [255, 210, 60], tolerance: 55}
+  - {x: 640, y: 253, rgb: [40, 120, 200], tolerance: 65}

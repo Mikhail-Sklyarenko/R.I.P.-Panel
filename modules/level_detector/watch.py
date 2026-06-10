@@ -8,7 +8,7 @@ import time
 from typing import Any
 
 from config.schema import AppConfig
-from modules.level_detector.detector import detect_level_up, sim_level_up_elapsed
+from modules.level_detector.detector import count_level_up_matches, sim_level_up_elapsed
 from modules.level_detector.result import WatchResult
 from modules.ui_nav.artifacts import ArtifactStore
 
@@ -42,6 +42,18 @@ def _capture_frame(ctx: dict[str, Any], artifacts: ArtifactStore) -> Any:
     return img
 
 
+def _grace_sec(config: AppConfig) -> float:
+    if os.environ.get("LEVEL_DETECT_GRACE_SEC"):
+        return max(0.0, float(os.environ["LEVEL_DETECT_GRACE_SEC"]))
+    return float(config.level_detect_grace_minutes) * 60.0
+
+
+def _consecutive_required(config: AppConfig) -> int:
+    if os.environ.get("LEVEL_DETECT_CONSECUTIVE_HITS"):
+        return max(1, int(os.environ["LEVEL_DETECT_CONSECUTIVE_HITS"]))
+    return max(1, config.level_detect_consecutive_hits)
+
+
 def watch(ctx: dict[str, Any] | None = None) -> WatchResult:
     """
     Блокируется до level_up, combat_timeout (max_dm_minutes) или stop_requested.
@@ -66,11 +78,19 @@ def watch(ctx: dict[str, Any] | None = None) -> WatchResult:
         os.environ["_LEVEL_DETECT_SIM_START"] = str(time.monotonic())
 
     poll = float(os.environ.get("LEVEL_DETECT_POLL_SEC", "0.5"))
-    deadline = time.monotonic() + timeout_sec
+    grace_sec = _grace_sec(config)
+    consecutive_required = _consecutive_required(config)
+    watch_started = time.monotonic()
+    deadline = watch_started + timeout_sec
+    consecutive_hits = 0
+    grace_logged = False
+
     artifacts.log_step(
         "level_watch_start",
         max_dm_minutes=config.max_dm_minutes,
         timeout_sec=timeout_sec,
+        grace_sec=grace_sec,
+        consecutive_required=consecutive_required,
     )
 
     while time.monotonic() < deadline:
@@ -82,13 +102,40 @@ def watch(ctx: dict[str, Any] | None = None) -> WatchResult:
             artifacts.log_step("level_up", source="sim")
             return WatchResult.LEVEL_UP
 
-        try:
-            frame = _capture_frame(ctx, artifacts)
-            if detect_level_up(frame, resolution=config.cs_resolution):
-                artifacts.log_step("level_up", source="ui_probe")
-                return WatchResult.LEVEL_UP
-        except Exception as exc:
-            artifacts.log_step("level_detect_error", err=str(exc))
+        elapsed = time.monotonic() - watch_started
+        if grace_sec > 0 and elapsed < grace_sec:
+            if not grace_logged:
+                artifacts.log_step("level_detect_grace", grace_sec=grace_sec)
+                grace_logged = True
+        else:
+            try:
+                frame = _capture_frame(ctx, artifacts)
+                matched, required, total = count_level_up_matches(
+                    frame,
+                    resolution=config.cs_resolution,
+                )
+                if total > 0 and matched >= required:
+                    consecutive_hits += 1
+                    artifacts.log_step(
+                        "level_probe_hit",
+                        matched=matched,
+                        required=required,
+                        consecutive=consecutive_hits,
+                    )
+                    if consecutive_hits >= consecutive_required:
+                        artifacts.log_step(
+                            "level_up",
+                            source="ui_probe",
+                            matched=matched,
+                            required=required,
+                            consecutive=consecutive_hits,
+                        )
+                        return WatchResult.LEVEL_UP
+                else:
+                    consecutive_hits = 0
+            except Exception as exc:
+                consecutive_hits = 0
+                artifacts.log_step("level_detect_error", err=str(exc))
 
         time.sleep(poll)
 

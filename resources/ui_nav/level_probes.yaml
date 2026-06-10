@@ -2,6 +2,7 @@
 meta:
   base_width: 360
   base_height: 270
+  min_matches: 2
 
 level_up:
   - {x: 180, y: 72, rgb: [255, 210, 60], tolerance: 70}
