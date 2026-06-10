@@ -1,0 +1,8 @@
+name: dust2
+loop: true
+steps:
+  - { key: w, sec: 5.0 }
+  - { key: d, sec: 1.2 }
+  - { key: w, sec: 4.0 }
+  - { key: a, sec: 1.0 }
+  - { key: w, sec: 3.0 }

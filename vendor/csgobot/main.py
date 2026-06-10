@@ -10,6 +10,7 @@ import random
 import signal
 import sys
 import time
+from typing import Optional
 
 import cv2
 import keyboard
@@ -30,6 +31,14 @@ from utils.win32 import get_window_rect
 from detectors import YOLOv8Detector
 from aiming import FOVMouseMovement, TargetSelector
 from aiming.auto_shoot import should_auto_shoot_target
+from patrol import (
+    PatrolMode,
+    PatrolRunner,
+    load_patrol,
+    next_mode_after_combat_check,
+    resolve_patrol_path,
+    should_patrol_tick,
+)
 
 # Logging setup
 logging.basicConfig(
@@ -292,56 +301,117 @@ def detection_process(
     last_move_time = 0.0
     last_shot_time = 0.0
     auto_shoot_announced = False
+    patrol_runner: Optional[PatrolRunner] = None
+    patrol_mode = PatrolMode.PATROL
+    last_enemy_seen = 0.0
 
-    while not stop_event.is_set():
+    if config.patrol.enabled:
         try:
-            img = frame_queue.get(timeout=0.01)
-        except Exception:
-            continue
+            import pydirectinput
 
-        # Update team from shared state
-        current_team_str = shared_state.get("team", "ct")
-        target_selector.config.current_team = Team(current_team_str)
-
-        # Run detection
-        detections = detector.detect(img, verbose=False)
-
-        if (
-            activated.is_set()
-            and config.aim.auto_move
-            and time.monotonic() - last_move_time >= config.aim.move_interval_sec
-        ):
-            try:
-                import pydirectinput
-
-                pydirectinput.press(random.choice(["w", "a", "s", "d"]))
-                last_move_time = time.monotonic()
-            except Exception as e:
-                logger.debug(f"auto_move failed: {e}")
-
-        # Process if activated
-        if activated.is_set() and detections:
-            # select best target
-            target = target_selector.select_best_target(
-                detections,
-                max_distance=config.aim.max_assist_distance,
+            patrol_path = resolve_patrol_path(
+                config.patrol.script_name,
+                config.patrol.script_path,
             )
+            patrol_script = load_patrol(patrol_path)
+            patrol_runner = PatrolRunner(
+                patrol_script,
+                key_down=pydirectinput.keyDown,
+                key_up=pydirectinput.keyUp,
+            )
+            logger.info(
+                f"patrol: loaded {patrol_script.name} "
+                f"({len(patrol_script.steps)} steps) from {patrol_path}"
+            )
+        except Exception as e:
+            logger.error(f"patrol: failed to load ({e}); disabled")
+            config.patrol.enabled = False
 
-            if target is not None:
+    try:
+        while not stop_event.is_set():
+            try:
+                img = frame_queue.get(timeout=0.01)
+            except Exception:
+                continue
+
+            now = time.monotonic()
+
+            # Update team from shared state
+            current_team_str = shared_state.get("team", "ct")
+            target_selector.config.current_team = Team(current_team_str)
+
+            # Run detection
+            detections = detector.detect(img, verbose=False)
+
+            enemy_target = None
+            if activated.is_set() and detections:
+                enemy_target = target_selector.select_best_target(
+                    detections,
+                    max_distance=config.aim.max_assist_distance,
+                )
+
+            in_combat = enemy_target is not None
+            if in_combat:
+                last_enemy_seen = now
+
+            if not activated.is_set():
+                if patrol_runner is not None:
+                    patrol_runner.pause()
+                patrol_mode = PatrolMode.PATROL
+            elif config.patrol.enabled and patrol_runner is not None:
+                prev_mode = patrol_mode
+                patrol_mode = next_mode_after_combat_check(
+                    mode=patrol_mode,
+                    in_combat=in_combat,
+                    now=now,
+                    last_enemy_seen=last_enemy_seen,
+                    combat_clear_sec=config.patrol.combat_clear_sec,
+                )
+                if (
+                    config.patrol.pause_on_combat
+                    and prev_mode == PatrolMode.PATROL
+                    and patrol_mode == PatrolMode.COMBAT
+                ):
+                    patrol_runner.pause()
+                elif (
+                    prev_mode == PatrolMode.COMBAT
+                    and patrol_mode == PatrolMode.PATROL
+                ):
+                    patrol_runner.resume()
+
+                if should_patrol_tick(
+                    patrol_enabled=config.patrol.enabled,
+                    activated=activated.is_set(),
+                    mode=patrol_mode,
+                ):
+                    patrol_runner.tick(now)
+            elif (
+                activated.is_set()
+                and config.aim.auto_move
+                and now - last_move_time >= config.aim.move_interval_sec
+            ):
+                try:
+                    import pydirectinput
+
+                    pydirectinput.press(random.choice(["w", "a", "s", "d"]))
+                    last_move_time = now
+                except Exception as e:
+                    logger.debug(f"auto_move failed: {e}")
+
+            if activated.is_set() and enemy_target is not None:
+                target = enemy_target
                 aim_result = fov_mouse.get_move(
                     target.aim_x,
                     target.aim_y,
                     smoothing=config.aim.smoothing_factor,
                 )
 
-                # only move if outside dead zone (prevents over-aiming hopefully)
                 if aim_result.pixel_distance > config.aim.dead_zone:
                     mouse.move_relative(aim_result.mouse_x, aim_result.mouse_y)
 
                     if config.aim.one_shot:
                         activated.clear()
 
-                now = time.monotonic()
                 if should_auto_shoot_target(
                     config.aim,
                     target,
@@ -360,7 +430,6 @@ def detection_process(
                         logger.info("auto_shoot: enabled (first shot fired)")
                         auto_shoot_announced = True
 
-                # draw aim point on preview
                 if config.preview.enabled:
                     detector.draw_aim_point(
                         img,
@@ -369,23 +438,25 @@ def detection_process(
                         color=(0, 255, 0),
                     )
 
-        # Update FPS
-        current_fps = fps()
-        shared_state["fps"] = current_fps
+            # Update FPS
+            current_fps = fps()
+            shared_state["fps"] = current_fps
 
-        # Send to preview
-        if config.preview.enabled:
-            # Draw boxes
-            if config.preview.paint_boxes:
-                detector.draw_boxes(img, detections)
+            # Send to preview
+            if config.preview.enabled:
+                if config.preview.paint_boxes:
+                    detector.draw_boxes(img, detections)
 
-            while not preview_queue.empty():
-                try:
-                    preview_queue.get_nowait()
-                except Exception:
-                    break
+                while not preview_queue.empty():
+                    try:
+                        preview_queue.get_nowait()
+                    except Exception:
+                        break
 
-            preview_queue.put_nowait(img)
+                preview_queue.put_nowait(img)
+    finally:
+        if patrol_runner is not None:
+            patrol_runner.release_all_keys()
 
     logger.info("Stopped")
 

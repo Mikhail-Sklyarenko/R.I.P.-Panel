@@ -13,6 +13,7 @@ from config import (
     DetectorConfig,
     DetectorType,
     AimConfig,
+    PatrolConfig,
     Team,
     PreviewConfig,
     HotkeyConfig,
@@ -70,8 +71,11 @@ MAX_ASSIST_DISTANCE = 300  # Max pixel distance to engage
 SMOOTHING = 3.0  # higher = smoother aim; raise if mouse overshoots at high FPS
 AUTO_SHOOT = True  # LMB when crosshair on target; False = aim only
 SHOOT_COOLDOWN_SEC = 0.1  # 80–150 ms between shots
-AUTO_MOVE = True  # random WASD while Caps Lock active (like panel simple bot)
-MOVE_INTERVAL_SEC = 8.0  # seconds between key taps
+PATROL_ENABLED = True
+PATROL_SCRIPT = "generic_dm"  # resources/patrol/{name}.yaml — relative macro, any DM spawn
+PATROL_COMBAT_CLEAR_SEC = 0.75  # resume patrol after enemy gone (seconds)
+AUTO_MOVE = False  # legacy random tap; use PATROL when enabled
+MOVE_INTERVAL_SEC = 8.0
 DEAD_ZONE = 12.0  # stop micro-corrections near crosshair (reduces circular jitter)
 ONE_SHOT = False  # Only move once per activation
 
@@ -139,6 +143,12 @@ def create_config() -> AppConfig:
         exit=EXIT_HOTKEY,
     )
 
+    patrol_config = PatrolConfig(
+        enabled=PATROL_ENABLED,
+        script_name=PATROL_SCRIPT,
+        combat_clear_sec=PATROL_COMBAT_CLEAR_SEC,
+    )
+
     # Build grabber options
     grabber_options = {}
     if GRABBER_TYPE == "obs_vc":
@@ -156,6 +166,7 @@ def create_config() -> AppConfig:
         fov=fov_config,
         detector=detector_config,
         aim=aim_config,
+        patrol=patrol_config,
         preview=preview_config,
         hotkeys=hotkey_config,
     )

@@ -91,13 +91,31 @@ venv\Scripts\pip.exe install torch torchvision --index-url https://download.pyto
 
 Риск VAC выше, чем при одной только наводке.
 
-## Бот не ходит сам (WASD)
+## Патруль (PATROL)
 
-**csgobot** наводит мышь и (при `AUTO_SHOOT`) стреляет. Бег — **`AUTO_MOVE = True`**: тапы W/A/S/D раз в ~8 с.
+В DM респавн **случайный** — патруль это **относительный макрос** (W/A/S/D по времени), не GPS по карте.
+
+| Параметр | По умолчанию | Зачем |
+|----------|--------------|-------|
+| `PATROL_ENABLED` | `True` | сценарий вместо random WASD |
+| `PATROL_SCRIPT` | `generic_dm` | файл `resources/patrol/{name}.yaml` |
+| `PATROL_COMBAT_CLEAR_SEC` | `0.75` | пауза после врага перед бегом |
+| `AUTO_MOVE` | `False` | legacy random tap |
+
+Сценарии: `generic_dm.yaml`, `dust2.yaml`, `mirage.yaml`. В логе: `patrol: loaded ...`.
+
+При враге патруль **пауза** (клавиши отпущены) → aim + `AUTO_SHOOT`. Враг пропал → снова патруль.
+
+```bat
+pip install pyyaml
+```
+
+## Бот не ходит (legacy AUTO_MOVE)
+
+Если `PATROL_ENABLED = False`, можно включить **`AUTO_MOVE = True`** — случайный тап W/A/S/D раз в ~8 с.
 
 1. **Caps Lock** — бот активен только пока включён.
 2. **Окно CS2 в фокусе** — иначе клавиши/клики не попадут в игру.
-3. **`AUTO_MOVE = True`** в `run.py`.
 
 ## Отдельный venv (обязательно)
 

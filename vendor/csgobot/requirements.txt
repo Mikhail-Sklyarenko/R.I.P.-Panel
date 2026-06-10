@@ -19,4 +19,5 @@ pydirectinput>=1.0.4
 pynput>=1.7.0
 
 # Configuration
+pyyaml>=6.0
 # tomli>=2.0.0  # Only needed if using TOML config files

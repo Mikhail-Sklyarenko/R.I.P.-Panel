@@ -1,0 +1,8 @@
+name: generic_dm
+loop: true
+steps:
+  - { key: w, sec: 4.0 }
+  - { key: d, sec: 1.0 }
+  - { key: w, sec: 3.0 }
+  - { key: a, sec: 0.8 }
+  - { key: w, sec: 2.5 }

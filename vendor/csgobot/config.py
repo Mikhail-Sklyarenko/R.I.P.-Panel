@@ -157,6 +157,16 @@ class PreviewConfig:
 
 
 @dataclass
+class PatrolConfig:
+    """Relative WASD patrol (DM-safe: no map coordinates)."""
+    enabled: bool = True
+    script_name: str = "generic_dm"
+    script_path: str = ""
+    combat_clear_sec: float = 0.75
+    pause_on_combat: bool = True
+
+
+@dataclass
 class HotkeyConfig:
     """Hotkey configuration."""
     activation: int = 58  # CAPS LOCK
@@ -181,6 +191,7 @@ class AppConfig:
     fov: FOVConfig = field(default_factory=FOVConfig)
     detector: DetectorConfig = field(default_factory=DetectorConfig)
     aim: AimConfig = field(default_factory=AimConfig)
+    patrol: PatrolConfig = field(default_factory=PatrolConfig)
     preview: PreviewConfig = field(default_factory=PreviewConfig)
     hotkeys: HotkeyConfig = field(default_factory=HotkeyConfig)
 

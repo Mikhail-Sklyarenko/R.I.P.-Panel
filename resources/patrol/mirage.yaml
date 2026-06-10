@@ -1,0 +1,8 @@
+name: mirage
+loop: true
+steps:
+  - { key: w, sec: 4.5 }
+  - { key: a, sec: 1.0 }
+  - { key: w, sec: 3.5 }
+  - { key: d, sec: 1.2 }
+  - { key: w, sec: 2.5 }
