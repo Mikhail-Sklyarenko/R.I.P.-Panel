@@ -164,6 +164,10 @@ class PatrolConfig:
     script_path: str = ""
     combat_clear_sec: float = 0.75
     pause_on_combat: bool = True
+    anti_stuck_enabled: bool = True
+    stuck_sec: float = 6.0
+    stuck_motion_threshold: float = 2.0
+    unstuck_cooldown_sec: float = 3.0
 
 
 @dataclass

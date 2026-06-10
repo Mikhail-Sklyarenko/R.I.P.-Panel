@@ -34,10 +34,13 @@ from aiming.auto_shoot import should_auto_shoot_target
 from patrol import (
     PatrolMode,
     PatrolRunner,
+    StuckDetector,
+    UnstuckSequence,
     load_patrol,
     next_mode_after_combat_check,
     resolve_patrol_path,
     should_patrol_tick,
+    should_trigger_unstuck,
 )
 
 # Logging setup
@@ -302,8 +305,12 @@ def detection_process(
     last_shot_time = 0.0
     auto_shoot_announced = False
     patrol_runner: Optional[PatrolRunner] = None
+    unstuck_seq: Optional[UnstuckSequence] = None
+    stuck_detector: Optional[StuckDetector] = None
     patrol_mode = PatrolMode.PATROL
     last_enemy_seen = 0.0
+    stuck_since: Optional[float] = None
+    last_unstuck_time = 0.0
 
     if config.patrol.enabled:
         try:
@@ -318,6 +325,14 @@ def detection_process(
                 patrol_script,
                 key_down=pydirectinput.keyDown,
                 key_up=pydirectinput.keyUp,
+            )
+            unstuck_seq = UnstuckSequence(
+                press=pydirectinput.press,
+                key_down=pydirectinput.keyDown,
+                key_up=pydirectinput.keyUp,
+            )
+            stuck_detector = StuckDetector(
+                motion_threshold=config.patrol.stuck_motion_threshold,
             )
             logger.info(
                 f"patrol: loaded {patrol_script.name} "
@@ -357,6 +372,9 @@ def detection_process(
             if not activated.is_set():
                 if patrol_runner is not None:
                     patrol_runner.pause()
+                if unstuck_seq is not None:
+                    unstuck_seq.abort()
+                stuck_since = None
                 patrol_mode = PatrolMode.PATROL
             elif config.patrol.enabled and patrol_runner is not None:
                 prev_mode = patrol_mode
@@ -367,6 +385,12 @@ def detection_process(
                     last_enemy_seen=last_enemy_seen,
                     combat_clear_sec=config.patrol.combat_clear_sec,
                 )
+                if in_combat:
+                    stuck_since = None
+                    if unstuck_seq is not None and unstuck_seq.is_running:
+                        unstuck_seq.abort()
+                        patrol_runner.pause()
+
                 if (
                     config.patrol.pause_on_combat
                     and prev_mode == PatrolMode.PATROL
@@ -379,12 +403,58 @@ def detection_process(
                 ):
                     patrol_runner.resume()
 
-                if should_patrol_tick(
+                unstuck_running = False
+                if unstuck_seq is not None and unstuck_seq.is_running:
+                    unstuck_running = unstuck_seq.tick(now)
+                    if not unstuck_running:
+                        last_unstuck_time = now
+                        stuck_since = None
+                        if stuck_detector is not None:
+                            stuck_detector.reset()
+                        patrol_runner.reset()
+                        patrol_runner.resume()
+                        logger.info("patrol: unstuck sequence completed")
+
+                if not unstuck_running and should_patrol_tick(
                     patrol_enabled=config.patrol.enabled,
                     activated=activated.is_set(),
                     mode=patrol_mode,
                 ):
-                    patrol_runner.tick(now)
+                    is_moving = patrol_runner.current_key is not None
+                    if (
+                        not in_combat
+                        and config.patrol.anti_stuck_enabled
+                        and stuck_detector is not None
+                        and unstuck_seq is not None
+                    ):
+                        stuck_detector.update(img)
+                        if is_moving and stuck_detector.is_low_motion():
+                            if stuck_since is None:
+                                stuck_since = now
+                        else:
+                            stuck_since = None
+
+                        if should_trigger_unstuck(
+                            anti_stuck_enabled=config.patrol.anti_stuck_enabled,
+                            activated=activated.is_set(),
+                            patrol_mode=patrol_mode,
+                            in_combat=in_combat,
+                            is_moving=is_moving,
+                            stuck_since=stuck_since,
+                            now=now,
+                            stuck_sec=config.patrol.stuck_sec,
+                            last_unstuck_time=last_unstuck_time,
+                            unstuck_cooldown_sec=config.patrol.unstuck_cooldown_sec,
+                        ):
+                            patrol_runner.pause()
+                            unstuck_seq.start(now)
+                            stuck_since = None
+                            logger.info("patrol: stuck detected, unstuck started")
+                        else:
+                            patrol_runner.tick(now)
+                    else:
+                        stuck_since = None
+                        patrol_runner.tick(now)
             elif (
                 activated.is_set()
                 and config.aim.auto_move
@@ -455,6 +525,8 @@ def detection_process(
 
                 preview_queue.put_nowait(img)
     finally:
+        if unstuck_seq is not None:
+            unstuck_seq.abort()
         if patrol_runner is not None:
             patrol_runner.release_all_keys()
 

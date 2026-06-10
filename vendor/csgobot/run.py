@@ -74,6 +74,10 @@ SHOOT_COOLDOWN_SEC = 0.1  # 80–150 ms between shots
 PATROL_ENABLED = True
 PATROL_SCRIPT = "generic_dm"  # resources/patrol/{name}.yaml — relative macro, any DM spawn
 PATROL_COMBAT_CLEAR_SEC = 0.75  # resume patrol after enemy gone (seconds)
+ANTI_STUCK_ENABLED = True
+STUCK_SEC = 6.0  # seconds low motion while moving before unstuck
+STUCK_MOTION_THRESHOLD = 2.0  # mean pixel diff on center ROI (tune on farm PC)
+UNSTUCK_COOLDOWN_SEC = 3.0
 AUTO_MOVE = False  # legacy random tap; use PATROL when enabled
 MOVE_INTERVAL_SEC = 8.0
 DEAD_ZONE = 12.0  # stop micro-corrections near crosshair (reduces circular jitter)
@@ -147,6 +151,10 @@ def create_config() -> AppConfig:
         enabled=PATROL_ENABLED,
         script_name=PATROL_SCRIPT,
         combat_clear_sec=PATROL_COMBAT_CLEAR_SEC,
+        anti_stuck_enabled=ANTI_STUCK_ENABLED,
+        stuck_sec=STUCK_SEC,
+        stuck_motion_threshold=STUCK_MOTION_THRESHOLD,
+        unstuck_cooldown_sec=UNSTUCK_COOLDOWN_SEC,
     )
 
     # Build grabber options

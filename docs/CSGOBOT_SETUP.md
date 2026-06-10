@@ -110,6 +110,26 @@ venv\Scripts\pip.exe install torch torchvision --index-url https://download.pyto
 pip install pyyaml
 ```
 
+## Анти-застревание (ANTI_STUCK)
+
+Пока патруль **двигается**, но картинка в центре кадра почти не меняется ~6 с — бот считает, что застрял в геометрии, и выполняет макрос:
+
+1. `space` (прыжок)
+2. `s` 0.5 с (назад)
+3. случайный `a` или `d` 1–2 с
+4. патруль с начала сценария
+
+| Параметр | По умолчанию | Зачем |
+|----------|--------------|-------|
+| `ANTI_STUCK_ENABLED` | `True` | выключить = только патруль |
+| `STUCK_SEC` | `6.0` | сколько секунд «нет движения» |
+| `STUCK_MOTION_THRESHOLD` | `2.0` | порог diff центра кадра (ниже = застрял) |
+| `UNSTUCK_COOLDOWN_SEC` | `3.0` | пауза между unstuck-подряд |
+
+В бою anti-stuck **не срабатывает**. В логе: `patrol: stuck detected, unstuck started` → `patrol: unstuck sequence completed`.
+
+Если ложные срабатывания — поднимите `STUCK_SEC` или `STUCK_MOTION_THRESHOLD`. Если не вытаскивает из угла — понизьте порог или увеличьте `STUCK_SEC`.
+
 ## Бот не ходит (legacy AUTO_MOVE)
 
 Если `PATROL_ENABLED = False`, можно включить **`AUTO_MOVE = True`** — случайный тап W/A/S/D раз в ~8 с.
