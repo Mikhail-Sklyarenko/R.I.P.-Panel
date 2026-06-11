@@ -75,7 +75,15 @@ LEAD_MS = 80.0  # override: CSGOBOT_LEAD_MS
 ADAPTIVE_SMOOTHING = True  # override: CSGOBOT_ADAPTIVE_SMOOTHING=0
 BODY_FALLBACK_SEC = 0.2  # override: CSGOBOT_BODY_FALLBACK_MS=200
 AUTO_SHOOT = True  # LMB when crosshair on target; False = aim only
-SHOOT_COOLDOWN_SEC = 0.1  # 80–150 ms between shots
+SHOOT_MODE = "hold"  # tap | burst | hold (зажим)
+SHOOT_COOLDOWN_SEC = 0.07  # tap mode; env CSGOBOT_SHOOT_COOLDOWN_MS
+BURST_SIZE = 5
+BURST_SHOT_INTERVAL_SEC = 0.07
+BURST_GAP_SEC = 0.15
+HOLD_MAX_SEC = 0.4
+HOLD_RELEASE_GRACE_SEC = 0.1
+HEAD_SHOOT_CONFIDENCE = 0.65
+BODY_SHOOT_CONFIDENCE = 0.55
 PATROL_ENABLED = True
 PATROL_SCRIPT = "generic_dm"  # resources/patrol/{name}.yaml — relative macro, any DM spawn
 PATROL_COMBAT_CLEAR_SEC = 0.75  # resume patrol after enemy gone (seconds)
@@ -133,7 +141,14 @@ def create_config() -> AppConfig:
         resolve_mouse_max_delta,
         resolve_mouse_min_delta,
         resolve_prioritize_heads,
+        resolve_burst_gap_sec,
+        resolve_burst_shot_interval_sec,
+        resolve_burst_size,
+        resolve_hold_max_sec,
+        resolve_hold_release_grace_sec,
+        resolve_shoot_cooldown_sec,
         resolve_shoot_dead_zone,
+        resolve_shoot_mode,
         resolve_smoothing,
         resolve_x360,
     )
@@ -193,8 +208,20 @@ def create_config() -> AppConfig:
         aim_smooth_jump_reset_px=AIM_SMOOTH_JUMP_RESET_PX,
         mouse_max_delta=resolve_mouse_max_delta(MOUSE_MAX_DELTA),
         mouse_min_delta=resolve_mouse_min_delta(MOUSE_MIN_DELTA),
+        head_confidence=HEAD_SHOOT_CONFIDENCE,
+        body_confidence=BODY_SHOOT_CONFIDENCE,
         auto_shoot=AUTO_SHOOT,
-        shoot_cooldown_sec=SHOOT_COOLDOWN_SEC,
+        shoot_mode=resolve_shoot_mode(SHOOT_MODE),
+        shoot_cooldown_sec=resolve_shoot_cooldown_sec(SHOOT_COOLDOWN_SEC),
+        burst_size=resolve_burst_size(BURST_SIZE),
+        burst_shot_interval_sec=resolve_burst_shot_interval_sec(
+            BURST_SHOT_INTERVAL_SEC
+        ),
+        burst_gap_sec=resolve_burst_gap_sec(BURST_GAP_SEC),
+        hold_max_sec=resolve_hold_max_sec(HOLD_MAX_SEC),
+        hold_release_grace_sec=resolve_hold_release_grace_sec(
+            HOLD_RELEASE_GRACE_SEC
+        ),
         auto_move=AUTO_MOVE,
         move_interval_sec=MOVE_INTERVAL_SEC,
         dead_zone=aim_high,
@@ -324,6 +351,11 @@ def main() -> int:
         f"lead_ms={config.aim.lead_ms} lead_gate={config.aim.lead_variance_gate} "
         f"smooth={config.aim.aim_smooth_alpha} body_fallback={config.aim.body_fallback_sec}s "
         f"mouse_cap={config.aim.mouse_max_delta}"
+    )
+    logger.info(
+        f"Shoot: mode={config.aim.shoot_mode} burst={config.aim.burst_size} "
+        f"hold_max={config.aim.hold_max_sec}s "
+        f"conf head/body={config.aim.head_confidence}/{config.aim.body_confidence}"
     )
     logger.info(f"Team: {config.aim.current_team.value.upper()}")
     try:

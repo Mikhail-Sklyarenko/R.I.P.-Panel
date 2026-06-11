@@ -30,8 +30,9 @@ from utils.win32 import get_window_rect
 
 from detectors import YOLOv8Detector
 from aiming import FOVMouseMovement, TargetSelector
-from aiming.auto_shoot import should_auto_shoot_target
 from aiming.aim_pipeline import AimPipelineState, process_aim_frame
+from aiming.fire_actions import apply_fire_action
+from aiming.fire_controller import FireAction, FireController
 from aiming.combat_aim import maybe_switch_to_body
 from aim_tuning import aim_debug_enabled
 from patrol import (
@@ -311,8 +312,8 @@ def detection_process(
 
     fps = FPSCounter()
     last_move_time = 0.0
-    last_shot_time = 0.0
-    auto_shoot_announced = False
+    fire_controller = FireController.from_aim_config(config.aim)
+    fire_announced = False
     patrol_runner: Optional[PatrolRunner] = None
     unstuck_seq: Optional[UnstuckSequence] = None
     stuck_detector: Optional[StuckDetector] = None
@@ -378,16 +379,21 @@ def detection_process(
                     detections,
                     max_distance=config.aim.max_assist_distance,
                 )
+            fire_action = FireAction()
             if enemy_target is None:
                 head_miss_since = None
                 last_target_key = None
                 aim_pipeline.reset_trackers()
+                if fire_controller.is_holding:
+                    fire_action = fire_controller.force_release(now)
 
             in_combat = enemy_target is not None
             if in_combat:
                 last_enemy_seen = now
 
             if not activated.is_set():
+                if fire_controller.is_holding:
+                    fire_action = fire_controller.force_release(now)
                 if patrol_runner is not None:
                     patrol_runner.pause()
                 if unstuck_seq is not None:
@@ -529,11 +535,19 @@ def detection_process(
                     if config.aim.one_shot:
                         activated.clear()
 
+                fire_action = fire_controller.tick(
+                    pixel_distance=frame.pixel_distance,
+                    confidence=target.confidence,
+                    is_head=target.is_head,
+                    now=now,
+                )
+
                 if aim_debug and now - last_aim_debug_log >= 2.0:
                     logger.info(
                         "aim: fps=%.0f dist=%.1f smooth=%.2f "
                         "mouse=(%d,%d) target=(%.0f,%.0f) "
-                        "lead_stable=%s speed=%.0f move=%s body_fb=%s",
+                        "lead_stable=%s speed=%.0f move=%s "
+                        "fire=%s hold=%s body_fb=%s",
                         fps(),
                         frame.pixel_distance,
                         frame.smoothing,
@@ -544,27 +558,11 @@ def detection_process(
                         frame.lead.stable,
                         frame.lead.speed_px_s,
                         frame.should_move,
+                        fire_action.mode,
+                        fire_action.holding,
                         switched_body,
                     )
                     last_aim_debug_log = now
-
-                if should_auto_shoot_target(
-                    config.aim,
-                    target,
-                    frame.pixel_distance,
-                    now,
-                    last_shot_time,
-                ):
-                    try:
-                        mouse.click("left")
-                    except Exception:
-                        import pydirectinput
-
-                        pydirectinput.click(button="left")
-                    last_shot_time = now
-                    if not auto_shoot_announced:
-                        logger.info("auto_shoot: enabled (first shot fired)")
-                        auto_shoot_announced = True
 
                 if config.preview.enabled:
                     detector.draw_aim_point(
@@ -573,6 +571,21 @@ def detection_process(
                         frame.aim_y,
                         color=(0, 255, 0),
                     )
+
+            if (
+                fire_action.click
+                or fire_action.press
+                or fire_action.release
+            ):
+                apply_fire_action(mouse, fire_action)
+                if not fire_announced and (
+                    fire_action.fired or fire_action.press
+                ):
+                    logger.info(
+                        "auto_shoot: %s fire active",
+                        config.aim.shoot_mode,
+                    )
+                    fire_announced = True
 
             # Update FPS
             current_fps = fps()
@@ -591,6 +604,7 @@ def detection_process(
 
                 preview_queue.put_nowait(img)
     finally:
+        apply_fire_action(mouse, fire_controller.force_release(time.monotonic()))
         if unstuck_seq is not None:
             unstuck_seq.abort()
         if patrol_runner is not None:

@@ -104,6 +104,8 @@ Env без правки `run.py`: `CS2_SENSITIVITY`, `CSGOBOT_X360`, `CSGOBOT_SM
 
 **Lead aim (PR-6b):** `CSGOBOT_LEAD_MS`, `CSGOBOT_LEAD_ENABLED`, `CSGOBOT_ADAPTIVE_SMOOTHING`, `CSGOBOT_BODY_FALLBACK_MS`, `CSGOBOT_CONFIDENCE`, `CSGOBOT_PRIORITIZE_HEADS`, `CSGOBOT_MAX_DIST` — см. `docs/AIM_TUNING.md`.
 
+**Fire (PR-6d):** default `CSGOBOT_SHOOT_MODE=hold` (зажим LMB). Альтернативы: `burst`, `tap`. См. `docs/AIM_TUNING.md`.
+
 Окно с рамками: `SHOW_PREVIEW = True` (для фарма по умолчанию **False**).
 
 ## Автострельба (AUTO_SHOOT)

@@ -159,6 +159,55 @@ def resolve_adaptive_smoothing(default: bool) -> bool:
     return default if val is None else val
 
 
+def resolve_shoot_mode(default: str) -> str:
+    raw = os.environ.get("CSGOBOT_SHOOT_MODE", "").strip().lower()
+    if raw in ("tap", "burst", "hold"):
+        return raw
+    return default
+
+
+def resolve_burst_size(default: int) -> int:
+    raw = os.environ.get("CSGOBOT_BURST_SIZE", "").strip()
+    if raw:
+        return max(1, int(float(raw)))
+    return default
+
+
+def resolve_burst_gap_sec(default: float) -> float:
+    raw = os.environ.get("CSGOBOT_BURST_GAP_MS", "").strip()
+    if raw:
+        return max(0.0, float(raw)) / 1000.0
+    return default
+
+
+def resolve_burst_shot_interval_sec(default: float) -> float:
+    raw = os.environ.get("CSGOBOT_BURST_INTERVAL_MS", "").strip()
+    if raw:
+        return max(0.02, float(raw)) / 1000.0
+    return default
+
+
+def resolve_hold_max_sec(default: float) -> float:
+    raw = os.environ.get("CSGOBOT_HOLD_MAX_MS", "").strip()
+    if raw:
+        return max(0.05, float(raw)) / 1000.0
+    return default
+
+
+def resolve_hold_release_grace_sec(default: float) -> float:
+    raw = os.environ.get("CSGOBOT_HOLD_RELEASE_GRACE_MS", "").strip()
+    if raw:
+        return max(0.0, float(raw)) / 1000.0
+    return default
+
+
+def resolve_shoot_cooldown_sec(default: float) -> float:
+    raw = os.environ.get("CSGOBOT_SHOOT_COOLDOWN_MS", "").strip()
+    if raw:
+        return max(0.02, float(raw)) / 1000.0
+    return default
+
+
 def resolve_body_fallback_sec(default: float) -> float:
     raw = os.environ.get("CSGOBOT_BODY_FALLBACK_MS", "").strip()
     if raw:

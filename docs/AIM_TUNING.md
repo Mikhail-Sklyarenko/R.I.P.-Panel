@@ -82,6 +82,27 @@ Caps Lock → проверка поворота на 360°.
 
 **Body fallback** — если выбрана голова, но `dist > aim_dead_zone_high` дольше `BODY_FALLBACK_MS`, цель переключается на ближайшее тело.
 
+## Fire modes (PR-6d)
+
+| Параметр | Default | Env |
+|----------|---------|-----|
+| Mode | **`hold`** (зажим) | `CSGOBOT_SHOOT_MODE=tap\|burst\|hold` |
+| Burst size | `5` | `CSGOBOT_BURST_SIZE` |
+| Burst interval | `70 ms` | `CSGOBOT_BURST_INTERVAL_MS` |
+| Burst gap | `150 ms` | `CSGOBOT_BURST_GAP_MS` |
+| Hold max spray | `400 ms` | `CSGOBOT_HOLD_MAX_MS` |
+| Hold release grace | `100 ms` | `CSGOBOT_HOLD_RELEASE_GRACE_MS` |
+| Shoot cooldown (tap) | `70 ms` | `CSGOBOT_SHOOT_COOLDOWN_MS` |
+| Head/body conf | `0.65` / `0.55` | — |
+
+**hold** — `mouseDown` пока цель в `shoot_dead_zone`, отпускает после `HOLD_MAX_MS` или потери цели (с grace). Ближе к «зажиму» в DM.
+
+**burst** — серия из N выстрелов, пауза, повтор.
+
+**tap** — одиночные клики (старое поведение).
+
+Лог: `auto_shoot: hold fire active`, debug: `fire=hold hold=True`.
+
 ## Anti-jitter (PR-6c)
 
 | Параметр | Default | Env |

@@ -112,8 +112,8 @@ class AimConfig:
     min_shoot_distance: int = 50    # Min distance for auto-shoot
 
     # Confidence thresholds for auto-shoot
-    head_confidence: float = 0.8
-    body_confidence: float = 0.7
+    head_confidence: float = 0.65
+    body_confidence: float = 0.55
 
     # Smoothing (1.0 = instant, higher = slower)
     smoothing_factor: float = 1.0
@@ -150,7 +150,14 @@ class AimConfig:
 
     # Auto-shoot settings
     auto_shoot: bool = False
-    shoot_cooldown_sec: float = 0.1  # min seconds between LMB clicks (0.08–0.15)
+    shoot_mode: str = "hold"  # tap | burst | hold
+    shoot_cooldown_sec: float = 0.07
+    burst_size: int = 5
+    burst_shot_interval_sec: float = 0.07
+    burst_gap_sec: float = 0.15
+    hold_max_sec: float = 0.4
+    hold_release_grace_sec: float = 0.1
+    shoot_humanize_jitter_sec: float = 0.02
 
     # WASD movement while bot is active (csgobot has no pathfinding)
     auto_move: bool = False

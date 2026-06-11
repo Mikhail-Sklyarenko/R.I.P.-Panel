@@ -100,6 +100,16 @@ def test_create_config_lead_and_adaptive_defaults(monkeypatch) -> None:
     assert cfg.aim.body_fallback_sec == 0.2
 
 
+def test_create_config_6d_shoot_defaults(monkeypatch) -> None:
+    monkeypatch.delenv("CSGOBOT_SHOOT_MODE", raising=False)
+    from run import create_config  # noqa: E402
+
+    cfg = create_config()
+    assert cfg.aim.shoot_mode == "hold"
+    assert cfg.aim.burst_size == 5
+    assert cfg.aim.head_confidence == 0.65
+
+
 def test_create_config_6c_stabilizer_defaults(monkeypatch) -> None:
     monkeypatch.delenv("CSGOBOT_AIM_DEAD_ZONE_HIGH", raising=False)
     monkeypatch.delenv("CSGOBOT_SHOOT_DEAD_ZONE", raising=False)
