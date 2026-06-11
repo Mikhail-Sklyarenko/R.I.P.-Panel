@@ -18,8 +18,8 @@ detectors:
     - {x: 180, y: 135, rgb: [200, 200, 200], tolerance: 70}
     - {x: 180, y: 100, rgb: [160, 160, 160], tolerance: 65}
   in_dm:
-    - {x: 28, y: 248, rgb: [240, 200, 60], tolerance: 80}
-    - {x: 55, y: 248, rgb: [200, 180, 40], tolerance: 75}
+    - {x: 180, y: 6, rgb: [255, 255, 255], tolerance: 70}
+    - {x: 15, y: 264, rgb: [14, 17, 28], tolerance: 40}
   level_up:
     - {x: 180, y: 72, rgb: [255, 210, 60], tolerance: 70}
     - {x: 180, y: 95, rgb: [40, 120, 200], tolerance: 80}

@@ -5,13 +5,14 @@ meta:
   base_height: 720
   calibration: armoryfarm_operator_2026-06
   cs2_build: "2025-06 Panorama RU @ 1280x720 windowed (ИГРАТЬ + БОЙ НАСМЕРТЬ)"
-  note: "ИГРАТЬ @663,20 recalibrated; in_dm HUD @99,661 +195,661 draft ArmoryFarm 2026-06"
+  note: "in_dm calibrated ArmoryFarm 2026-06 from in_dm_hud.png (timer + health HUD)"
 
 clicks:
   main_menu_play: {x: 663, y: 20}
   mode_deathmatch: {x: 667, y: 95}
   start_search: {x: 1125, y: 691}
   leave_match: {x: 1255, y: 19}
+  team_random: {x: 1152, y: 688}
 
 detectors:
   main_menu:
@@ -21,8 +22,10 @@ detectors:
     - {x: 640, y: 360, rgb: [200, 200, 200], tolerance: 70}
     - {x: 640, y: 266, rgb: [160, 160, 160], tolerance: 65}
   in_dm:
-    - {x: 99, y: 661, rgb: [240, 200, 60], tolerance: 80}
-    - {x: 195, y: 661, rgb: [200, 180, 40], tolerance: 75}
+    - {x: 640, y: 16, rgb: [255, 255, 255], tolerance: 70}
+    - {x: 52, y: 704, rgb: [14, 17, 28], tolerance: 40}
+  team_select:
+    - {x: 640, y: 16, rgb: [62, 91, 113], tolerance: 55}
   level_up:
     - {x: 640, y: 192, rgb: [255, 210, 60], tolerance: 70}
     - {x: 640, y: 253, rgb: [40, 120, 200], tolerance: 80}

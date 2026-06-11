@@ -12,6 +12,7 @@ from modules.ui_nav.artifacts import ArtifactStore
 from modules.ui_nav.coords import load_nav_coords_for_hwnd
 from modules.ui_nav.detectors import (
     ScreenState,
+    detect_probe_key,
     detect_state,
     wait_for_in_dm,
     wait_for_state,
@@ -262,6 +263,31 @@ class DmNavigator:
             return "dm_runner: in_dm (soft_peek)"
         return "dm_runner: in_dm"
 
+    def _try_join_team_if_needed(self, img=None) -> None:
+        """Deathmatch team-pick overlay: click СЛУЧАЙНЫЙ ВЫБОР before in_dm wait."""
+        if isinstance(self.driver, SimDriver):
+            return
+        frame = img if img is not None else self.driver.capture()
+        if detect_state(
+            frame,
+            ScreenState.IN_DM,
+            self.coords,
+            min_match=self.config.in_dm_min_match,
+        ):
+            return
+        if not detect_probe_key(frame, self.coords, "team_select"):
+            return
+        try:
+            pt = self.coords.click("team_random")
+        except KeyError:
+            return
+        self._nav_progress(
+            f"dm nav: team select → random @({pt.x},{pt.y})"
+        )
+        self.driver.click(pt)
+        self.artifacts.log_step("team_random_click", x=pt.x, y=pt.y)
+        time.sleep(2.0)
+
     def _emit_in_dm_if_already_on_frame(self) -> bool:
         """Retry fast-path: skip map_load_delay when soft/strict in_dm visible."""
         img = self.driver.capture()
@@ -284,6 +310,7 @@ class DmNavigator:
         self._confirm_search_started()
 
         self._set_sim_phase(ScreenState.IN_DM)
+        self._try_join_team_if_needed()
         result = wait_for_in_dm(
             self.driver,
             self.coords,
@@ -291,6 +318,7 @@ class DmNavigator:
             timeout_sec=float(self.config.map_load_delay_sec),
             soft_min_match=self.config.in_dm_min_match,
             on_progress=self._nav_progress,
+            on_poll=self._try_join_team_if_needed,
         )
         self._e(EventType.IN_DM, self._in_dm_detail(soft_peek=result.soft_peek))
 

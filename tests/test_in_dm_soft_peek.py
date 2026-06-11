@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -10,17 +11,40 @@ from PIL import Image
 from config.schema import AppConfig
 from core.events import EventType
 from modules.ui_nav.coords import load_nav_coords
-from modules.ui_nav.detectors import InDmWaitResult, ScreenState, wait_for_in_dm
+from modules.ui_nav.detectors import (
+    InDmWaitResult,
+    ScreenState,
+    detect_probe_key,
+    detect_state,
+    wait_for_in_dm,
+)
+
+AI_PC_1280 = Path(__file__).resolve().parent / "fixtures" / "ai_pc" / "1280x720"
 from modules.ui_nav.errors import UiNavTimeoutError
+
+
+def test_armoryfarm_in_dm_hud_fixture_strict_and_soft() -> None:
+    coords = load_nav_coords("1280x720")
+    img = Image.open(AI_PC_1280 / "in_dm_hud.png").convert("RGB")
+    img720 = img.resize((1280, 720), Image.Resampling.LANCZOS)
+    assert detect_state(img720, ScreenState.IN_DM, coords) is True
+    assert detect_state(img720, ScreenState.IN_DM, coords, min_match=1) is True
+
+    team = Image.open(AI_PC_1280 / "team_select.png").convert("RGB")
+    team720 = team.resize((1280, 720), Image.Resampling.LANCZOS)
+    assert detect_state(team720, ScreenState.IN_DM, coords) is False
+    assert detect_probe_key(team720, coords, "team_select") is True
 
 
 def _soft_in_dm_image_one_probe(coords) -> Image.Image:
     """Only first in_dm probe matches (soft 1/2, not strict)."""
-    img = Image.new("RGB", (360, 270), (0, 0, 0))
+    img = Image.new("RGB", (360, 270), (100, 100, 100))
     probes = coords.probes("in_dm")
     if probes:
-        p = probes[0]
-        img.putpixel((p.x, p.y), p.rgb)
+        img.putpixel((probes[0].x, probes[0].y), probes[0].rgb)
+    if len(probes) > 1:
+        p1 = probes[1]
+        img.putpixel((p1.x, p1.y), (100, 100, 100))
     return img
 
 
@@ -76,7 +100,7 @@ def test_wait_for_in_dm_strict_early() -> None:
 
 def test_wait_for_in_dm_timeout_logs_probe_rgb() -> None:
     coords = load_nav_coords("360x270")
-    img = Image.new("RGB", (360, 270), (5, 5, 5))
+    img = Image.new("RGB", (360, 270), (100, 100, 100))
     driver = MagicMock()
     driver.capture.return_value = img
     artifacts = MagicMock()

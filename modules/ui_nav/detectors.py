@@ -104,6 +104,22 @@ def _required_matches(state: ScreenState, probe_count: int, min_match: int | Non
     return max(1, probe_count - 1)
 
 
+def detect_probe_key(
+    img: Image.Image,
+    coords: NavCoords,
+    key: str,
+    *,
+    min_match: int | None = None,
+) -> bool:
+    """Match YAML detectors.<key> probes (e.g. team_select)."""
+    probes = coords.probes(key)
+    if not probes:
+        return False
+    matched = sum(1 for p in probes if _probe_match(img, p))
+    required = min_match if min_match is not None else len(probes)
+    return matched >= min(max(1, required), len(probes))
+
+
 def detect_state(
     img: Image.Image,
     state: ScreenState,
@@ -155,6 +171,7 @@ def wait_for_in_dm(
     soft_min_match: int = 1,
     soft_peek_polls: int = 3,
     on_progress: Callable[[str], None] | None = None,
+    on_poll: Callable[[Image.Image], None] | None = None,
 ) -> InDmWaitResult:
     """
     Poll until in_dm probes match (strict all probes, or soft ≥1 probe × N polls).
@@ -173,6 +190,8 @@ def wait_for_in_dm(
     while time.monotonic() < deadline:
         attempt += 1
         img = driver.capture()
+        if on_poll is not None:
+            on_poll(img)
         artifacts.save_image(f"wait_in_dm_{attempt}", img)
         probe_results = probe_match_results(img, ScreenState.IN_DM, coords)
         last_probe_results = probe_results

@@ -344,11 +344,16 @@ def test_dm_retry_skips_menu_wait_after_clicks(data_dir, monkeypatch) -> None:
     )
     nav._menu_nav_done = True
 
-    with patch.object(nav, "_wait_search_and_in_dm", side_effect=UiNavTimeoutError("in_dm")) as mock_in_dm:
-        with patch.object(nav, "_run_menu_and_clicks") as mock_menu:
-            with patch.object(nav, "_prepare_cs2_window"):
-                with pytest.raises(UiNavTimeoutError):
-                    nav.navigate_to_dm_with_retries()
+    with patch.object(
+        nav, "_emit_in_dm_if_already_on_frame", return_value=False
+    ):
+        with patch.object(
+            nav, "_wait_search_and_in_dm", side_effect=UiNavTimeoutError("in_dm")
+        ) as mock_in_dm:
+            with patch.object(nav, "_run_menu_and_clicks") as mock_menu:
+                with patch.object(nav, "_prepare_cs2_window"):
+                    with pytest.raises(UiNavTimeoutError):
+                        nav.navigate_to_dm_with_retries()
     assert mock_menu.call_count == 0
     assert mock_in_dm.call_count == 2
 

@@ -63,7 +63,8 @@ Main log при nav: `dm click main_menu_play @(x,y)` — если строк н
 |-------|----------|--------|
 | `main_menu` | `detectors.main_menu` @ **x≈217** | launcher + dm_runner confirmed: **2/2**; warn path: soft **1/2** |
 | `searching` | `detectors.searching` | N−1 из N |
-| `in_dm` | `detectors.in_dm` @ HUD bottom | strict **2/2**; soft **≥1/2 × 3 polls** → `in_dm (soft_peek)` |
+| `in_dm` | `detectors.in_dm` @ **timer (640,16)** + **health (52,704)** @ 1280×720 | strict **2/2**; soft **≥1/2 × 3 polls** → `in_dm (soft_peek)` |
+| `team_select` | `detectors.team_select` | blue countdown; auto-click `team_random` @ 1152,688 |
 
 `cs2_menu_confirmed` в launcher — **только strict 2/2** на вкладке ИГРАТЬ.  
 `cs2_menu_soft_peek` — если soft 1/2 был хотя бы раз (hint, не confirmed).
