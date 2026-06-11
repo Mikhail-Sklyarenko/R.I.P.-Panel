@@ -120,18 +120,12 @@ def collect_startup_warnings(config: AppConfig | None = None) -> list[str]:
         elif csgobot_ai.python_executable() is None:
             warnings.append("csgobot venv missing — run setup in vendor/csgobot")
         else:
-            weights = (
-                root
-                / "vendor"
-                / "csgobot"
-                / "yolov8"
-                / "cs2_yolov8m_640_augmented_v4.pt"
-            )
-            if not weights.is_file():
-                warnings.append(
-                    f"YOLO weights missing: {weights.name} "
-                    f"(see docs/FARM_PC_CHECKLIST.md)"
-                )
+            preflight_ok, preflight_msgs = csgobot_ai.check_csgobot_preflight()
+            for msg in preflight_msgs:
+                if preflight_ok:
+                    warnings.append(f"csgobot: {msg}")
+                else:
+                    warnings.append(f"csgobot preflight failed: {msg}")
             if sys.platform == "win32" and not cfg.test_mode:
                 obs_ok, obs_detail = csgobot_ai.check_obs_virtual_camera()
                 if not obs_ok:

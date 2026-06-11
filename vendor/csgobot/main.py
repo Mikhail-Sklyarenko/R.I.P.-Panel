@@ -171,12 +171,14 @@ class CS2Bot:
             logger.info("auto_activate: bot enabled (Caps Lock not required)")
 
         # Main loop
+        child_died = False
         try:
             while not self.stop_event.is_set():
                 # Check if any process died
                 for p in self.processes:
                     if not p.is_alive():
                         logger.error(f"{p.name} died unexpectedly")
+                        child_died = True
                         self.stop_event.set()
                         break
                 time.sleep(0.1)
@@ -191,7 +193,7 @@ class CS2Bot:
                 p.terminate()
 
         logger.info("Shutdown complete")
-        return 0
+        return 1 if child_died else 0
 
 
 def grab_process(

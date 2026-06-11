@@ -31,6 +31,7 @@ def test_no_trade_link_warn_when_auto_collect_off(_which, tmp_path, monkeypatch)
 
 
 @patch("shutil.which", return_value="/usr/bin/node")
+@patch("modules.combat.csgobot_ai.check_csgobot_preflight", return_value=(True, []))
 @patch("modules.combat.csgobot_ai.check_obs_virtual_camera", return_value=(False, "not found"))
 @patch("modules.combat.csgobot_ai.is_installed", return_value=True)
 @patch("modules.combat.csgobot_ai.python_executable", return_value=__import__("pathlib").Path("python.exe"))
@@ -38,6 +39,7 @@ def test_warn_obs_vc_missing(
     _py: object,
     _installed: object,
     _obs: object,
+    _preflight: object,
     _which: object,
     tmp_path,
     monkeypatch,
@@ -54,6 +56,10 @@ def test_warn_obs_vc_missing(
 
 
 @patch("shutil.which", return_value="/usr/bin/node")
+@patch(
+    "modules.combat.csgobot_ai.check_csgobot_preflight",
+    return_value=(False, ["weights missing: cs2_yolov8m_640_augmented_v4.pt"]),
+)
 @patch("modules.combat.csgobot_ai.check_obs_virtual_camera", return_value=(True, ""))
 @patch("modules.combat.csgobot_ai.is_installed", return_value=True)
 @patch("modules.combat.csgobot_ai.python_executable", return_value=__import__("pathlib").Path("python.exe"))
@@ -61,6 +67,7 @@ def test_warn_yolo_weights_missing(
     _py: object,
     _installed: object,
     _obs: object,
+    _preflight: object,
     _which: object,
     tmp_path,
     monkeypatch,
@@ -73,4 +80,4 @@ def test_warn_yolo_weights_missing(
         bot_mode="ai",
     )
     warnings = collect_startup_warnings(cfg)
-    assert any("YOLO weights missing" in w for w in warnings)
+    assert any("weights missing" in w for w in warnings)

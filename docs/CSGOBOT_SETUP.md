@@ -43,6 +43,15 @@ cd vendor\csgobot
 
 Панель при старте и перед `combat_ai_started` предупреждает, если VC недоступна.
 
+Полная preflight-проверка (веса, pygrabber, torch/YOLO) одним вызовом:
+
+```powershell
+cd vendor\csgobot
+.\venv\Scripts\python tools\preflight.py
+```
+
+JSON на stdout: `ok`, `warnings` (например CPU-only), `errors`. Панель запускает это при старте и перед subprocess; при `ok: false` — `combat_fallback` без ложного `finished ok`.
+
 4. `pip install pygrabber` в venv csgobot
 
 Исправление grabber (уже в репо): виртуальная камера отдаёт сцену OBS без смещения `left/top` экрана — файл `grabbers/obs_vc_grabber.py`.
@@ -186,5 +195,13 @@ venv\Scripts\python.exe run.py
 В логе панели: `csgobot: subprocess started (auto_activate)`. В логе csgobot: `auto_activate: bot enabled`.
 
 Ручной `run.py` без env — по-прежнему **Caps Lock**. Для ручного теста с авто: `set CSGOBOT_AUTO_ACTIVATE=1` или `AUTO_ACTIVATE = True` в `run.py`.
+
+### Ранний выход subprocess (Дыра 2)
+
+Если csgobot завершился быстрее **30 с** (или `CSGOBOT_MIN_RUNTIME_SEC`), панель **не** пишет `csgobot: finished ok` — вместо этого `combat_fallback` с `early exit` и хвостом stderr.
+
+Диагностика: `data/logs/csgobot_{session_id}.stderr.txt` (последние строки также в Main log).
+
+Причины: GrabProcess/DetectionProcess умерли (OBS VC, веса, pygrabber), импорт torch. Vendor `main.py` возвращает exit code **1** при неожиданной смерти child process.
 
 См. также `docs/AI_PC_PROFILE.md`.
