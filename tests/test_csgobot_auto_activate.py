@@ -73,6 +73,11 @@ def _patch_start_ai_deps(monkeypatch, csgobot_ai) -> None:
         "check_csgobot_preflight",
         lambda: (True, []),
     )
+    monkeypatch.setattr(
+        csgobot_ai,
+        "check_cuda_torch",
+        lambda: (True, {"cuda": True, "device": "GPU"}),
+    )
 
 
 def _fake_clock(monkeypatch, csgobot_ai, start: float = 1000.0) -> list[float]:

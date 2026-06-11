@@ -216,6 +216,17 @@ class PanelView:
         self._build_executable_paths(scroll)
         cfg = self.ctrl.config
         self._add_entry(scroll, "trade_offer_link", cfg.trade_offer_link)
+        self._add_entry(
+            scroll,
+            "cs2_sensitivity",
+            str(getattr(cfg, "cs2_sensitivity", 2.1)),
+        )
+        ctk.CTkLabel(
+            scroll,
+            text="CS2 console: sensitivity → csgobot X360",
+            text_color="gray55",
+            font=ctk.CTkFont(size=11),
+        ).pack(anchor="w", padx=8, pady=(0, 4))
         self._add_switch(scroll, "auto_collect_drop", cfg.auto_collect_drop)
         self._add_switch(
             scroll, "start_farm_when_launched", cfg.start_farm_when_launched
@@ -331,6 +342,11 @@ class PanelView:
             values=[BotMode.AUTO.value, BotMode.AI.value, BotMode.SIMPLE.value],
             variable=self._vars["bot_mode"],
         ).pack(fill="x", padx=8, pady=2)
+        self._add_switch(
+            parent,
+            "csgobot_require_cuda",
+            getattr(cfg, "csgobot_require_cuda", False),
+        )
         ctk.CTkButton(
             parent,
             text="Save Config #3",
@@ -410,9 +426,16 @@ class PanelView:
         )
 
     def _save_config1(self) -> None:
+        sens_raw = self._vars["cs2_sensitivity"].get().strip()
+        try:
+            cs2_sensitivity = float(sens_raw) if sens_raw else 2.1
+        except ValueError:
+            cs2_sensitivity = 2.1
+            self.ctrl.append_log("WARN: invalid cs2_sensitivity — saved as 2.1")
         self.ctrl.save_config_from_ui(
             {
                 "trade_offer_link": self._vars["trade_offer_link"].get().strip(),
+                "cs2_sensitivity": cs2_sensitivity,
                 "auto_collect_drop": bool(self._vars["auto_collect_drop"].get()),
                 "start_farm_when_launched": bool(
                     self._vars["start_farm_when_launched"].get()
@@ -456,6 +479,9 @@ class PanelView:
                 "fsm_logpass_path": self._vars["fsm_logpass_path"].get().strip(),
                 "fsm_mafiles_dir": self._vars["fsm_mafiles_dir"].get().strip(),
                 "bot_mode": BotMode(self._vars["bot_mode"].get()),
+                "csgobot_require_cuda": bool(
+                    self._vars["csgobot_require_cuda"].get()
+                ),
             }
         )
 

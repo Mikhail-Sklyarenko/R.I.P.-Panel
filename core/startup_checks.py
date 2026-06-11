@@ -127,6 +127,15 @@ def collect_startup_warnings(config: AppConfig | None = None) -> list[str]:
                 else:
                     warnings.append(f"csgobot preflight failed: {msg}")
             if sys.platform == "win32" and not cfg.test_mode:
+                cuda_ok, cuda_info = csgobot_ai.check_cuda_torch()
+                if not cuda_ok:
+                    hint = cuda_info.get("install_hint") or cuda_info.get("error") or ""
+                    warnings.append(
+                        "csgobot PyTorch CPU — install CUDA torch for 25+ FPS "
+                        f"({str(hint)[:100]})"
+                    )
+                elif cuda_info.get("device"):
+                    warnings.append(f"csgobot CUDA: {cuda_info['device']}")
                 obs_ok, obs_detail = csgobot_ai.check_obs_virtual_camera()
                 if not obs_ok:
                     warnings.append(

@@ -127,7 +127,9 @@ venv\Scripts\pip install -r requirements.txt
 
 `bot_mode: ai` → subprocess; `auto` falls back to simple if venv missing.
 
-**Aim (Level 1):** calibrate `X360` to in-game sens — see `docs/AIM_TUNING.md`. Defaults: `SHOW_PREVIEW=False`, `SMOOTHING=3`, `DEAD_ZONE=12`. Env: `CS2_SENSITIVITY`, `CSGOBOT_X360`.
+**Aim (Level 1):** set **`cs2_sensitivity`** in panel Config #1 (CS2 console value) — panel passes `CS2_SENSITIVITY` to csgobot. See `docs/AIM_TUNING.md`. Defaults: `SHOW_PREVIEW=False`, `SMOOTHING=3`, `DEAD_ZONE=12`. Override env: `CSGOBOT_X360`.
+
+**CUDA:** `venv\Scripts\python tools\check_cuda_torch.py` → `"cuda": true`. Optional **Config #3 → `csgobot_require_cuda`** blocks farm on CPU torch.
 
 ## Calibration checklist
 

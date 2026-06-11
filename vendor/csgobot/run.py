@@ -63,7 +63,7 @@ FOV_VERTICAL = 73.74
 # 2. Record mouse movement while doing a full 360
 # 3. That number is your x360
 # X360 = 16364  # Default for CS2 at sensitivity 1.0
-X360 = 7792  # Default for CS2 at sensitivity 1.0
+X360 = 7792  # fallback ~sens 2.1; override via CS2_SENSITIVITY / panel Config #1
 
 # Aim settings
 CURRENT_TEAM = Team.CT  # Your starting team
@@ -244,8 +244,17 @@ def main() -> int:
     logger.info(f"Window: {config.window_title}")
     logger.info(f"Grabber: {config.grabber_type}")
     logger.info(f"FOV: {config.fov.horizontal}° x {config.fov.vertical}°")
+    x360_env = os.environ.get("CSGOBOT_X360", "").strip()
+    sens_env = os.environ.get("CS2_SENSITIVITY", "").strip()
+    if x360_env:
+        aim_source = f"CSGOBOT_X360={x360_env}"
+    elif sens_env:
+        aim_source = f"CS2_SENSITIVITY={sens_env}"
+    else:
+        aim_source = "run.py X360 default"
     logger.info(
-        f"Aim: x360={config.fov.x360} smoothing={config.aim.smoothing_factor} "
+        f"Aim: x360={config.fov.x360} ({aim_source}) "
+        f"smoothing={config.aim.smoothing_factor} "
         f"dead_zone={config.aim.dead_zone} max_dist={config.aim.max_assist_distance}"
     )
     logger.info(f"Team: {config.aim.current_team.value.upper()}")

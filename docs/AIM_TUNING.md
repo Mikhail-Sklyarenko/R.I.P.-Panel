@@ -7,14 +7,16 @@
 1. CS2: **оконный** режим **1280×720**, Panorama RU  
 2. OBS: canvas **1280×720**, Virtual Camera on  
 3. В логе `run.py`: `Capture region (OBS canvas): ... 1280 x 720`  
-4. GPU:
+4. GPU (CUDA обязателен для приемлемой наводки):
 
 ```bat
 cd vendor\csgobot
-venv\Scripts\python.exe torch_check_gpu.py
+venv\Scripts\python.exe tools\check_cuda_torch.py
 ```
 
-Должно быть `cuda`, не `cpu`. Иначе см. `docs/CSGOBOT_SETUP.md` (PyTorch CUDA).
+Должно быть `"cuda": true`. Иначе см. `docs/CSGOBOT_SETUP.md` (PyTorch CUDA).
+
+Панель при старте пишет `csgobot CUDA: …` или `WARN: PyTorch CPU-only`. В **Config #3** можно включить **`csgobot_require_cuda`** — тогда farm не запустит csgobot без GPU.
 
 5. **`SHOW_PREVIEW = False`** — уже default для фарма (True только для отладки)
 
@@ -24,13 +26,17 @@ venv\Scripts\python.exe torch_check_gpu.py
 
 `X360` — сколько «единиц мыши» нужно для поворота на 360°. Неверное значение → перелёт, недолёт, «карусель».
 
-### Вариант A — из sens (формула)
+### Вариант A — из sens (рекомендуется через панель)
+
+**Config #1 → `cs2_sensitivity`** — значение из CS2 console (`sensitivity`). Панель передаёт его в subprocess как `CS2_SENSITIVITY` и в логе после `combat_ai_started` пишет `csgobot: x360 from CS2_SENSITIVITY=…`.
+
+Ручная проверка формулы:
 
 ```bat
 venv\Scripts\python.exe tools\calibrate_x360.py --sensitivity 2.1
 ```
 
-Или env без правки `run.py`:
+Или env без панели:
 
 ```bat
 set CS2_SENSITIVITY=2.1

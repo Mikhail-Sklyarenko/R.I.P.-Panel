@@ -22,16 +22,33 @@ def run_checks() -> dict[str, object]:
     except Exception as exc:
         errors.append(f"pygrabber import failed: {exc}")
 
+    cuda_available = False
+    device_name = ""
+    torch_version = ""
     try:
         import torch
         from ultralytics import YOLO  # noqa: F401
 
-        if not torch.cuda.is_available():
+        torch_version = str(getattr(torch, "__version__", ""))
+        cuda_available = bool(torch.cuda.is_available())
+        if cuda_available:
+            try:
+                device_name = str(torch.cuda.get_device_name(0))
+            except Exception:
+                device_name = "cuda:0"
+        else:
             warnings.append("PyTorch on CPU — expect low FPS (install CUDA torch)")
     except Exception as exc:
         errors.append(f"torch/ultralytics import failed: {exc}")
 
-    return {"ok": not errors, "warnings": warnings, "errors": errors}
+    return {
+        "ok": not errors,
+        "warnings": warnings,
+        "errors": errors,
+        "cuda_available": cuda_available,
+        "device_name": device_name,
+        "torch_version": torch_version,
+    }
 
 
 def main() -> int:

@@ -138,6 +138,43 @@ def check_obs_virtual_camera() -> tuple[bool, str]:
     return False, detail or "OBS Virtual Camera not found"
 
 
+def check_cuda_torch() -> tuple[bool, dict[str, object]]:
+    """
+    True if PyTorch CUDA is available in csgobot venv.
+    Returns (ok, info dict from check_cuda_torch.py JSON).
+    """
+    if sys.platform != "win32":
+        return True, {"cuda": True}
+    py = python_executable()
+    script = _csgobot_dir() / "tools" / "check_cuda_torch.py"
+    if py is None or not script.is_file():
+        return True, {}
+    try:
+        result = subprocess.run(
+            [str(py), str(script)],
+            cwd=str(_csgobot_dir()),
+            capture_output=True,
+            text=True,
+            timeout=30.0,
+            creationflags=(
+                subprocess.CREATE_NO_WINDOW
+                if hasattr(subprocess, "CREATE_NO_WINDOW")
+                else 0
+            ),
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        return False, {"error": str(exc), "cuda": False}
+    payload = (result.stdout or "").strip()
+    if not payload:
+        detail = (result.stderr or "").strip() or f"check_cuda_torch exit {result.returncode}"
+        return False, {"error": detail, "cuda": False}
+    try:
+        data = json.loads(payload)
+    except json.JSONDecodeError:
+        return False, {"error": payload[:200], "cuda": False}
+    return bool(data.get("cuda")), data
+
+
 def check_csgobot_preflight() -> tuple[bool, list[str]]:
     """
     Quick subprocess check: weights, pygrabber, torch/YOLO imports.
@@ -181,6 +218,39 @@ def check_csgobot_preflight() -> tuple[bool, list[str]]:
     if errors or not data.get("ok", False):
         return False, errors + warnings
     return True, warnings
+
+
+def _panel_config(ctx: dict[str, Any]) -> Any | None:
+    return ctx.get("config")
+
+
+def _apply_child_env_from_ctx(ctx: dict[str, Any], child_env: dict[str, str]) -> None:
+    config = _panel_config(ctx)
+    if config is not None:
+        sens = getattr(config, "cs2_sensitivity", None)
+        if sens is not None:
+            try:
+                sens_f = float(sens)
+            except (TypeError, ValueError):
+                sens_f = 0.0
+            if sens_f > 0:
+                child_env["CS2_SENSITIVITY"] = str(sens_f)
+    x360_override = os.environ.get("CSGOBOT_X360", "").strip()
+    if x360_override:
+        child_env["CSGOBOT_X360"] = x360_override
+
+
+def _aim_env_summary(ctx: dict[str, Any]) -> str:
+    config = _panel_config(ctx)
+    if config is not None:
+        sens = getattr(config, "cs2_sensitivity", None)
+        if sens is not None:
+            return f"csgobot: x360 from CS2_SENSITIVITY={sens}"
+    if os.environ.get("CS2_SENSITIVITY", "").strip():
+        return f"csgobot: x360 from CS2_SENSITIVITY={os.environ['CS2_SENSITIVITY']}"
+    if os.environ.get("CSGOBOT_X360", "").strip():
+        return f"csgobot: x360 from CSGOBOT_X360={os.environ['CSGOBOT_X360']}"
+    return "csgobot: x360 from run.py default"
 
 
 def _max_runtime_sec(ctx: dict[str, Any]) -> int:
@@ -264,6 +334,25 @@ def start_ai(ctx: dict[str, Any]) -> bool:
         if emit:
             emit(EventType.FARMING, f"csgobot: preflight warn — {warn}")
 
+    config = _panel_config(ctx)
+    require_cuda = bool(getattr(config, "csgobot_require_cuda", False)) if config else False
+    test_mode = bool(getattr(config, "test_mode", False)) if config else False
+    cuda_ok, cuda_info = check_cuda_torch()
+    if not cuda_ok and not test_mode:
+        hint = str(cuda_info.get("install_hint") or cuda_info.get("error") or "install CUDA torch")
+        detail = f"csgobot: PyTorch CPU — expect low FPS; {hint}"
+        if require_cuda:
+            if emit:
+                emit(EventType.COMBAT_FALLBACK, detail)
+            return False
+        if emit:
+            emit(EventType.FARMING, detail + " (see FARM_PC_CHECKLIST.md)")
+    elif cuda_ok and cuda_info.get("device") and emit:
+        emit(
+            EventType.FARMING,
+            f"csgobot: CUDA ok — {cuda_info.get('device')}",
+        )
+
     if _PROCESS is not None and _PROCESS.poll() is None:
         stop_ai()
 
@@ -276,6 +365,7 @@ def start_ai(ctx: dict[str, Any]) -> bool:
     )
     child_env = os.environ.copy()
     child_env["CSGOBOT_AUTO_ACTIVATE"] = "1"
+    _apply_child_env_from_ctx(ctx, child_env)
     try:
         _PROCESS = subprocess.Popen(
             cmd,
@@ -294,6 +384,7 @@ def start_ai(ctx: dict[str, Any]) -> bool:
             EventType.COMBAT_AI_STARTED,
             "csgobot: subprocess started (auto_activate)",
         )
+        emit(EventType.FARMING, _aim_env_summary(ctx))
 
     started_at = time.monotonic()
     timeout = _max_runtime_sec(ctx)

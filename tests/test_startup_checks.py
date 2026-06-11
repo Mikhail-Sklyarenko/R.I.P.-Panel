@@ -31,6 +31,7 @@ def test_no_trade_link_warn_when_auto_collect_off(_which, tmp_path, monkeypatch)
 
 
 @patch("shutil.which", return_value="/usr/bin/node")
+@patch("modules.combat.csgobot_ai.check_cuda_torch", return_value=(True, {"cuda": True, "device": "GPU"}))
 @patch("modules.combat.csgobot_ai.check_csgobot_preflight", return_value=(True, []))
 @patch("modules.combat.csgobot_ai.check_obs_virtual_camera", return_value=(False, "not found"))
 @patch("modules.combat.csgobot_ai.is_installed", return_value=True)
@@ -56,6 +57,7 @@ def test_warn_obs_vc_missing(
 
 
 @patch("shutil.which", return_value="/usr/bin/node")
+@patch("modules.combat.csgobot_ai.check_cuda_torch", return_value=(True, {"cuda": True, "device": "GPU"}))
 @patch(
     "modules.combat.csgobot_ai.check_csgobot_preflight",
     return_value=(False, ["weights missing: cs2_yolov8m_640_augmented_v4.pt"]),

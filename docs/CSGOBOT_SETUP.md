@@ -60,14 +60,16 @@ JSON на stdout: `ok`, `warnings` (например CPU-only), `errors`. Пан
 
 **6–7 FPS** на CPU с YOLOv8m — нормально без GPU. Для 30+ FPS нужна **видеокарта NVIDIA** и PyTorch с CUDA.
 
-Проверка:
+Проверка (JSON для панели и preflight):
 
 ```bat
 cd vendor\csgobot
-venv\Scripts\python.exe torch_check_gpu.py
+venv\Scripts\python.exe tools\check_cuda_torch.py
 ```
 
-Если `cpu` — переустановите torch (пример CUDA 12.1):
+Скрипт `torch_check_gpu.py` — краткий вывод в консоль. Панель и `tools/preflight.py` используют `check_cuda_torch.py`.
+
+Если `"cuda": false` — переустановите torch (пример CUDA 12.1):
 
 ```bat
 venv\Scripts\pip.exe install torch torchvision --index-url https://download.pytorch.org/whl/cu121
@@ -94,7 +96,9 @@ venv\Scripts\pip.exe install torch torchvision --index-url https://download.pyto
 1. **OBS** — в логе должно быть `Capture region (OBS canvas): ... 1280 x 720`, не `704`.
 2. **Высокий FPS + перелёт** — в `run.py`: `SMOOTHING = 3.0`, `DEAD_ZONE = 12.0`.
 3. **Неверная команда** — **Ctrl+T** (CT / T).
-4. **Чувствительность** — `X360` / `CS2_SENSITIVITY` / `CSGOBOT_X360` (см. AIM_TUNING.md).
+4. **Чувствительность** — **Config #1 → `cs2_sensitivity`** (панель → `CS2_SENSITIVITY`) или `CSGOBOT_X360` (см. AIM_TUNING.md).
+
+В **Config #3** опция **`csgobot_require_cuda`**: при включении farm не стартует csgobot на CPU-only torch.
 
 Env без правки `run.py`: `CS2_SENSITIVITY`, `CSGOBOT_X360`, `CSGOBOT_SMOOTHING`, `CSGOBOT_DEAD_ZONE`, `CSGOBOT_AIM_DEBUG=1`.
 

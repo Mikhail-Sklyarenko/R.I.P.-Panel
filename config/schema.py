@@ -123,6 +123,16 @@ class AppConfig(BaseModel):
     bot_mode: BotMode = Field(
         default=BotMode.AUTO, description="auto | ai | simple"
     )
+    cs2_sensitivity: float = Field(
+        default=2.1,
+        gt=0,
+        le=20,
+        description="CS2 sensitivity для csgobot X360 (console: sensitivity)",
+    )
+    csgobot_require_cuda: bool = Field(
+        default=False,
+        description="Блокировать AI если PyTorch без CUDA (farm GPU only)",
+    )
     combat_simple_minutes: int = Field(
         default=10, ge=1, description="Длительность simple-бота (мин)"
     )
