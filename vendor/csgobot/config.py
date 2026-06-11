@@ -125,10 +125,27 @@ class AimConfig:
     lead_ema_alpha: float = 0.35
     lead_max_px: float = 120.0
 
-    # Switch from head to body if head not in dead_zone this long (seconds)
+    # Switch from head to body if head not in aim zone this long (seconds)
     body_fallback_sec: float = 0.2
 
-    dead_zone: float = 5.0
+    # PR-6c: aim movement hysteresis (pixels from crosshair)
+    aim_dead_zone_high: float = 14.0
+    aim_dead_zone_low: float = 8.0
+    shoot_dead_zone: float = 18.0
+
+    # PR-6c: aim point EMA + mouse delta filter
+    aim_smooth_enabled: bool = True
+    aim_smooth_alpha: float = 0.45
+    aim_smooth_jump_reset_px: float = 80.0
+    mouse_max_delta: int = 35
+    mouse_min_delta: int = 2
+
+    # PR-6c: lead variance gate
+    lead_variance_gate: bool = True
+    lead_min_speed_px_s: float = 40.0
+    lead_max_speed_variance: float = 2500.0
+
+    dead_zone: float = 5.0  # legacy alias → aim_dead_zone_high in run.py
     one_shot: bool = False
 
     # Auto-shoot settings

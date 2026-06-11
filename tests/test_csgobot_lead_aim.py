@@ -58,27 +58,40 @@ def _body_target(distance: float = 60.0) -> Target:
 
 
 def test_velocity_lead_predicts_ahead_on_motion() -> None:
-    lead = VelocityLead(LeadConfig(enabled=True, lead_ms=100.0, ema_alpha=1.0))
+    lead = VelocityLead(
+        LeadConfig(
+            enabled=True,
+            lead_ms=100.0,
+            ema_alpha=1.0,
+            variance_gate=False,
+        )
+    )
     t0 = 1.0
     lead.predict(100.0, 200.0, t0)
-    x, y = lead.predict(150.0, 200.0, t0 + 0.1)
-    assert x > 150.0
-    assert abs(y - 200.0) < 1.0
+    r = lead.predict(150.0, 200.0, t0 + 0.1)
+    assert r.x > 150.0
+    assert abs(r.y - 200.0) < 1.0
 
 
 def test_velocity_lead_disabled_returns_raw() -> None:
     lead = VelocityLead(LeadConfig(enabled=False))
-    x, y = lead.predict(100.0, 200.0, 1.0)
-    assert (x, y) == (100.0, 200.0)
+    r = lead.predict(100.0, 200.0, 1.0)
+    assert (r.x, r.y) == (100.0, 200.0)
 
 
 def test_velocity_lead_clamps_offset() -> None:
     lead = VelocityLead(
-        LeadConfig(enabled=True, lead_ms=500.0, ema_alpha=1.0, max_lead_px=30.0),
+        LeadConfig(
+            enabled=True,
+            lead_ms=500.0,
+            ema_alpha=1.0,
+            max_lead_px=30.0,
+            variance_gate=False,
+        ),
     )
     lead.predict(0.0, 0.0, 0.0)
-    x, y = lead.predict(500.0, 0.0, 0.1)
-    assert x - 500.0 <= 30.1
+    r = lead.predict(500.0, 0.0, 0.1)
+    assert r.x - 500.0 <= 30.1
 
 
 def test_adaptive_smoothing_far_lower_than_close() -> None:
@@ -99,7 +112,7 @@ def test_body_fallback_switches_after_timeout() -> None:
     target, miss_since, switched = maybe_switch_to_body(
         head,
         prioritize_heads=True,
-        dead_zone=12.0,
+        aim_dead_zone_high=12.0,
         body_fallback_sec=0.2,
         head_miss_since=0.0,
         now=0.25,
@@ -115,7 +128,7 @@ def test_body_fallback_not_before_timeout() -> None:
     target, miss_since, switched = maybe_switch_to_body(
         head,
         prioritize_heads=True,
-        dead_zone=12.0,
+        aim_dead_zone_high=12.0,
         body_fallback_sec=0.2,
         head_miss_since=0.0,
         now=0.1,

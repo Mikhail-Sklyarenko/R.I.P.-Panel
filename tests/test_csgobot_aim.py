@@ -98,3 +98,16 @@ def test_create_config_lead_and_adaptive_defaults(monkeypatch) -> None:
     assert cfg.aim.lead_aim_enabled is True
     assert cfg.aim.adaptive_smoothing is True
     assert cfg.aim.body_fallback_sec == 0.2
+
+
+def test_create_config_6c_stabilizer_defaults(monkeypatch) -> None:
+    monkeypatch.delenv("CSGOBOT_AIM_DEAD_ZONE_HIGH", raising=False)
+    monkeypatch.delenv("CSGOBOT_SHOOT_DEAD_ZONE", raising=False)
+    from run import create_config  # noqa: E402
+
+    cfg = create_config()
+    assert cfg.aim.aim_dead_zone_high == 14.0
+    assert cfg.aim.aim_dead_zone_low == 8.0
+    assert cfg.aim.shoot_dead_zone == 18.0
+    assert cfg.aim.aim_smooth_enabled is True
+    assert cfg.aim.lead_variance_gate is True

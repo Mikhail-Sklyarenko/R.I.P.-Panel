@@ -11,21 +11,21 @@ def maybe_switch_to_body(
     target: Target,
     *,
     prioritize_heads: bool,
-    dead_zone: float,
+    aim_dead_zone_high: float,
     body_fallback_sec: float,
     head_miss_since: Optional[float],
     now: float,
     select_body: Callable[[], Optional[Target]],
 ) -> tuple[Target, Optional[float], bool]:
     """
-    If head aim fails to reach dead_zone for body_fallback_sec, switch to body.
+    If head aim fails to reach aim_dead_zone_high for body_fallback_sec, switch to body.
 
     Returns (target, head_miss_since, switched).
     """
     if not prioritize_heads or not target.is_head:
         return target, None, False
 
-    if target.distance <= dead_zone:
+    if target.distance <= aim_dead_zone_high:
         return target, None, False
 
     if head_miss_since is None:

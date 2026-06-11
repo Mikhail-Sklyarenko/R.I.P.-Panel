@@ -80,7 +80,23 @@ Caps Lock → проверка поворота на 360°.
 
 **Lead aim** — EMA-скорость центра bbox, прицел в `pos + v × lead_ms`. Помогает против бегущих в DM.
 
-**Body fallback** — если выбрана голова, но `dist > DEAD_ZONE` дольше `BODY_FALLBACK_MS`, цель переключается на ближайшее тело.
+**Body fallback** — если выбрана голова, но `dist > aim_dead_zone_high` дольше `BODY_FALLBACK_MS`, цель переключается на ближайшее тело.
+
+## Anti-jitter (PR-6c)
+
+| Параметр | Default | Env |
+|----------|---------|-----|
+| Aim smooth EMA | `0.45` | `CSGOBOT_AIM_SMOOTH_ALPHA`, `CSGOBOT_AIM_SMOOTH=0` |
+| Aim move hysteresis | high **14** / low **8** | `CSGOBOT_AIM_DEAD_ZONE_HIGH`, `_LOW` |
+| Shoot zone | **18** | `CSGOBOT_SHOOT_DEAD_ZONE` |
+| Mouse cap / min | **35** / **2** | `CSGOBOT_MOUSE_MAX_DELTA`, `_MIN_DELTA` |
+| Lead variance gate | `on` | `CSGOBOT_LEAD_VARIANCE_GATE=0` |
+
+Pipeline: **EMA aim point → lead (if stable) → FOV → mouse cap → hysteresis move → shoot zone**.
+
+Legacy `CSGOBOT_DEAD_ZONE` → `aim_dead_zone_high`.
+
+Симптом «дёргается на бегу» → `git pull` 6c; debug: `lead_stable=False` в `aim:` log.
 
 ## Детекция (env)
 

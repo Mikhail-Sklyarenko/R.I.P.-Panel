@@ -16,7 +16,7 @@ def test_shoot_when_on_target_and_cooldown_elapsed() -> None:
     assert should_auto_shoot(
         auto_shoot=True,
         pixel_distance=8.0,
-        dead_zone=12.0,
+        shoot_dead_zone=12.0,
         confidence=0.85,
         is_head=True,
         head_confidence=0.8,
@@ -31,7 +31,7 @@ def test_no_shoot_when_disabled() -> None:
     assert not should_auto_shoot(
         auto_shoot=False,
         pixel_distance=5.0,
-        dead_zone=12.0,
+        shoot_dead_zone=12.0,
         confidence=0.9,
         is_head=False,
         head_confidence=0.8,
@@ -46,7 +46,7 @@ def test_no_shoot_outside_dead_zone() -> None:
     assert not should_auto_shoot(
         auto_shoot=True,
         pixel_distance=20.0,
-        dead_zone=12.0,
+        shoot_dead_zone=12.0,
         confidence=0.9,
         is_head=False,
         head_confidence=0.8,
@@ -61,7 +61,7 @@ def test_no_shoot_low_confidence() -> None:
     assert not should_auto_shoot(
         auto_shoot=True,
         pixel_distance=5.0,
-        dead_zone=12.0,
+        shoot_dead_zone=12.0,
         confidence=0.6,
         is_head=True,
         head_confidence=0.8,
@@ -76,7 +76,7 @@ def test_no_shoot_during_cooldown() -> None:
     assert not should_auto_shoot(
         auto_shoot=True,
         pixel_distance=5.0,
-        dead_zone=12.0,
+        shoot_dead_zone=12.0,
         confidence=0.9,
         is_head=False,
         head_confidence=0.8,
@@ -91,7 +91,7 @@ def test_shoot_after_cooldown() -> None:
     assert should_auto_shoot(
         auto_shoot=True,
         pixel_distance=5.0,
-        dead_zone=12.0,
+        shoot_dead_zone=12.0,
         confidence=0.75,
         is_head=False,
         head_confidence=0.8,

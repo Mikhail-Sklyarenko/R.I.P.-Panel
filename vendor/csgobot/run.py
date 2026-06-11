@@ -85,7 +85,17 @@ STUCK_MOTION_THRESHOLD = 2.0  # mean pixel diff on center ROI (tune on farm PC)
 UNSTUCK_COOLDOWN_SEC = 3.0
 AUTO_MOVE = False  # legacy random tap; use PATROL when enabled
 MOVE_INTERVAL_SEC = 8.0
-DEAD_ZONE = 12.0  # stop micro-corrections near crosshair (reduces circular jitter)
+DEAD_ZONE = 12.0  # legacy; maps to AIM_DEAD_ZONE_HIGH if unset
+AIM_DEAD_ZONE_HIGH = 14.0
+AIM_DEAD_ZONE_LOW = 8.0
+SHOOT_DEAD_ZONE = 18.0
+MOUSE_MAX_DELTA = 35
+MOUSE_MIN_DELTA = 2
+AIM_SMOOTH_ENABLED = True
+AIM_SMOOTH_ALPHA = 0.45
+AIM_SMOOTH_JUMP_RESET_PX = 80.0
+LEAD_VARIANCE_GATE = True
+LEAD_MIN_SPEED_PX_S = 40.0
 ONE_SHOT = False  # Only move once per activation
 
 # Hotkeys
@@ -108,13 +118,22 @@ def create_config() -> AppConfig:
     """Create application configuration from settings above."""
     from aim_tuning import (
         resolve_adaptive_smoothing,
+        resolve_aim_dead_zone_high,
+        resolve_aim_dead_zone_low,
+        resolve_aim_smooth_alpha,
+        resolve_aim_smooth_enabled,
         resolve_body_fallback_sec,
         resolve_confidence,
         resolve_dead_zone,
         resolve_lead_enabled,
+        resolve_lead_min_speed,
         resolve_lead_ms,
+        resolve_lead_variance_gate,
         resolve_max_assist_distance,
+        resolve_mouse_max_delta,
+        resolve_mouse_min_delta,
         resolve_prioritize_heads,
+        resolve_shoot_dead_zone,
         resolve_smoothing,
         resolve_x360,
     )
@@ -122,6 +141,9 @@ def create_config() -> AppConfig:
     x360 = resolve_x360(X360)
     smoothing = resolve_smoothing(SMOOTHING)
     dead_zone = resolve_dead_zone(DEAD_ZONE)
+    aim_high = resolve_aim_dead_zone_high(AIM_DEAD_ZONE_HIGH, dead_zone)
+    aim_low = resolve_aim_dead_zone_low(AIM_DEAD_ZONE_LOW, aim_high)
+    shoot_zone = resolve_shoot_dead_zone(SHOOT_DEAD_ZONE)
     confidence = resolve_confidence(CONFIDENCE_THRESHOLD)
     prioritize_heads = resolve_prioritize_heads(PRIORITIZE_HEADS)
     max_assist_distance = resolve_max_assist_distance(MAX_ASSIST_DISTANCE)
@@ -160,12 +182,22 @@ def create_config() -> AppConfig:
         adaptive_smoothing=adaptive_smooth,
         lead_aim_enabled=lead_enabled,
         lead_ms=lead_ms,
+        lead_variance_gate=resolve_lead_variance_gate(LEAD_VARIANCE_GATE),
+        lead_min_speed_px_s=resolve_lead_min_speed(LEAD_MIN_SPEED_PX_S),
         body_fallback_sec=body_fallback_sec,
+        aim_dead_zone_high=aim_high,
+        aim_dead_zone_low=aim_low,
+        shoot_dead_zone=shoot_zone,
+        aim_smooth_enabled=resolve_aim_smooth_enabled(AIM_SMOOTH_ENABLED),
+        aim_smooth_alpha=resolve_aim_smooth_alpha(AIM_SMOOTH_ALPHA),
+        aim_smooth_jump_reset_px=AIM_SMOOTH_JUMP_RESET_PX,
+        mouse_max_delta=resolve_mouse_max_delta(MOUSE_MAX_DELTA),
+        mouse_min_delta=resolve_mouse_min_delta(MOUSE_MIN_DELTA),
         auto_shoot=AUTO_SHOOT,
         shoot_cooldown_sec=SHOOT_COOLDOWN_SEC,
         auto_move=AUTO_MOVE,
         move_interval_sec=MOVE_INTERVAL_SEC,
-        dead_zone=dead_zone,
+        dead_zone=aim_high,
         one_shot=ONE_SHOT,
     )
 
@@ -282,12 +314,16 @@ def main() -> int:
         f"Aim: x360={config.fov.x360} ({aim_source}) "
         f"smoothing={config.aim.smoothing_factor} "
         f"adaptive={config.aim.adaptive_smoothing} "
-        f"dead_zone={config.aim.dead_zone} max_dist={config.aim.max_assist_distance} "
+        f"aim_hz={config.aim.aim_dead_zone_high}/{config.aim.aim_dead_zone_low} "
+        f"shoot_dz={config.aim.shoot_dead_zone} "
+        f"max_dist={config.aim.max_assist_distance} "
         f"conf={config.detector.confidence_threshold} heads={config.aim.prioritize_heads}"
     )
     logger.info(
         f"Aim advanced: lead={config.aim.lead_aim_enabled} "
-        f"lead_ms={config.aim.lead_ms} body_fallback={config.aim.body_fallback_sec}s"
+        f"lead_ms={config.aim.lead_ms} lead_gate={config.aim.lead_variance_gate} "
+        f"smooth={config.aim.aim_smooth_alpha} body_fallback={config.aim.body_fallback_sec}s "
+        f"mouse_cap={config.aim.mouse_max_delta}"
     )
     logger.info(f"Team: {config.aim.current_team.value.upper()}")
     try:

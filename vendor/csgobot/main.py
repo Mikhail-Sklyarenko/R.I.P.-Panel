@@ -31,9 +31,9 @@ from utils.win32 import get_window_rect
 from detectors import YOLOv8Detector
 from aiming import FOVMouseMovement, TargetSelector
 from aiming.auto_shoot import should_auto_shoot_target
+from aiming.aim_pipeline import AimPipelineState, process_aim_frame
 from aiming.combat_aim import maybe_switch_to_body
-from aiming.velocity_lead import LeadConfig, VelocityLead
-from aim_tuning import adaptive_smoothing, aim_debug_enabled
+from aim_tuning import aim_debug_enabled
 from patrol import (
     PatrolMode,
     PatrolRunner,
@@ -322,14 +322,7 @@ def detection_process(
     last_unstuck_time = 0.0
     aim_debug = aim_debug_enabled()
     last_aim_debug_log = 0.0
-    velocity_lead = VelocityLead(
-        LeadConfig(
-            enabled=config.aim.lead_aim_enabled,
-            lead_ms=config.aim.lead_ms,
-            ema_alpha=config.aim.lead_ema_alpha,
-            max_lead_px=config.aim.lead_max_px,
-        )
-    )
+    aim_pipeline = AimPipelineState.from_aim_config(config.aim)
     head_miss_since: Optional[float] = None
     last_target_key: Optional[tuple] = None
 
@@ -388,6 +381,7 @@ def detection_process(
             if enemy_target is None:
                 head_miss_since = None
                 last_target_key = None
+                aim_pipeline.reset_trackers()
 
             in_combat = enemy_target is not None
             if in_combat:
@@ -497,7 +491,7 @@ def detection_process(
                 target, head_miss_since, switched_body = maybe_switch_to_body(
                     target,
                     prioritize_heads=config.aim.prioritize_heads,
-                    dead_zone=config.aim.dead_zone,
+                    aim_dead_zone_high=config.aim.aim_dead_zone_high,
                     body_fallback_sec=config.aim.body_fallback_sec,
                     head_miss_since=head_miss_since,
                     now=now,
@@ -507,7 +501,7 @@ def detection_process(
                     ),
                 )
                 if switched_body:
-                    velocity_lead.reset()
+                    aim_pipeline.reset_trackers()
 
                 target_key = (
                     target.class_name,
@@ -515,29 +509,22 @@ def detection_process(
                     int(target.aim_y // 8),
                 )
                 if target_key != last_target_key:
-                    velocity_lead.reset()
+                    aim_pipeline.reset_trackers()
                     last_target_key = target_key
 
-                aim_x, aim_y = target.aim_x, target.aim_y
-                aim_x, aim_y = velocity_lead.predict(aim_x, aim_y, now)
-
-                smoothing = config.aim.smoothing_factor
-                if config.aim.adaptive_smoothing:
-                    smoothing = adaptive_smoothing(
-                        smoothing,
-                        target.distance,
-                        fps(),
-                        max_distance=float(config.aim.max_assist_distance),
-                    )
-
-                aim_result = fov_mouse.get_move(
-                    aim_x,
-                    aim_y,
-                    smoothing=smoothing,
+                frame = process_aim_frame(
+                    raw_x=target.aim_x,
+                    raw_y=target.aim_y,
+                    target_distance=target.distance,
+                    now=now,
+                    aim_config=config.aim,
+                    fov_mouse=fov_mouse,
+                    pipeline=aim_pipeline,
+                    fps_value=fps(),
                 )
 
-                if aim_result.pixel_distance > config.aim.dead_zone:
-                    mouse.move_relative(aim_result.mouse_x, aim_result.mouse_y)
+                if frame.should_move and (frame.mouse_dx or frame.mouse_dy):
+                    mouse.move_relative(frame.mouse_dx, frame.mouse_dy)
 
                     if config.aim.one_shot:
                         activated.clear()
@@ -545,15 +532,18 @@ def detection_process(
                 if aim_debug and now - last_aim_debug_log >= 2.0:
                     logger.info(
                         "aim: fps=%.0f dist=%.1f smooth=%.2f "
-                        "mouse=(%d,%d) target=(%.0f,%.0f) lead=%s body_fb=%s",
+                        "mouse=(%d,%d) target=(%.0f,%.0f) "
+                        "lead_stable=%s speed=%.0f move=%s body_fb=%s",
                         fps(),
-                        aim_result.pixel_distance,
-                        smoothing,
-                        aim_result.mouse_x,
-                        aim_result.mouse_y,
-                        aim_x,
-                        aim_y,
-                        config.aim.lead_aim_enabled,
+                        frame.pixel_distance,
+                        frame.smoothing,
+                        frame.mouse_dx,
+                        frame.mouse_dy,
+                        frame.aim_x,
+                        frame.aim_y,
+                        frame.lead.stable,
+                        frame.lead.speed_px_s,
+                        frame.should_move,
                         switched_body,
                     )
                     last_aim_debug_log = now
@@ -561,7 +551,7 @@ def detection_process(
                 if should_auto_shoot_target(
                     config.aim,
                     target,
-                    aim_result.pixel_distance,
+                    frame.pixel_distance,
                     now,
                     last_shot_time,
                 ):
@@ -579,8 +569,8 @@ def detection_process(
                 if config.preview.enabled:
                     detector.draw_aim_point(
                         img,
-                        aim_x,
-                        aim_y,
+                        frame.aim_x,
+                        frame.aim_y,
                         color=(0, 255, 0),
                     )
 

@@ -13,7 +13,7 @@ def should_auto_shoot(
     *,
     auto_shoot: bool,
     pixel_distance: float,
-    dead_zone: float,
+    shoot_dead_zone: float,
     confidence: float,
     is_head: bool,
     head_confidence: float,
@@ -23,11 +23,11 @@ def should_auto_shoot(
     shoot_cooldown_sec: float,
 ) -> bool:
     """
-    Fire when crosshair is on target (inside dead_zone), confidence OK, cooldown elapsed.
+    Fire when crosshair is on target (inside shoot_dead_zone), confidence OK, cooldown elapsed.
     """
     if not auto_shoot:
         return False
-    if pixel_distance > dead_zone:
+    if pixel_distance > shoot_dead_zone:
         return False
     min_conf = head_confidence if is_head else body_confidence
     if confidence < min_conf:
@@ -45,10 +45,13 @@ def should_auto_shoot_target(
     last_shot_time: float,
 ) -> bool:
     """Convenience wrapper using AimConfig + Target."""
+    zone = getattr(aim_config, "shoot_dead_zone", None)
+    if zone is None:
+        zone = aim_config.dead_zone
     return should_auto_shoot(
         auto_shoot=aim_config.auto_shoot,
         pixel_distance=pixel_distance,
-        dead_zone=aim_config.dead_zone,
+        shoot_dead_zone=float(zone),
         confidence=target.confidence,
         is_head=target.is_head,
         head_confidence=aim_config.head_confidence,

@@ -37,7 +37,72 @@ def resolve_smoothing(default: float) -> float:
 
 
 def resolve_dead_zone(default: float) -> float:
+    """Legacy single dead zone → aim_dead_zone_high."""
     raw = os.environ.get("CSGOBOT_DEAD_ZONE", "").strip()
+    if raw:
+        return max(0.0, float(raw))
+    return default
+
+
+def resolve_aim_dead_zone_high(default: float, legacy: float) -> float:
+    raw = os.environ.get("CSGOBOT_AIM_DEAD_ZONE_HIGH", "").strip()
+    if raw:
+        return max(0.0, float(raw))
+    dz = os.environ.get("CSGOBOT_DEAD_ZONE", "").strip()
+    if dz:
+        return max(0.0, float(dz))
+    return default if default > 0 else legacy
+
+
+def resolve_aim_dead_zone_low(default: float, high: float) -> float:
+    raw = os.environ.get("CSGOBOT_AIM_DEAD_ZONE_LOW", "").strip()
+    if raw:
+        return max(0.0, float(raw))
+    if default > 0:
+        return default
+    return round(high * 0.65, 1)
+
+
+def resolve_shoot_dead_zone(default: float) -> float:
+    raw = os.environ.get("CSGOBOT_SHOOT_DEAD_ZONE", "").strip()
+    if raw:
+        return max(0.0, float(raw))
+    return default
+
+
+def resolve_aim_smooth_enabled(default: bool) -> bool:
+    val = _env_bool("CSGOBOT_AIM_SMOOTH")
+    return default if val is None else val
+
+
+def resolve_aim_smooth_alpha(default: float) -> float:
+    raw = os.environ.get("CSGOBOT_AIM_SMOOTH_ALPHA", "").strip()
+    if raw:
+        return max(0.05, min(1.0, float(raw)))
+    return default
+
+
+def resolve_mouse_max_delta(default: int) -> int:
+    raw = os.environ.get("CSGOBOT_MOUSE_MAX_DELTA", "").strip()
+    if raw:
+        return max(1, int(float(raw)))
+    return default
+
+
+def resolve_mouse_min_delta(default: int) -> int:
+    raw = os.environ.get("CSGOBOT_MOUSE_MIN_DELTA", "").strip()
+    if raw:
+        return max(0, int(float(raw)))
+    return default
+
+
+def resolve_lead_variance_gate(default: bool) -> bool:
+    val = _env_bool("CSGOBOT_LEAD_VARIANCE_GATE")
+    return default if val is None else val
+
+
+def resolve_lead_min_speed(default: float) -> float:
+    raw = os.environ.get("CSGOBOT_LEAD_MIN_SPEED", "").strip()
     if raw:
         return max(0.0, float(raw))
     return default
