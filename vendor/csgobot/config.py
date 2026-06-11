@@ -117,6 +117,16 @@ class AimConfig:
 
     # Smoothing (1.0 = instant, higher = slower)
     smoothing_factor: float = 1.0
+    adaptive_smoothing: bool = True
+
+    # Lead aim (velocity prediction for moving targets)
+    lead_aim_enabled: bool = True
+    lead_ms: float = 80.0
+    lead_ema_alpha: float = 0.35
+    lead_max_px: float = 120.0
+
+    # Switch from head to body if head not in dead_zone this long (seconds)
+    body_fallback_sec: float = 0.2
 
     dead_zone: float = 5.0
     one_shot: bool = False

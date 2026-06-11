@@ -64,8 +64,31 @@ Caps Lock → проверка поворота на 360°.
 
 | Параметр | Default | Env |
 |----------|---------|-----|
-| SMOOTHING | `3.0` | `CSGOBOT_SMOOTHING` |
+| SMOOTHING | `2.5` | `CSGOBOT_SMOOTHING` |
 | DEAD_ZONE | `12.0` | `CSGOBOT_DEAD_ZONE` |
+| Adaptive smoothing | `on` | `CSGOBOT_ADAPTIVE_SMOOTHING=0` выкл |
+
+**Adaptive smoothing** (PR-6b): далёкая цель → меньше smoothing (быстрее доводка), близкая → больше (точнее). При FPS &lt; 25 smoothing повышается против перелёта.
+
+## Lead aim и body fallback (PR-6b)
+
+| Параметр | Default | Env |
+|----------|---------|-----|
+| Lead aim | `on` | `CSGOBOT_LEAD_ENABLED=0` |
+| Lead time | `80 ms` | `CSGOBOT_LEAD_MS` |
+| Body fallback | `200 ms` | `CSGOBOT_BODY_FALLBACK_MS` |
+
+**Lead aim** — EMA-скорость центра bbox, прицел в `pos + v × lead_ms`. Помогает против бегущих в DM.
+
+**Body fallback** — если выбрана голова, но `dist > DEAD_ZONE` дольше `BODY_FALLBACK_MS`, цель переключается на ближайшее тело.
+
+## Детекция (env)
+
+| Параметр | Default | Env |
+|----------|---------|-----|
+| Confidence | `0.65` | `CSGOBOT_CONFIDENCE` |
+| Prioritize heads | `true` | `CSGOBOT_PRIORITIZE_HEADS=0` |
+| Max assist dist | `260` | `CSGOBOT_MAX_DIST` |
 
 Smoothing делит шаг мыши на N каждый кадр YOLO (не плавная кривая).
 

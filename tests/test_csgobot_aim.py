@@ -87,3 +87,14 @@ def test_create_config_uses_env_sensitivity(monkeypatch) -> None:
     cfg = create_config()
     assert cfg.fov.x360 == 8182
     assert cfg.preview.enabled is False
+
+
+def test_create_config_lead_and_adaptive_defaults(monkeypatch) -> None:
+    monkeypatch.delenv("CSGOBOT_LEAD_ENABLED", raising=False)
+    monkeypatch.delenv("CSGOBOT_ADAPTIVE_SMOOTHING", raising=False)
+    from run import create_config  # noqa: E402
+
+    cfg = create_config()
+    assert cfg.aim.lead_aim_enabled is True
+    assert cfg.aim.adaptive_smoothing is True
+    assert cfg.aim.body_fallback_sec == 0.2

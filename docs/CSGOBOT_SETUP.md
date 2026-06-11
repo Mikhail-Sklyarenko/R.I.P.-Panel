@@ -102,6 +102,8 @@ venv\Scripts\pip.exe install torch torchvision --index-url https://download.pyto
 
 Env без правки `run.py`: `CS2_SENSITIVITY`, `CSGOBOT_X360`, `CSGOBOT_SMOOTHING`, `CSGOBOT_DEAD_ZONE`, `CSGOBOT_AIM_DEBUG=1`.
 
+**Lead aim (PR-6b):** `CSGOBOT_LEAD_MS`, `CSGOBOT_LEAD_ENABLED`, `CSGOBOT_ADAPTIVE_SMOOTHING`, `CSGOBOT_BODY_FALLBACK_MS`, `CSGOBOT_CONFIDENCE`, `CSGOBOT_PRIORITIZE_HEADS`, `CSGOBOT_MAX_DIST` — см. `docs/AIM_TUNING.md`.
+
 Окно с рамками: `SHOW_PREVIEW = True` (для фарма по умолчанию **False**).
 
 ## Автострельба (AUTO_SHOOT)

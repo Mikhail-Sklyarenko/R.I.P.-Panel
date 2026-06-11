@@ -45,3 +45,90 @@ def resolve_dead_zone(default: float) -> float:
 
 def aim_debug_enabled() -> bool:
     return os.environ.get("CSGOBOT_AIM_DEBUG", "").lower() in ("1", "true", "yes")
+
+
+def _env_bool(name: str) -> bool | None:
+    raw = os.environ.get(name, "").strip().lower()
+    if not raw:
+        return None
+    if raw in ("1", "true", "yes", "on"):
+        return True
+    if raw in ("0", "false", "no", "off"):
+        return False
+    return None
+
+
+def resolve_confidence(default: float) -> float:
+    raw = os.environ.get("CSGOBOT_CONFIDENCE", "").strip()
+    if raw:
+        return max(0.05, min(1.0, float(raw)))
+    return default
+
+
+def resolve_prioritize_heads(default: bool) -> bool:
+    val = _env_bool("CSGOBOT_PRIORITIZE_HEADS")
+    return default if val is None else val
+
+
+def resolve_max_assist_distance(default: int) -> int:
+    raw = os.environ.get("CSGOBOT_MAX_DIST", "").strip()
+    if raw:
+        return max(50, int(float(raw)))
+    return default
+
+
+def resolve_lead_enabled(default: bool) -> bool:
+    val = _env_bool("CSGOBOT_LEAD_ENABLED")
+    return default if val is None else val
+
+
+def resolve_lead_ms(default: float) -> float:
+    raw = os.environ.get("CSGOBOT_LEAD_MS", "").strip()
+    if raw:
+        return max(0.0, float(raw))
+    return default
+
+
+def resolve_adaptive_smoothing(default: bool) -> bool:
+    val = _env_bool("CSGOBOT_ADAPTIVE_SMOOTHING")
+    return default if val is None else val
+
+
+def resolve_body_fallback_sec(default: float) -> float:
+    raw = os.environ.get("CSGOBOT_BODY_FALLBACK_MS", "").strip()
+    if raw:
+        return max(0.0, float(raw)) / 1000.0
+    return default
+
+
+def adaptive_smoothing(
+    base: float,
+    pixel_distance: float,
+    fps: float,
+    *,
+    max_distance: float = 300.0,
+) -> float:
+    """
+    Scale smoothing by target distance and detector FPS.
+
+    Far targets → lower smoothing (faster snap). Close → higher (precision).
+    Low FPS → higher smoothing (less overshoot per frame).
+    """
+    base = max(1.0, base)
+    if max_distance <= 0:
+        max_distance = 300.0
+
+    dist_norm = min(1.0, max(0.0, pixel_distance / max_distance))
+    # far: *0.65, close: *1.25
+    dist_factor = 1.25 - 0.6 * dist_norm
+
+    fps_factor = 1.0
+    if fps > 0:
+        if fps < 15:
+            fps_factor = 1.45
+        elif fps < 25:
+            fps_factor = 1.2
+        elif fps > 35:
+            fps_factor = 0.88
+
+    return max(1.0, base * dist_factor * fps_factor)

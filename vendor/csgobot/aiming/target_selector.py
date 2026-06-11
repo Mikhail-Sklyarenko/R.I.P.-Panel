@@ -213,6 +213,23 @@ class TargetSelector:
         # Return nearest target
         return min(enemies, key=lambda t: t.distance)
 
+    def select_nearest_body(
+        self,
+        detections: Dict[str, List[Dict]],
+        max_distance: Optional[float] = None,
+    ) -> Optional[Target]:
+        """Nearest enemy body (non-head) within max_distance."""
+        bodies = [
+            t
+            for t in self.filter_enemies(detections)
+            if not t.is_head
+        ]
+        if max_distance is not None:
+            bodies = [t for t in bodies if t.distance <= max_distance]
+        if not bodies:
+            return None
+        return min(bodies, key=lambda t: t.distance)
+
     def select_all_sorted(
         self,
         detections: Dict[str, List[Dict]],

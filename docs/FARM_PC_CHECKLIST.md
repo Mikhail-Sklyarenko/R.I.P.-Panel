@@ -122,7 +122,8 @@ Must **not** appear: `loot_failed`, `session_failed`, long idle on main menu whe
 | `OBS Virtual Camera not found` | Start OBS, enable Virtual Camera |
 | 60s menu wait then DM works | Recalibrate probe: screenshot + `scripts/sample_probe_rgb.py` → `coords_1280x720.yaml` |
 | `combat_fallback` / `early exit` instantly | Check `data/logs/csgobot_*.stderr.txt`; run `tools\preflight.py`; OBS VC |
-| Weak aim / carousel crosshair | Set **cs2_sensitivity** in Config #1; install CUDA PyTorch (`check_cuda_torch.py`) |
+| Weak aim / carousel crosshair | Set **cs2_sensitivity** in Config #1; CUDA torch; lead aim on (default PR-6b) |
+| Misses on running enemies | `CSGOBOT_LEAD_MS=100`; `CSGOBOT_BODY_FALLBACK_MS=200`; `CSGOBOT_AIM_DEBUG=1` |
 | `WARN: PyTorch CPU-only` | Install torch+cu124 in csgobot venv; optional **csgobot_require_cuda** in Config #3 |
 | False `csgobot: finished ok` after 1s | Fixed — should show `early exit` + stderr tail |
 | `retry in_dm wait attempt 2` + 65s | Fixed — soft_peek 1/2 probes; retry skips if already in DM |

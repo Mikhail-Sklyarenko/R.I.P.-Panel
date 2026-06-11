@@ -45,7 +45,7 @@ OBS_CANVAS_HEIGHT = 720
 
 # YOLO model settings
 YOLO_WEIGHTS = "./yolov8/cs2_yolov8m_640_augmented_v4.pt"
-CONFIDENCE_THRESHOLD = 0.7
+CONFIDENCE_THRESHOLD = 0.65  # farm: 0.55–0.65 via CSGOBOT_CONFIDENCE
 IOU_THRESHOLD = 0.2
 YOLO_IMGSZ = 640  # must match weights name; do not raise without retraining
 DETECTOR_DEVICE = ""  # "" = auto, "cuda", or "cpu"
@@ -67,9 +67,13 @@ X360 = 7792  # fallback ~sens 2.1; override via CS2_SENSITIVITY / panel Config #
 
 # Aim settings
 CURRENT_TEAM = Team.CT  # Your starting team
-PRIORITIZE_HEADS = True  # Prefer headshots
-MAX_ASSIST_DISTANCE = 300  # Max pixel distance to engage
-SMOOTHING = 3.0  # higher = smoother aim; raise if mouse overshoots at high FPS
+PRIORITIZE_HEADS = True  # body fallback after BODY_FALLBACK_SEC if head misses
+MAX_ASSIST_DISTANCE = 260  # override: CSGOBOT_MAX_DIST
+SMOOTHING = 2.5  # base; adaptive_smoothing scales by dist/fps
+LEAD_AIM_ENABLED = True  # velocity lead for moving targets
+LEAD_MS = 80.0  # override: CSGOBOT_LEAD_MS
+ADAPTIVE_SMOOTHING = True  # override: CSGOBOT_ADAPTIVE_SMOOTHING=0
+BODY_FALLBACK_SEC = 0.2  # override: CSGOBOT_BODY_FALLBACK_MS=200
 AUTO_SHOOT = True  # LMB when crosshair on target; False = aim only
 SHOOT_COOLDOWN_SEC = 0.1  # 80–150 ms between shots
 PATROL_ENABLED = True
@@ -102,11 +106,29 @@ PREVIEW_HEIGHT = 360
 
 def create_config() -> AppConfig:
     """Create application configuration from settings above."""
-    from aim_tuning import resolve_dead_zone, resolve_smoothing, resolve_x360
+    from aim_tuning import (
+        resolve_adaptive_smoothing,
+        resolve_body_fallback_sec,
+        resolve_confidence,
+        resolve_dead_zone,
+        resolve_lead_enabled,
+        resolve_lead_ms,
+        resolve_max_assist_distance,
+        resolve_prioritize_heads,
+        resolve_smoothing,
+        resolve_x360,
+    )
 
     x360 = resolve_x360(X360)
     smoothing = resolve_smoothing(SMOOTHING)
     dead_zone = resolve_dead_zone(DEAD_ZONE)
+    confidence = resolve_confidence(CONFIDENCE_THRESHOLD)
+    prioritize_heads = resolve_prioritize_heads(PRIORITIZE_HEADS)
+    max_assist_distance = resolve_max_assist_distance(MAX_ASSIST_DISTANCE)
+    lead_enabled = resolve_lead_enabled(LEAD_AIM_ENABLED)
+    lead_ms = resolve_lead_ms(LEAD_MS)
+    adaptive_smooth = resolve_adaptive_smoothing(ADAPTIVE_SMOOTHING)
+    body_fallback_sec = resolve_body_fallback_sec(BODY_FALLBACK_SEC)
 
     # Create sub-configs
     obs_config = OBSConfig(
@@ -123,7 +145,7 @@ def create_config() -> AppConfig:
     detector_config = DetectorConfig(
         type=DetectorType.YOLOV8,
         weights_path=YOLO_WEIGHTS,
-        confidence_threshold=CONFIDENCE_THRESHOLD,
+        confidence_threshold=confidence,
         iou_threshold=IOU_THRESHOLD,
         imgsz=YOLO_IMGSZ,
         device=DETECTOR_DEVICE,
@@ -132,9 +154,13 @@ def create_config() -> AppConfig:
 
     aim_config = AimConfig(
         current_team=CURRENT_TEAM,
-        prioritize_heads=PRIORITIZE_HEADS,
-        max_assist_distance=MAX_ASSIST_DISTANCE,
+        prioritize_heads=prioritize_heads,
+        max_assist_distance=max_assist_distance,
         smoothing_factor=smoothing,
+        adaptive_smoothing=adaptive_smooth,
+        lead_aim_enabled=lead_enabled,
+        lead_ms=lead_ms,
+        body_fallback_sec=body_fallback_sec,
         auto_shoot=AUTO_SHOOT,
         shoot_cooldown_sec=SHOOT_COOLDOWN_SEC,
         auto_move=AUTO_MOVE,
@@ -255,7 +281,13 @@ def main() -> int:
     logger.info(
         f"Aim: x360={config.fov.x360} ({aim_source}) "
         f"smoothing={config.aim.smoothing_factor} "
-        f"dead_zone={config.aim.dead_zone} max_dist={config.aim.max_assist_distance}"
+        f"adaptive={config.aim.adaptive_smoothing} "
+        f"dead_zone={config.aim.dead_zone} max_dist={config.aim.max_assist_distance} "
+        f"conf={config.detector.confidence_threshold} heads={config.aim.prioritize_heads}"
+    )
+    logger.info(
+        f"Aim advanced: lead={config.aim.lead_aim_enabled} "
+        f"lead_ms={config.aim.lead_ms} body_fallback={config.aim.body_fallback_sec}s"
     )
     logger.info(f"Team: {config.aim.current_team.value.upper()}")
     try:
