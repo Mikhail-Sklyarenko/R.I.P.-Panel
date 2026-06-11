@@ -2,7 +2,13 @@
 
 from modules.ui_nav.artifacts import ArtifactStore
 from modules.ui_nav.coords import NavCoords, load_nav_coords
-from modules.ui_nav.detectors import ScreenState, detect_state, wait_for_state
+from modules.ui_nav.detectors import (
+    InDmWaitResult,
+    ScreenState,
+    detect_state,
+    wait_for_in_dm,
+    wait_for_state,
+)
 from modules.ui_nav.driver import NavDriver, create_driver
 
 __all__ = [
@@ -11,7 +17,9 @@ __all__ = [
     "NavDriver",
     "ScreenState",
     "create_driver",
+    "InDmWaitResult",
     "detect_state",
     "load_nav_coords",
+    "wait_for_in_dm",
     "wait_for_state",
 ]

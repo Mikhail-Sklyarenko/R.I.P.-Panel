@@ -10,7 +10,12 @@ from config.schema import AppConfig
 from core.events import EventType
 from modules.ui_nav.artifacts import ArtifactStore
 from modules.ui_nav.coords import load_nav_coords_for_hwnd
-from modules.ui_nav.detectors import ScreenState, detect_state, wait_for_state
+from modules.ui_nav.detectors import (
+    ScreenState,
+    detect_state,
+    wait_for_in_dm,
+    wait_for_state,
+)
 from modules.ui_nav.driver import NavDriver, SimDriver, create_driver
 from modules.dm_runner.errors import DmNavStopped
 from modules.ui_nav.errors import UiNavError, UiNavTimeoutError
@@ -221,7 +226,12 @@ class DmNavigator:
             return
         except UiNavTimeoutError:
             img = self.driver.capture()
-            if detect_state(img, ScreenState.IN_DM, self.coords):
+            if detect_state(
+                img,
+                ScreenState.IN_DM,
+                self.coords,
+                min_match=self.config.in_dm_min_match,
+            ):
                 self._nav_progress(
                     "dm nav: searching screen skipped; in_dm probes already match"
                 )
@@ -247,18 +257,42 @@ class DmNavigator:
                 "start_search not confirmed"
             ) from None
 
+    def _in_dm_detail(self, *, soft_peek: bool) -> str:
+        if soft_peek:
+            return "dm_runner: in_dm (soft_peek)"
+        return "dm_runner: in_dm"
+
+    def _emit_in_dm_if_already_on_frame(self) -> bool:
+        """Retry fast-path: skip map_load_delay when soft/strict in_dm visible."""
+        img = self.driver.capture()
+        if not detect_state(
+            img,
+            ScreenState.IN_DM,
+            self.coords,
+            min_match=self.config.in_dm_min_match,
+        ):
+            return False
+        strict = detect_state(img, ScreenState.IN_DM, self.coords)
+        if strict:
+            self._nav_progress("dm nav: in_dm on frame; skip wait")
+        else:
+            self._nav_progress("dm nav: soft in_dm on frame; skip wait")
+        self._e(EventType.IN_DM, self._in_dm_detail(soft_peek=not strict))
+        return True
+
     def _wait_search_and_in_dm(self) -> None:
         self._confirm_search_started()
 
         self._set_sim_phase(ScreenState.IN_DM)
-        wait_for_state(
+        result = wait_for_in_dm(
             self.driver,
-            ScreenState.IN_DM,
             self.coords,
             self.artifacts,
             timeout_sec=float(self.config.map_load_delay_sec),
+            soft_min_match=self.config.in_dm_min_match,
+            on_progress=self._nav_progress,
         )
-        self._e(EventType.IN_DM, "dm_runner: in_dm")
+        self._e(EventType.IN_DM, self._in_dm_detail(soft_peek=result.soft_peek))
 
     def _click_target(self, name: str) -> None:
         before = self.driver.capture()
@@ -326,6 +360,8 @@ class DmNavigator:
                     self._nav_progress(
                         f"dm nav: retry in_dm wait (attempt {attempt})"
                     )
+                    if attempt > 1 and self._emit_in_dm_if_already_on_frame():
+                        return
                     self._wait_search_and_in_dm()
                 else:
                     self.navigate_to_dm()

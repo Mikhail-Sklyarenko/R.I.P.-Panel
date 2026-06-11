@@ -63,7 +63,7 @@ Main log при nav: `dm click main_menu_play @(x,y)` — если строк н
 |-------|----------|--------|
 | `main_menu` | `detectors.main_menu` @ **x≈217** | launcher + dm_runner confirmed: **2/2**; warn path: soft **1/2** |
 | `searching` | `detectors.searching` | N−1 из N |
-| `in_dm` | `detectors.in_dm` | **все** probes (HUD, не Loadout) |
+| `in_dm` | `detectors.in_dm` @ HUD bottom | strict **2/2**; soft **≥1/2 × 3 polls** → `in_dm (soft_peek)` |
 
 `cs2_menu_confirmed` в launcher — **только strict 2/2** на вкладке ИГРАТЬ.  
 `cs2_menu_soft_peek` — если soft 1/2 был хотя бы раз (hint, не confirmed).
@@ -75,9 +75,16 @@ Main log при nav: `dm click main_menu_play @(x,y)` — если строк н
 3. `wait_for_cs2_main_menu` (**strict 2/2**, unified focus capture)
 4. `cs2_ok` → ready **или** unconfirmed
 5. dm_runner: menu wait / fallback click @217
-6. Retry fail **in_dm** only: `dm nav: retry in_dm wait (attempt N)` — **не** повторный soft probe wait
+6. Retry fail **in_dm** only: `dm nav: retry in_dm wait (attempt N)` — **не** повторный menu wait
+7. Retry attempt **>1**: если кадр уже soft `in_dm` → `dm nav: soft in_dm on frame; skip wait` (без второго 65s)
 
-Timeout log: `main_menu timeout: p0=… p1=… last@(x,y)=[r,g,b] expected=[…]`
+Timeout logs:
+- `main_menu timeout: p0=… p1=… last@(x,y)=[r,g,b] expected=[…]`
+- `in_dm timeout: p0=… p1=… last@(x,y)=[r,g,b] expected=[…]`
+
+Config: `in_dm_min_match` (default **1**) — порог для soft path; strict = все probes.
+
+Artifacts: `in_dm_probe`, `in_dm_soft_peek_ok` в `steps.jsonl` (p0/p1/rgb0/rgb1).
 
 ## Artifacts
 
@@ -106,5 +113,5 @@ Timeout log: `main_menu timeout: p0=… p1=… last@(x,y)=[r,g,b] expected=[…]
 
 ## Модули
 
-- `modules/ui_nav/` — detectors, `probe_match_results`, `wait_for_cs2_main_menu`
+- `modules/ui_nav/` — detectors, `wait_for_in_dm`, `probe_match_results`, `wait_for_cs2_main_menu`
 - `modules/dm_runner/` — `navigate_to_dm`, controlled fallback click

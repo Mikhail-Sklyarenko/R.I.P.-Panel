@@ -5,7 +5,7 @@ meta:
   base_height: 720
   calibration: armoryfarm_operator_2026-06
   cs2_build: "2025-06 Panorama RU @ 1280x720 windowed (ИГРАТЬ + БОЙ НАСМЕРТЬ)"
-  note: "736,20 was МАГАЗИН — recalibrated to ИГРАТЬ @663,20; searching/in_dm still draft"
+  note: "ИГРАТЬ @663,20 recalibrated; in_dm HUD @99,661 +195,661 draft ArmoryFarm 2026-06"
 
 clicks:
   main_menu_play: {x: 663, y: 20}

@@ -53,10 +53,11 @@ cd vendor\csgobot
 python -m venv venv
 .\venv\Scripts\pip install -r requirements.txt
 .\venv\Scripts\pip install pygrabber pyyaml
+.\venv\Scripts\python tools\preflight.py
 .\venv\Scripts\python torch_check_gpu.py
 ```
 
-Expected: `cuda available: True`.
+`preflight.py` → JSON `"ok": true`. Expected GPU: `cuda available: True` in `torch_check_gpu.py`.
 
 ## 5. YOLO weights (~52 MB, not in git)
 
@@ -119,7 +120,9 @@ Must **not** appear: `loot_failed`, `session_failed`, long idle on main menu whe
 | `loot_failed (trade_offer_link empty)` | Set trade URL in Config #1 |
 | `OBS Virtual Camera not found` | Start OBS, enable Virtual Camera |
 | 60s menu wait then DM works | Recalibrate probe: screenshot + `scripts/sample_probe_rgb.py` → `coords_1280x720.yaml` |
-| `combat_fallback` instantly | OBS VC or csgobot venv / weights |
+| `combat_fallback` / `early exit` instantly | Check `data/logs/csgobot_*.stderr.txt`; run `tools\preflight.py`; OBS VC |
+| False `csgobot: finished ok` after 1s | Fixed — should show `early exit` + stderr tail |
+| `retry in_dm wait attempt 2` + 65s | Fixed — soft_peek 1/2 probes; retry skips if already in DM |
 | False `level_up` in first seconds | Already fixed (grace period); `git pull` |
 
 ## Related docs

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
 
@@ -36,6 +37,20 @@ class ProbeMatchResult:
     y: int
     actual_rgb: tuple[int, int, int]
     expected_rgb: tuple[int, int, int]
+
+
+@dataclass(frozen=True)
+class InDmWaitResult:
+    """strict_ok: all in_dm probes matched. soft_peek: ≥1 probe × N polls."""
+
+    strict_ok: bool
+    soft_peek: bool = False
+    timed_out: bool = False
+    attempts: int = 0
+
+    @property
+    def ok(self) -> bool:
+        return self.strict_ok or self.soft_peek
 
 
 def _probe_pixel(img: Image.Image, probe: ColorProbe) -> tuple[int, int, int] | None:
@@ -127,3 +142,95 @@ def wait_for_state(
         time.sleep(poll_sec)
     artifacts.log_step("detect_timeout", state=state.value, timeout_sec=timeout_sec)
     raise UiNavTimeoutError(f"timeout waiting for {state.value} ({timeout_sec}s)")
+
+
+def wait_for_in_dm(
+    driver: NavDriver,
+    coords: NavCoords,
+    artifacts: ArtifactStore,
+    *,
+    timeout_sec: float,
+    poll_sec: float = 0.5,
+    strict_min_match: int | None = None,
+    soft_min_match: int = 1,
+    soft_peek_polls: int = 3,
+    on_progress: Callable[[str], None] | None = None,
+) -> InDmWaitResult:
+    """
+    Poll until in_dm probes match (strict all probes, or soft ≥1 probe × N polls).
+    Raises UiNavTimeoutError on timeout (after progress log with probe RGB).
+    """
+    probe_count = len(coords.probes("in_dm"))
+    strict_required = (
+        strict_min_match if strict_min_match is not None else (probe_count or 1)
+    )
+    soft_required = min(max(1, soft_min_match), probe_count) if probe_count else 1
+    deadline = time.monotonic() + timeout_sec
+    attempt = 0
+    last_probe_results: list[ProbeMatchResult] = []
+    consecutive_soft = 0
+
+    while time.monotonic() < deadline:
+        attempt += 1
+        img = driver.capture()
+        artifacts.save_image(f"wait_in_dm_{attempt}", img)
+        probe_results = probe_match_results(img, ScreenState.IN_DM, coords)
+        last_probe_results = probe_results
+        soft_hit = sum(1 for r in probe_results if r.matched) >= soft_required
+        if soft_hit:
+            consecutive_soft += 1
+        else:
+            consecutive_soft = 0
+        strict = detect_state(
+            img,
+            ScreenState.IN_DM,
+            coords,
+            min_match=strict_required,
+        )
+        probe_kwargs: dict = {
+            "attempt": attempt,
+            "matched": int(soft_hit),
+            "strict": int(strict),
+            "img_w": img.width,
+            "img_h": img.height,
+        }
+        for idx, result in enumerate(probe_results[:2]):
+            probe_kwargs[f"p{idx}"] = int(result.matched)
+            probe_kwargs[f"rgb{idx}"] = list(result.actual_rgb)
+            probe_kwargs[f"exp{idx}"] = list(result.expected_rgb)
+        artifacts.log_step("in_dm_probe", **probe_kwargs)
+        if strict:
+            artifacts.log_step("in_dm_detect_ok", attempt=attempt, strict=True)
+            return InDmWaitResult(strict_ok=True, attempts=attempt)
+        if soft_hit and consecutive_soft >= max(1, soft_peek_polls):
+            artifacts.log_step(
+                "in_dm_soft_peek_ok",
+                attempt=attempt,
+                consecutive=consecutive_soft,
+            )
+            if on_progress:
+                on_progress(
+                    f"in_dm soft_peek confirmed after {consecutive_soft} polls"
+                )
+            return InDmWaitResult(
+                strict_ok=False,
+                soft_peek=True,
+                attempts=attempt,
+            )
+        time.sleep(poll_sec)
+
+    artifacts.log_step(
+        "in_dm_detect_timeout",
+        timeout_sec=timeout_sec,
+        attempts=attempt,
+    )
+    if on_progress and last_probe_results:
+        r0 = last_probe_results[0]
+        p1 = int(last_probe_results[1].matched) if len(last_probe_results) > 1 else 0
+        on_progress(
+            "in_dm timeout: "
+            f"p0={int(r0.matched)} p1={p1} "
+            f"last@({r0.x},{r0.y})={list(r0.actual_rgb)} "
+            f"expected={list(r0.expected_rgb)}"
+        )
+    raise UiNavTimeoutError(f"timeout waiting for in_dm ({timeout_sec}s)")

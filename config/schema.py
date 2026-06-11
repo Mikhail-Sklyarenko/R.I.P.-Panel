@@ -95,6 +95,11 @@ class AppConfig(BaseModel):
     map_load_delay_sec: int = Field(
         default=65, ge=10, description="FSM MAP_LOAD_DELAY — загрузка карты"
     )
+    in_dm_min_match: int = Field(
+        default=1,
+        ge=1,
+        description="Soft in_dm: минимум совпавших probes (strict path = все probes)",
+    )
     cs2_window_wait_timeout_sec: int = Field(
         default=90,
         ge=15,
