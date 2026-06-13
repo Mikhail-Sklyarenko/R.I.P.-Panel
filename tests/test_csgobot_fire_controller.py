@@ -135,7 +135,25 @@ def test_force_release_when_target_lost() -> None:
 def test_from_aim_config_defaults() -> None:
     fc = FireController.from_aim_config(AimConfig(auto_shoot=True))
     assert fc.config.mode == "hold"
-    assert fc.config.burst_size == 5
+    assert fc.config.burst_size == 7
+
+
+def test_hold_represses_quickly_after_max_duration() -> None:
+    cfg = FireConfig(
+        enabled=True,
+        mode="hold",
+        shoot_dead_zone=18.0,
+        body_confidence=0.55,
+        hold_max_sec=0.2,
+        hold_repress_gap_sec=0.05,
+        humanize_jitter_sec=0.0,
+    )
+    fc = FireController(cfg)
+    fc.tick(pixel_distance=10.0, confidence=0.8, is_head=False, now=0.0)
+    r_release = fc.tick(pixel_distance=10.0, confidence=0.8, is_head=False, now=0.21)
+    assert r_release.release
+    r_repress = fc.tick(pixel_distance=10.0, confidence=0.8, is_head=False, now=0.27)
+    assert r_repress.press
 
 
 def test_env_resolvers_6d(monkeypatch) -> None:

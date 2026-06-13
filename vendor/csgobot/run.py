@@ -76,12 +76,13 @@ ADAPTIVE_SMOOTHING = True  # override: CSGOBOT_ADAPTIVE_SMOOTHING=0
 BODY_FALLBACK_SEC = 0.2  # override: CSGOBOT_BODY_FALLBACK_MS=200
 AUTO_SHOOT = True  # LMB when crosshair on target; False = aim only
 SHOOT_MODE = "hold"  # tap | burst | hold (зажим)
-SHOOT_COOLDOWN_SEC = 0.07  # tap mode; env CSGOBOT_SHOOT_COOLDOWN_MS
-BURST_SIZE = 5
-BURST_SHOT_INTERVAL_SEC = 0.07
-BURST_GAP_SEC = 0.15
-HOLD_MAX_SEC = 0.4
-HOLD_RELEASE_GRACE_SEC = 0.1
+SHOOT_COOLDOWN_SEC = 0.05  # tap mode; env CSGOBOT_SHOOT_COOLDOWN_MS
+BURST_SIZE = 7
+BURST_SHOT_INTERVAL_SEC = 0.05
+BURST_GAP_SEC = 0.10
+HOLD_MAX_SEC = 0.8
+HOLD_REPRESS_GAP_SEC = 0.05
+HOLD_RELEASE_GRACE_SEC = 0.08
 HEAD_SHOOT_CONFIDENCE = 0.65
 BODY_SHOOT_CONFIDENCE = 0.55
 PATROL_ENABLED = True
@@ -145,6 +146,7 @@ def create_config() -> AppConfig:
         resolve_burst_shot_interval_sec,
         resolve_burst_size,
         resolve_hold_max_sec,
+        resolve_hold_repress_gap_sec,
         resolve_hold_release_grace_sec,
         resolve_shoot_cooldown_sec,
         resolve_shoot_dead_zone,
@@ -219,6 +221,7 @@ def create_config() -> AppConfig:
         ),
         burst_gap_sec=resolve_burst_gap_sec(BURST_GAP_SEC),
         hold_max_sec=resolve_hold_max_sec(HOLD_MAX_SEC),
+        hold_repress_gap_sec=resolve_hold_repress_gap_sec(HOLD_REPRESS_GAP_SEC),
         hold_release_grace_sec=resolve_hold_release_grace_sec(
             HOLD_RELEASE_GRACE_SEC
         ),
@@ -354,7 +357,7 @@ def main() -> int:
     )
     logger.info(
         f"Shoot: mode={config.aim.shoot_mode} burst={config.aim.burst_size} "
-        f"hold_max={config.aim.hold_max_sec}s "
+        f"hold_max={config.aim.hold_max_sec}s hold_gap={config.aim.hold_repress_gap_sec}s "
         f"conf head/body={config.aim.head_confidence}/{config.aim.body_confidence}"
     )
     logger.info(f"Team: {config.aim.current_team.value.upper()}")

@@ -152,12 +152,13 @@ class AimConfig:
     auto_shoot: bool = False
     shoot_mode: str = "hold"  # tap | burst | hold
     shoot_cooldown_sec: float = 0.07
-    burst_size: int = 5
-    burst_shot_interval_sec: float = 0.07
-    burst_gap_sec: float = 0.15
-    hold_max_sec: float = 0.4
-    hold_release_grace_sec: float = 0.1
-    shoot_humanize_jitter_sec: float = 0.02
+    burst_size: int = 7
+    burst_shot_interval_sec: float = 0.05
+    burst_gap_sec: float = 0.10
+    hold_max_sec: float = 0.8
+    hold_repress_gap_sec: float = 0.05
+    hold_release_grace_sec: float = 0.08
+    shoot_humanize_jitter_sec: float = 0.01
 
     # WASD movement while bot is active (csgobot has no pathfinding)
     auto_move: bool = False

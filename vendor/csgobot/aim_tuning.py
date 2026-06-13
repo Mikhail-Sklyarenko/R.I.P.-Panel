@@ -194,6 +194,13 @@ def resolve_hold_max_sec(default: float) -> float:
     return default
 
 
+def resolve_hold_repress_gap_sec(default: float) -> float:
+    raw = os.environ.get("CSGOBOT_HOLD_GAP_MS", "").strip()
+    if raw:
+        return max(0.0, float(raw)) / 1000.0
+    return default
+
+
 def resolve_hold_release_grace_sec(default: float) -> float:
     raw = os.environ.get("CSGOBOT_HOLD_RELEASE_GRACE_MS", "").strip()
     if raw:

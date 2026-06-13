@@ -106,7 +106,7 @@ def test_create_config_6d_shoot_defaults(monkeypatch) -> None:
 
     cfg = create_config()
     assert cfg.aim.shoot_mode == "hold"
-    assert cfg.aim.burst_size == 5
+    assert cfg.aim.burst_size == 7
     assert cfg.aim.head_confidence == 0.65
 
 

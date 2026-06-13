@@ -90,8 +90,9 @@ Caps Lock → проверка поворота на 360°.
 | Burst size | `5` | `CSGOBOT_BURST_SIZE` |
 | Burst interval | `70 ms` | `CSGOBOT_BURST_INTERVAL_MS` |
 | Burst gap | `150 ms` | `CSGOBOT_BURST_GAP_MS` |
-| Hold max spray | `400 ms` | `CSGOBOT_HOLD_MAX_MS` |
-| Hold release grace | `100 ms` | `CSGOBOT_HOLD_RELEASE_GRACE_MS` |
+| Hold max spray | `800 ms` | `CSGOBOT_HOLD_MAX_MS` |
+| Hold re-press gap | `50 ms` | `CSGOBOT_HOLD_GAP_MS` |
+| Hold release grace | `80 ms` | `CSGOBOT_HOLD_RELEASE_GRACE_MS` |
 | Shoot cooldown (tap) | `70 ms` | `CSGOBOT_SHOOT_COOLDOWN_MS` |
 | Head/body conf | `0.65` / `0.55` | — |
 
