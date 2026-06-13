@@ -44,7 +44,7 @@
 		"cl_cursor_scale"		"1.000000"
 		"cl_deathcampanel_position_dynamic"		"1"
 		"cl_disable_round_end_report"		"false"
-		"cl_dm_buyrandomweapons"		"true"
+		"cl_dm_buyrandomweapons"		"false"
 		"cl_embedded_stream_audio_volume"		"60.000000"
 		"cl_embedded_stream_audio_volume_xmaster"		"true"
 		"cl_ent_pivot_size"		"20.000000"

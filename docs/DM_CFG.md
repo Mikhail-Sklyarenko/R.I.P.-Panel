@@ -13,6 +13,29 @@
 
 Остальные бинды / low-FPS cvars сохранены для solo farm.
 
+## Autobuy rifle (DM)
+
+Цель: после респавна в DM — **AK-47 (T)** или **M4A4 (CT)**, не random pistol/SMG.
+
+| Слой | Файл | Что делает |
+|------|------|------------|
+| convars | `cs2_machine_convars.vcfg` | `cl_dm_buyrandomweapons false` |
+| cfg | `fsm.cfg` | `buy_rifle_ct` / `buy_rifle_t` aliases, `bind f9` / `f10` |
+| csgobot | `CSGOBOT_AUTO_BUY=1` (default) | pulse F9/F10 каждые 3 s по текущей team |
+
+```cfg
+alias buy_rifle_ct "buy m4a1; buy vesthelm"
+alias buy_rifle_t "buy ak47; buy vesthelm"
+bind f9 "buy_rifle_ct"
+bind f10 "buy_rifle_t"
+```
+
+**Team sync:** csgobot жмёт F9 или F10 по `shared_state["team"]` (Ctrl+T). В DM сторона меняется каждый life — при desync нажми **Ctrl+T** чтобы YOLO и autobuy совпали с игрой.
+
+Env: `CSGOBOT_AUTO_BUY=0`, `CSGOBOT_AUTO_BUY_INTERVAL=5`.
+
+При `cs2_vac_safe_launch=true` convars могут не деплоиться — binds в `farm_panel.cfg` (копия fsm.cfg) работают всегда.
+
 ## cs2_video.txt
 
 Минимальное разрешение **360×270**, low settings (как FSM `CS_RESOLUTION`).

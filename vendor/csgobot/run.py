@@ -15,6 +15,7 @@ from config import (
     DetectorType,
     AimConfig,
     PatrolConfig,
+    AutoBuyConfig,
     Team,
     PreviewConfig,
     HotkeyConfig,
@@ -96,6 +97,10 @@ ANTI_STUCK_ENABLED = True
 STUCK_SEC = 6.0  # seconds low motion while moving before unstuck
 STUCK_MOTION_THRESHOLD = 2.0  # mean pixel diff on center ROI (tune on farm PC)
 UNSTUCK_COOLDOWN_SEC = 3.0
+AUTO_BUY_RIFLE = True
+AUTO_BUY_INTERVAL_SEC = 3.0
+AUTO_BUY_CT_KEY = "f9"
+AUTO_BUY_T_KEY = "f10"
 AUTO_MOVE = False  # legacy random tap; use PATROL when enabled
 MOVE_INTERVAL_SEC = 8.0
 DEAD_ZONE = 12.0  # legacy; maps to AIM_DEAD_ZONE_HIGH if unset
@@ -271,6 +276,18 @@ def create_config() -> AppConfig:
         unstuck_cooldown_sec=UNSTUCK_COOLDOWN_SEC,
     )
 
+    from controls.autobuy import (
+        resolve_autobuy_enabled,
+        resolve_autobuy_interval,
+    )
+
+    autobuy_config = AutoBuyConfig(
+        enabled=resolve_autobuy_enabled(AUTO_BUY_RIFLE),
+        interval_sec=resolve_autobuy_interval(AUTO_BUY_INTERVAL_SEC),
+        ct_key=AUTO_BUY_CT_KEY,
+        t_key=AUTO_BUY_T_KEY,
+    )
+
     # Build grabber options
     grabber_options = {}
     if GRABBER_TYPE == "obs_vc":
@@ -289,6 +306,7 @@ def create_config() -> AppConfig:
         detector=detector_config,
         aim=aim_config,
         patrol=patrol_config,
+        autobuy=autobuy_config,
         preview=preview_config,
         hotkeys=hotkey_config,
     )
@@ -382,6 +400,11 @@ def main() -> int:
         f"conf head/body={config.aim.head_confidence}/{config.aim.body_confidence}"
     )
     logger.info(f"Team: {config.aim.current_team.value.upper()}")
+    logger.info(
+        f"Autobuy: enabled={config.autobuy.enabled} "
+        f"interval={config.autobuy.interval_sec}s "
+        f"ct={config.autobuy.ct_key} t={config.autobuy.t_key}"
+    )
     try:
         import torch
         if torch.cuda.is_available():

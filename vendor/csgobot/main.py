@@ -25,6 +25,7 @@ from config import (
 
 from grabbers import get_grabber
 from controls.mouse import get_mouse_controls
+from controls.autobuy import maybe_autobuy_pulse
 from utils.fps import FPSCounter
 from utils.win32 import get_window_rect
 
@@ -330,6 +331,23 @@ def detection_process(
     last_target_key: Optional[tuple] = None
     last_detect_debug_log = 0.0
     roi_used_last = False
+    last_autobuy_pulse = 0.0
+    autobuy_press = None
+
+    if config.autobuy.enabled:
+        try:
+            import pydirectinput
+
+            autobuy_press = pydirectinput.press
+            logger.info(
+                "autobuy: enabled ct=%s t=%s interval=%.1fs",
+                config.autobuy.ct_key,
+                config.autobuy.t_key,
+                config.autobuy.interval_sec,
+            )
+        except ImportError:
+            logger.error("autobuy: pydirectinput missing; disabled")
+            config.autobuy.enabled = False
 
     if config.patrol.enabled:
         try:
@@ -508,6 +526,18 @@ def detection_process(
                     last_move_time = now
                 except Exception as e:
                     logger.debug(f"auto_move failed: {e}")
+
+            if autobuy_press is not None:
+                unstuck_active = unstuck_seq is not None and unstuck_seq.is_running
+                last_autobuy_pulse = maybe_autobuy_pulse(
+                    config=config.autobuy,
+                    team=current_team_str,
+                    activated=activated.is_set(),
+                    now=now,
+                    last_pulse=last_autobuy_pulse,
+                    press=autobuy_press,
+                    unstuck_running=unstuck_active,
+                )
 
             if activated.is_set() and enemy_target is not None:
                 target = enemy_target

@@ -106,6 +106,8 @@ Env без правки `run.py`: `CS2_SENSITIVITY`, `CSGOBOT_X360`, `CSGOBOT_SM
 
 **Long-range detect (PR-6f):** default detect conf `0.50`, ROI center zoom, body-first aim. Env: `CSGOBOT_DETECT_DEBUG`, `CSGOBOT_ROI_ZOOM`, `CSGOBOT_ROI_FRACTION`, `CSGOBOT_MIN_BBOX_HEIGHT`, `CSGOBOT_LONG_RANGE_BODY`.
 
+**Autobuy rifle (DM):** `cl_dm_buyrandomweapons false` + F9/F10 binds in `fsm.cfg`. csgobot pulse: `CSGOBOT_AUTO_BUY=1` (default), `CSGOBOT_AUTO_BUY_INTERVAL`. Sync team: **Ctrl+T** when DM side changes. См. `docs/DM_CFG.md`.
+
 **Fire (PR-6d):** default `CSGOBOT_SHOOT_MODE=hold` (зажим LMB). Альтернативы: `burst`, `tap`. См. `docs/AIM_TUNING.md`.
 
 Окно с рамками: `SHOW_PREVIEW = True` (для фарма по умолчанию **False**).

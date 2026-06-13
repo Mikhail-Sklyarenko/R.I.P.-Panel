@@ -210,6 +210,15 @@ class PatrolConfig:
 
 
 @dataclass
+class AutoBuyConfig:
+    """DM rifle autobuy (team-aware F9/F10 binds in fsm.cfg)."""
+    enabled: bool = True
+    interval_sec: float = 3.0
+    ct_key: str = "f9"
+    t_key: str = "f10"
+
+
+@dataclass
 class HotkeyConfig:
     """Hotkey configuration."""
     activation: int = 58  # CAPS LOCK
@@ -236,6 +245,7 @@ class AppConfig:
     detector: DetectorConfig = field(default_factory=DetectorConfig)
     aim: AimConfig = field(default_factory=AimConfig)
     patrol: PatrolConfig = field(default_factory=PatrolConfig)
+    autobuy: AutoBuyConfig = field(default_factory=AutoBuyConfig)
     preview: PreviewConfig = field(default_factory=PreviewConfig)
     hotkeys: HotkeyConfig = field(default_factory=HotkeyConfig)
 
