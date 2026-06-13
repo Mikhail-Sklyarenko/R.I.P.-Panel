@@ -112,6 +112,15 @@ def aim_debug_enabled() -> bool:
     return os.environ.get("CSGOBOT_AIM_DEBUG", "").lower() in ("1", "true", "yes")
 
 
+def team_debug_enabled() -> bool:
+    return os.environ.get("CSGOBOT_TEAM_DEBUG", "").lower() in ("1", "true", "yes")
+
+
+def resolve_auto_team_enabled(default: bool) -> bool:
+    val = _env_bool("CSGOBOT_AUTO_TEAM")
+    return default if val is None else val
+
+
 def _env_bool(name: str) -> bool | None:
     raw = os.environ.get(name, "").strip().lower()
     if not raw:

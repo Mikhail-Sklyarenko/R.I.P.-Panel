@@ -95,7 +95,7 @@ venv\Scripts\pip.exe install torch torchvision --index-url https://download.pyto
 
 1. **OBS** — в логе должно быть `Capture region (OBS canvas): ... 1280 x 720`, не `704`.
 2. **Высокий FPS + перелёт** — в `run.py`: `SMOOTHING = 3.0`, `DEAD_ZONE = 12.0`.
-3. **Неверная команда** — **Ctrl+T** (CT / T).
+3. **Неверная команда** — по умолчанию **auto team** из HUD (см. ниже); ручной override: **Ctrl+T** (5 s блокировки авто).
 4. **Чувствительность** — **Config #1 → `cs2_sensitivity`** (панель → `CS2_SENSITIVITY`) или `CSGOBOT_X360` (см. AIM_TUNING.md).
 
 В **Config #3** опция **`csgobot_require_cuda`**: при включении farm не стартует csgobot на CPU-only torch.
@@ -107,6 +107,8 @@ Env без правки `run.py`: `CS2_SENSITIVITY`, `CSGOBOT_X360`, `CSGOBOT_SM
 **Long-range detect (PR-6f):** default detect conf `0.50`, ROI center zoom, body-first aim. Env: `CSGOBOT_DETECT_DEBUG`, `CSGOBOT_ROI_ZOOM`, `CSGOBOT_ROI_FRACTION`, `CSGOBOT_MIN_BBOX_HEIGHT`, `CSGOBOT_LONG_RANGE_BODY`.
 
 **Autobuy rifle (DM):** `cl_dm_buyrandomweapons 0` + Insert→`buy_rifle_dm` in `fsm.cfg`. csgobot: burst every **1 s** + on respawn. Env: `CSGOBOT_AUTO_BUY`, `CSGOBOT_AUTO_BUY_INTERVAL`. См. `docs/DM_CFG.md`.
+
+**Auto team CT/T (PR-T1):** color probes на HUD @ 1280×720 — синхронизирует YOLO `enemy_classes` и autobuy при смене стороны в DM. По умолчанию **включено** (`AUTO_TEAM_DETECT = True`). Hysteresis 3 кадра; Ctrl+T = manual override 5 s. Env: `CSGOBOT_AUTO_TEAM=0` (выкл), `CSGOBOT_TEAM_DEBUG=1` (лог scores). Probes: `resources/csgobot/team_probes_1280x720.yaml`; калибровка: `scripts/sample_probe_rgb.py` + эталоны `tests/fixtures/csgobot_team/`.
 
 **Fire (PR-6d):** default `CSGOBOT_SHOOT_MODE=hold` (зажим LMB). Альтернативы: `burst`, `tap`. См. `docs/AIM_TUNING.md`.
 

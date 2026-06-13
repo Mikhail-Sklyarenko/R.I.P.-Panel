@@ -16,6 +16,7 @@ from config import (
     AimConfig,
     PatrolConfig,
     AutoBuyConfig,
+    TeamDetectConfig,
     Team,
     PreviewConfig,
     HotkeyConfig,
@@ -101,6 +102,9 @@ UNSTUCK_COOLDOWN_SEC = 3.0
 AUTO_BUY_RIFLE = True
 AUTO_BUY_INTERVAL_SEC = 1.0
 AUTO_BUY_KEY = "insert"
+AUTO_TEAM_DETECT = True
+TEAM_DETECT_CONFIRM_FRAMES = 3
+TEAM_MANUAL_OVERRIDE_SEC = 5.0
 AUTO_MOVE = False  # legacy random tap; use PATROL when enabled
 MOVE_INTERVAL_SEC = 8.0
 DEAD_ZONE = 12.0  # legacy; maps to AIM_DEAD_ZONE_HIGH if unset
@@ -164,6 +168,7 @@ def create_config() -> AppConfig:
         resolve_hold_release_grace_sec,
         resolve_shoot_cooldown_sec,
         resolve_shoot_dead_zone,
+        resolve_auto_team_enabled,
         resolve_shoot_mode,
         resolve_smoothing,
         resolve_x360,
@@ -291,6 +296,12 @@ def create_config() -> AppConfig:
         t_key=AUTO_BUY_KEY,
     )
 
+    team_detect_config = TeamDetectConfig(
+        enabled=resolve_auto_team_enabled(AUTO_TEAM_DETECT),
+        confirm_frames=TEAM_DETECT_CONFIRM_FRAMES,
+        manual_override_sec=TEAM_MANUAL_OVERRIDE_SEC,
+    )
+
     # Build grabber options
     grabber_options = {}
     if GRABBER_TYPE == "obs_vc":
@@ -309,6 +320,7 @@ def create_config() -> AppConfig:
         detector=detector_config,
         aim=aim_config,
         patrol=patrol_config,
+        team_detect=team_detect_config,
         autobuy=autobuy_config,
         preview=preview_config,
         hotkeys=hotkey_config,
@@ -403,7 +415,28 @@ def main() -> int:
         f"hold_max={config.aim.hold_max_sec}s hold_gap={config.aim.hold_repress_gap_sec}s "
         f"conf head/body={config.aim.head_confidence}/{config.aim.body_confidence}"
     )
-    logger.info(f"Team: {config.aim.current_team.value.upper()}")
+    logger.info(f"Team: {config.aim.current_team.value.upper()} (initial)")
+    from team.paths import resolve_team_probes_path
+    from team.probes import load_team_probes
+
+    if config.team_detect.enabled:
+        try:
+            probe_path = resolve_team_probes_path(config.team_detect.probes_path)
+            probe_set = load_team_probes(probe_path)
+            logger.info(
+                "Team detect: enabled confirm_frames=%d override_sec=%.0fs "
+                "probes=ct:%d t:%d path=%s",
+                config.team_detect.confirm_frames,
+                config.team_detect.manual_override_sec,
+                len(probe_set.ct),
+                len(probe_set.t),
+                probe_path.name,
+            )
+        except Exception as exc:
+            logger.warning("Team detect: failed to load probes (%s); disabled", exc)
+            config.team_detect.enabled = False
+    else:
+        logger.info("Team detect: disabled (CSGOBOT_AUTO_TEAM=0 or run.py)")
     logger.info(
         f"Autobuy: enabled={config.autobuy.enabled} "
         f"interval={config.autobuy.interval_sec}s "

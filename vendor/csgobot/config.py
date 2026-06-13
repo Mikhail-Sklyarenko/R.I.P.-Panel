@@ -211,6 +211,16 @@ class PatrolConfig:
 
 
 @dataclass
+class TeamDetectConfig:
+    """Auto-detect CT/T from in-combat HUD color probes."""
+    enabled: bool = True
+    confirm_frames: int = 3
+    manual_override_sec: float = 5.0
+    min_votes: int = 2
+    probes_path: str = ""
+
+
+@dataclass
 class AutoBuyConfig:
     """DM rifle autobuy (Insert → buy_rifle_dm in fsm.cfg)."""
     enabled: bool = True
@@ -251,6 +261,7 @@ class AppConfig:
     detector: DetectorConfig = field(default_factory=DetectorConfig)
     aim: AimConfig = field(default_factory=AimConfig)
     patrol: PatrolConfig = field(default_factory=PatrolConfig)
+    team_detect: TeamDetectConfig = field(default_factory=TeamDetectConfig)
     autobuy: AutoBuyConfig = field(default_factory=AutoBuyConfig)
     preview: PreviewConfig = field(default_factory=PreviewConfig)
     hotkeys: HotkeyConfig = field(default_factory=HotkeyConfig)

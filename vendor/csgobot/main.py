@@ -37,7 +37,15 @@ from aiming.aim_pipeline import AimPipelineState, process_aim_frame
 from aiming.fire_actions import apply_fire_action
 from aiming.fire_controller import FireAction, FireController
 from aiming.combat_aim import maybe_switch_to_body
-from aim_tuning import aim_debug_enabled
+from aim_tuning import aim_debug_enabled, team_debug_enabled
+from team.hud_team_detect import (
+    TeamDetectState,
+    detect_team_hud,
+    score_probes,
+    update_team_hysteresis,
+)
+from team.paths import resolve_team_probes_path
+from team.probes import load_team_probes
 from patrol import (
     PatrolMode,
     PatrolRunner,
@@ -77,6 +85,7 @@ class CS2Bot:
         self.manager = multiprocessing.Manager()
         self.shared_state = self.manager.dict({
             "team": config.aim.current_team.value,
+            "team_manual_until": 0.0,
             "fps": 0.0,
         })
 
@@ -111,7 +120,15 @@ class CS2Bot:
         current = self.shared_state["team"]
         new_team = "t" if current == "ct" else "ct"
         self.shared_state["team"] = new_team
-        logger.info(f"Team changed to: {new_team.upper()}")
+        override_until = (
+            time.monotonic() + self.config.team_detect.manual_override_sec
+        )
+        self.shared_state["team_manual_until"] = override_until
+        logger.info(
+            "Team changed to: %s (manual override %.0fs)",
+            new_team.upper(),
+            self.config.team_detect.manual_override_sec,
+        )
 
     def _shutdown(self, *args) -> None:
         """Signal shutdown."""
@@ -333,6 +350,26 @@ def detection_process(
     roi_used_last = False
     autobuy_state = AutoBuyState()
     autobuy_press = None
+    team_probe_set = None
+    team_detect_state: Optional[TeamDetectState] = None
+    last_team_debug_log = 0.0
+
+    if config.team_detect.enabled:
+        try:
+            probe_path = resolve_team_probes_path(config.team_detect.probes_path)
+            team_probe_set = load_team_probes(probe_path)
+            team_detect_state = TeamDetectState.from_team(
+                shared_state.get("team", config.aim.current_team.value),
+            )
+            logger.info(
+                "team_detect: loaded %d ct + %d t probes from %s",
+                len(team_probe_set.ct),
+                len(team_probe_set.t),
+                probe_path,
+            )
+        except Exception as e:
+            logger.error("team_detect: failed to load probes (%s); disabled", e)
+            config.team_detect.enabled = False
 
     if config.autobuy.enabled:
         try:
@@ -387,6 +424,44 @@ def detection_process(
                 continue
 
             now = time.monotonic()
+
+            if (
+                config.team_detect.enabled
+                and team_probe_set is not None
+                and team_detect_state is not None
+                and activated.is_set()
+                and now > shared_state.get("team_manual_until", 0.0)
+            ):
+                winner = detect_team_hud(
+                    img,
+                    team_probe_set,
+                    min_votes=config.team_detect.min_votes,
+                )
+                changed, pending = update_team_hysteresis(
+                    team_detect_state,
+                    winner,
+                    confirm_frames=config.team_detect.confirm_frames,
+                )
+                if changed is not None:
+                    shared_state["team"] = changed
+                    logger.info(
+                        "team: auto %s (confirmed %d/%d)",
+                        changed,
+                        config.team_detect.confirm_frames,
+                        config.team_detect.confirm_frames,
+                    )
+                if team_debug_enabled() and now - last_team_debug_log >= 3.0:
+                    ct_score = score_probes(img, team_probe_set.ct)
+                    t_score = score_probes(img, team_probe_set.t)
+                    logger.info(
+                        "team: detect ct_score=%d t_score=%d winner=%s pending=%d/%d",
+                        ct_score,
+                        t_score,
+                        winner or "none",
+                        pending,
+                        config.team_detect.confirm_frames,
+                    )
+                    last_team_debug_log = now
 
             # Update team from shared state
             current_team_str = shared_state.get("team", "ct")

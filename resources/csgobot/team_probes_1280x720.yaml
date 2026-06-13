@@ -1,0 +1,15 @@
+# HUD team color probes @ 1280x720 — Panorama RU DM (ArmoryFarm 2026-06)
+meta:
+  base_width: 1280
+  base_height: 720
+  calibration: armoryfarm_operator_2026-06
+  note: "Center team emblem + bottom-right ammo strip; not team-select screen"
+
+ct:
+  - {x: 431, y: 683, rgb: [174, 158, 133], tolerance: 50}
+  - {x: 590, y: 689, rgb: [167, 153, 127], tolerance: 50}
+  - {x: 807, y: 693, rgb: [17, 20, 21], tolerance: 50}
+t:
+  - {x: 442, y: 699, rgb: [219, 223, 186], tolerance: 50}
+  - {x: 467, y: 695, rgb: [255, 221, 166], tolerance: 50}
+  - {x: 807, y: 693, rgb: [241, 223, 174], tolerance: 50}
