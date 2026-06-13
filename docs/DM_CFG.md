@@ -19,20 +19,21 @@
 
 | Слой | Файл | Что делает |
 |------|------|------------|
-| convars | `cs2_machine_convars.vcfg` | `cl_dm_buyrandomweapons false` |
-| cfg | `fsm.cfg` | `buy_rifle_ct` / `buy_rifle_t` aliases, `bind f9` / `f10` |
-| csgobot | `CSGOBOT_AUTO_BUY=1` (default) | pulse F9/F10 каждые 3 s по текущей team |
+| convars + cfg exec | `cs2_machine_convars.vcfg` + `fsm.cfg` | `cl_dm_buyrandomweapons 0` |
+| cfg | `fsm.cfg` | `buy_rifle_dm` alias, `bind insert` |
+| csgobot | `CSGOBOT_AUTO_BUY=1` (default) | burst Insert каждые 1 s + на respawn |
 
 ```cfg
-alias buy_rifle_ct "buy m4a1; buy vesthelm"
-alias buy_rifle_t "buy ak47; buy vesthelm"
-bind f9 "buy_rifle_ct"
-bind f10 "buy_rifle_t"
+cl_dm_buyrandomweapons 0
+alias buy_rifle_dm "buy ak47; buy m4a1; buy vesthelm"
+bind insert "buy_rifle_dm"
 ```
 
-**Team sync:** csgobot жмёт F9 или F10 по `shared_state["team"]` (Ctrl+T). В DM сторона меняется каждый life — при desync нажми **Ctrl+T** чтобы YOLO и autobuy совпали с игрой.
+Один alias покупает **AK или M4** для текущей стороны (не нужен sync F9/F10).
 
-Env: `CSGOBOT_AUTO_BUY=0`, `CSGOBOT_AUTO_BUY_INTERVAL=5`.
+**Respawn:** csgobot делает extra burst когда combat→idle (вероятный респавн). Интервал **1 s** (было 3 s) — окно buy в DM короткое.
+
+Env: `CSGOBOT_AUTO_BUY=0`, `CSGOBOT_AUTO_BUY_INTERVAL=0.8`.
 
 При `cs2_vac_safe_launch=true` convars могут не деплоиться — binds в `farm_panel.cfg` (копия fsm.cfg) работают всегда.
 

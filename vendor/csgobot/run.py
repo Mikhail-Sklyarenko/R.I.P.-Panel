@@ -98,9 +98,8 @@ STUCK_SEC = 6.0  # seconds low motion while moving before unstuck
 STUCK_MOTION_THRESHOLD = 2.0  # mean pixel diff on center ROI (tune on farm PC)
 UNSTUCK_COOLDOWN_SEC = 3.0
 AUTO_BUY_RIFLE = True
-AUTO_BUY_INTERVAL_SEC = 3.0
-AUTO_BUY_CT_KEY = "f9"
-AUTO_BUY_T_KEY = "f10"
+AUTO_BUY_INTERVAL_SEC = 1.0
+AUTO_BUY_KEY = "insert"
 AUTO_MOVE = False  # legacy random tap; use PATROL when enabled
 MOVE_INTERVAL_SEC = 8.0
 DEAD_ZONE = 12.0  # legacy; maps to AIM_DEAD_ZONE_HIGH if unset
@@ -284,8 +283,9 @@ def create_config() -> AppConfig:
     autobuy_config = AutoBuyConfig(
         enabled=resolve_autobuy_enabled(AUTO_BUY_RIFLE),
         interval_sec=resolve_autobuy_interval(AUTO_BUY_INTERVAL_SEC),
-        ct_key=AUTO_BUY_CT_KEY,
-        t_key=AUTO_BUY_T_KEY,
+        buy_key=AUTO_BUY_KEY,
+        ct_key=AUTO_BUY_KEY,
+        t_key=AUTO_BUY_KEY,
     )
 
     # Build grabber options
@@ -403,7 +403,7 @@ def main() -> int:
     logger.info(
         f"Autobuy: enabled={config.autobuy.enabled} "
         f"interval={config.autobuy.interval_sec}s "
-        f"ct={config.autobuy.ct_key} t={config.autobuy.t_key}"
+        f"key={config.autobuy.buy_key} burst={config.autobuy.burst_count}"
     )
     try:
         import torch

@@ -211,11 +211,16 @@ class PatrolConfig:
 
 @dataclass
 class AutoBuyConfig:
-    """DM rifle autobuy (team-aware F9/F10 binds in fsm.cfg)."""
+    """DM rifle autobuy (Insert → buy_rifle_dm in fsm.cfg)."""
     enabled: bool = True
-    interval_sec: float = 3.0
-    ct_key: str = "f9"
-    t_key: str = "f10"
+    interval_sec: float = 1.0
+    buy_key: str = "insert"
+    burst_count: int = 2
+    burst_gap_sec: float = 0.12
+    respawn_burst_count: int = 3
+    respawn_burst_cooldown_sec: float = 1.5
+    ct_key: str = "insert"
+    t_key: str = "insert"
 
 
 @dataclass
