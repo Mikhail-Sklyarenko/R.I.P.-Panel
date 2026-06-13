@@ -29,6 +29,8 @@ from utils.fps import FPSCounter
 from utils.win32 import get_window_rect
 
 from detectors import YOLOv8Detector
+from detectors.combat_detect import run_combat_detection
+from detectors.detect_debug import log_detect_status
 from aiming import FOVMouseMovement, TargetSelector
 from aiming.aim_pipeline import AimPipelineState, process_aim_frame
 from aiming.fire_actions import apply_fire_action
@@ -326,6 +328,8 @@ def detection_process(
     aim_pipeline = AimPipelineState.from_aim_config(config.aim)
     head_miss_since: Optional[float] = None
     last_target_key: Optional[tuple] = None
+    last_detect_debug_log = 0.0
+    roi_used_last = False
 
     if config.patrol.enabled:
         try:
@@ -370,8 +374,21 @@ def detection_process(
             current_team_str = shared_state.get("team", "ct")
             target_selector.config.current_team = Team(current_team_str)
 
-            # Run detection
-            detections = detector.detect(img, verbose=False)
+            # Run detection (full frame + optional ROI fallback)
+            detections, roi_used_last = run_combat_detection(
+                detector,
+                img,
+                config.detector,
+                config.aim,
+            )
+            last_detect_debug_log = log_detect_status(
+                detections=detections,
+                enemy_classes=config.aim.enemy_classes,
+                roi_used=roi_used_last,
+                activated=activated.is_set(),
+                now=now,
+                last_log=last_detect_debug_log,
+            )
 
             enemy_target = None
             if activated.is_set() and detections:
@@ -547,7 +564,7 @@ def detection_process(
                         "aim: fps=%.0f dist=%.1f smooth=%.2f "
                         "mouse=(%d,%d) target=(%.0f,%.0f) "
                         "lead_stable=%s speed=%.0f move=%s "
-                        "fire=%s hold=%s body_fb=%s",
+                        "fire=%s hold=%s roi=%s body_fb=%s",
                         fps(),
                         frame.pixel_distance,
                         frame.smoothing,
@@ -560,6 +577,7 @@ def detection_process(
                         frame.should_move,
                         fire_action.mode,
                         fire_action.holding,
+                        roi_used_last,
                         switched_body,
                     )
                     last_aim_debug_log = now

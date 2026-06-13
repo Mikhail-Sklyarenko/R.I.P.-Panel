@@ -45,7 +45,7 @@ OBS_CANVAS_HEIGHT = 720
 
 # YOLO model settings
 YOLO_WEIGHTS = "./yolov8/cs2_yolov8m_640_augmented_v4.pt"
-CONFIDENCE_THRESHOLD = 0.65  # farm: 0.55–0.65 via CSGOBOT_CONFIDENCE
+CONFIDENCE_THRESHOLD = 0.50  # detect; shoot uses head/body conf in fire_controller
 IOU_THRESHOLD = 0.2
 YOLO_IMGSZ = 640  # must match weights name; do not raise without retraining
 DETECTOR_DEVICE = ""  # "" = auto, "cuda", or "cpu"
@@ -67,8 +67,12 @@ X360 = 7792  # fallback ~sens 2.1; override via CS2_SENSITIVITY / panel Config #
 
 # Aim settings
 CURRENT_TEAM = Team.CT  # Your starting team
-PRIORITIZE_HEADS = True  # body fallback after BODY_FALLBACK_SEC if head misses
-MAX_ASSIST_DISTANCE = 260  # override: CSGOBOT_MAX_DIST
+PRIORITIZE_HEADS = False  # body-first for long range; env CSGOBOT_PRIORITIZE_HEADS=1
+MAX_ASSIST_DISTANCE = 320  # override: CSGOBOT_MAX_DIST
+MIN_BBOX_HEIGHT_FOR_HEAD = 28.0
+LONG_RANGE_BODY_BIAS = True
+ROI_ZOOM_ENABLED = True
+ROI_FRACTION = 0.75
 SMOOTHING = 2.5  # base; adaptive_smoothing scales by dist/fps
 LEAD_AIM_ENABLED = True  # velocity lead for moving targets
 LEAD_MS = 80.0  # override: CSGOBOT_LEAD_MS
@@ -138,10 +142,14 @@ def create_config() -> AppConfig:
         resolve_lead_min_speed,
         resolve_lead_ms,
         resolve_lead_variance_gate,
+        resolve_long_range_body_bias,
         resolve_max_assist_distance,
+        resolve_min_bbox_height_for_head,
         resolve_mouse_max_delta,
         resolve_mouse_min_delta,
         resolve_prioritize_heads,
+        resolve_roi_enabled,
+        resolve_roi_fraction,
         resolve_burst_gap_sec,
         resolve_burst_shot_interval_sec,
         resolve_burst_size,
@@ -189,11 +197,17 @@ def create_config() -> AppConfig:
         imgsz=YOLO_IMGSZ,
         device=DETECTOR_DEVICE,
         torch_num_threads=TORCH_NUM_THREADS,
+        roi_enabled=resolve_roi_enabled(ROI_ZOOM_ENABLED),
+        roi_fraction=resolve_roi_fraction(ROI_FRACTION),
     )
 
     aim_config = AimConfig(
         current_team=CURRENT_TEAM,
         prioritize_heads=prioritize_heads,
+        long_range_body_bias=resolve_long_range_body_bias(LONG_RANGE_BODY_BIAS),
+        min_bbox_height_for_head=resolve_min_bbox_height_for_head(
+            MIN_BBOX_HEIGHT_FOR_HEAD
+        ),
         max_assist_distance=max_assist_distance,
         smoothing_factor=smoothing,
         adaptive_smoothing=adaptive_smooth,
@@ -348,6 +362,13 @@ def main() -> int:
         f"shoot_dz={config.aim.shoot_dead_zone} "
         f"max_dist={config.aim.max_assist_distance} "
         f"conf={config.detector.confidence_threshold} heads={config.aim.prioritize_heads}"
+    )
+    logger.info(
+        f"Detect: conf={config.detector.confidence_threshold} "
+        f"max_dist={config.aim.max_assist_distance} "
+        f"heads={config.aim.prioritize_heads} "
+        f"min_bbox_h={config.aim.min_bbox_height_for_head} "
+        f"roi={config.detector.roi_enabled} frac={config.detector.roi_fraction}"
     )
     logger.info(
         f"Aim advanced: lead={config.aim.lead_aim_enabled} "

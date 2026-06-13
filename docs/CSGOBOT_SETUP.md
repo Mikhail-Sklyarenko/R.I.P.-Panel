@@ -104,6 +104,8 @@ Env без правки `run.py`: `CS2_SENSITIVITY`, `CSGOBOT_X360`, `CSGOBOT_SM
 
 **Lead aim (PR-6b):** `CSGOBOT_LEAD_MS`, `CSGOBOT_LEAD_ENABLED`, `CSGOBOT_ADAPTIVE_SMOOTHING`, `CSGOBOT_BODY_FALLBACK_MS`, `CSGOBOT_CONFIDENCE`, `CSGOBOT_PRIORITIZE_HEADS`, `CSGOBOT_MAX_DIST` — см. `docs/AIM_TUNING.md`.
 
+**Long-range detect (PR-6f):** default detect conf `0.50`, ROI center zoom, body-first aim. Env: `CSGOBOT_DETECT_DEBUG`, `CSGOBOT_ROI_ZOOM`, `CSGOBOT_ROI_FRACTION`, `CSGOBOT_MIN_BBOX_HEIGHT`, `CSGOBOT_LONG_RANGE_BODY`.
+
 **Fire (PR-6d):** default `CSGOBOT_SHOOT_MODE=hold` (зажим LMB). Альтернативы: `burst`, `tap`. См. `docs/AIM_TUNING.md`.
 
 Окно с рамками: `SHOW_PREVIEW = True` (для фарма по умолчанию **False**).

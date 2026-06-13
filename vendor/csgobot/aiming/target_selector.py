@@ -199,6 +199,13 @@ class TargetSelector:
         # If prioritizing heads, check if any heads are close enough
         if self.config.prioritize_heads:
             heads = [t for t in enemies if t.is_head]
+            if heads and getattr(self.config, "long_range_body_bias", True):
+                min_h = float(getattr(self.config, "min_bbox_height_for_head", 28.0))
+                large_heads = [t for t in heads if t.height >= min_h]
+                if large_heads:
+                    heads = large_heads
+                else:
+                    heads = []
 
             if heads:
                 # Get nearest head

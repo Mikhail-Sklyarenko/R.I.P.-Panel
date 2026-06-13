@@ -5,12 +5,20 @@ Supports YOLOv8 (and can be extended for YOLOv7).
 """
 
 from .base import BaseDetector
-from .yolov8 import YOLOv8Detector
 
 __all__ = [
     "BaseDetector",
     "YOLOv8Detector",
+    "get_detector",
 ]
+
+
+def __getattr__(name: str):
+    if name == "YOLOv8Detector":
+        from .yolov8 import YOLOv8Detector
+
+        return YOLOv8Detector
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 def get_detector(detector_type: str, **kwargs) -> BaseDetector:
@@ -24,6 +32,8 @@ def get_detector(detector_type: str, **kwargs) -> BaseDetector:
     Returns:
         Detector instance
     """
+    from .yolov8 import YOLOv8Detector
+
     detectors = {
         "yolov8": YOLOv8Detector,
     }

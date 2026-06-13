@@ -120,13 +120,20 @@ Legacy `CSGOBOT_DEAD_ZONE` → `aim_dead_zone_high`.
 
 Симптом «дёргается на бегу» → `git pull` 6c; debug: `lead_stable=False` в `aim:` log.
 
-## Детекция (env)
+## Детекция (env) — PR-6f long range
 
 | Параметр | Default | Env |
 |----------|---------|-----|
-| Confidence | `0.65` | `CSGOBOT_CONFIDENCE` |
-| Prioritize heads | `true` | `CSGOBOT_PRIORITIZE_HEADS=0` |
-| Max assist dist | `260` | `CSGOBOT_MAX_DIST` |
+| Confidence (detect) | `0.50` | `CSGOBOT_CONFIDENCE` |
+| Prioritize heads | `false` | `CSGOBOT_PRIORITIZE_HEADS=1` |
+| Max assist dist | `320` | `CSGOBOT_MAX_DIST` |
+| Min bbox height (head) | `28` | `CSGOBOT_MIN_BBOX_HEIGHT` |
+| Long-range body bias | `on` | `CSGOBOT_LONG_RANGE_BODY=0` |
+| ROI center zoom | `on` (0.75) | `CSGOBOT_ROI_ZOOM=0`, `CSGOBOT_ROI_FRACTION` |
+
+Shoot confidence отдельно: head `0.65`, body `0.55` (fire_controller).
+
+**ROI fallback:** если на полном кадре 0 врагов — второй YOLO pass по центральному crop 75%. Лог при `CSGOBOT_DETECT_DEBUG=1`: `detect: enemies=N roi=True best=t conf=... bbox_h=...`.
 
 Smoothing делит шаг мыши на N каждый кадр YOLO (не плавная кривая).
 
@@ -134,12 +141,15 @@ Smoothing делит шаг мыши на N каждый кадр YOLO (не п�
 
 | Симптом | Что сделать |
 |---------|-------------|
+| Не видит врага вдали | `git pull` 6f; `CSGOBOT_DETECT_DEBUG=1`; ↓ `CSGOBOT_CONFIDENCE` до `0.45` |
+| Видит, но aim по голове-микробоксу | default body-first; или `CSGOBOT_MIN_BBOX_HEIGHT=32` |
+| ROI не помогает | `CSGOBOT_ROI_FRACTION=0.65` (крупнее crop) |
 | Круговая наводка / перелёт | ↑ SMOOTHING (4–6), ↑ DEAD_ZONE (14–16), перекалибровать X360 |
 | Медленно доводит | ↓ SMOOTHING (2–2.5) |
 | Дёргает на месте | ↑ DEAD_ZONE |
-| Не стреляет | ↓ DEAD_ZONE или `PRIORITIZE_HEADS = False` |
+| Не стреляет | ↓ DEAD_ZONE или body-first (default с 6f) |
 | Aim мимо в сторону | OBS 1280×720, проверить capture region в логе |
-| Промахи по голове | `PRIORITIZE_HEADS = False` (цель — тело) |
+| Промахи по голове | default `PRIORITIZE_HEADS=False` (цель — тело) |
 
 ---
 
@@ -147,12 +157,17 @@ Smoothing делит шаг мыши на N каждый кадр YOLO (не п�
 
 ```bat
 set CSGOBOT_AIM_DEBUG=1
+set CSGOBOT_DETECT_DEBUG=1
 venv\Scripts\python.exe run.py
 ```
 
 Раз в ~2 с при цели в логе:
 
-`aim: fps=... dist=... mouse=(dx,dy) target=(x,y)`
+`aim: fps=... dist=... mouse=(dx,dy) target=(x,y) roi=True`
+
+Раз в ~3 с по детекции:
+
+`detect: enemies=N roi=True best=t conf=0.55 bbox_h=42`
 
 ---
 
@@ -165,8 +180,8 @@ SHOW_PREVIEW = False
 X360 = <calibrated>
 SMOOTHING = 3.0      # 4.0 если FPS > 35 и перелёт
 DEAD_ZONE = 12.0
-MAX_ASSIST_DISTANCE = 280
-PRIORITIZE_HEADS = True
+MAX_ASSIST_DISTANCE = 320
+PRIORITIZE_HEADS = False
 AUTO_SHOOT = True
 SHOOT_COOLDOWN_SEC = 0.1
 ```

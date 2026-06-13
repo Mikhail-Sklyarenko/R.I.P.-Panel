@@ -77,6 +77,8 @@ class DetectorConfig:
     half_precision: Optional[bool] = None
     max_det: int = 20
     torch_num_threads: int = 0  # 0 = PyTorch default
+    roi_enabled: bool = True
+    roi_fraction: float = 0.75
 
     # Class names in order of class index
     class_names: List[str] = field(default_factory=lambda: ["c", "ch", "t", "th"])
@@ -105,7 +107,9 @@ class AimConfig:
     current_team: Team = Team.CT
 
     # Target priority
-    prioritize_heads: bool = True
+    prioritize_heads: bool = False
+    long_range_body_bias: bool = True
+    min_bbox_height_for_head: float = 28.0
 
     # Distance thresholds (in pixels from screen center)
     max_assist_distance: int = 300  # Max distance to engage target

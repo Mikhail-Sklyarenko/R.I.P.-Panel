@@ -142,6 +142,30 @@ def resolve_max_assist_distance(default: int) -> int:
     return default
 
 
+def resolve_min_bbox_height_for_head(default: float) -> float:
+    raw = os.environ.get("CSGOBOT_MIN_BBOX_HEIGHT", "").strip()
+    if raw:
+        return max(4.0, float(raw))
+    return default
+
+
+def resolve_long_range_body_bias(default: bool) -> bool:
+    val = _env_bool("CSGOBOT_LONG_RANGE_BODY")
+    return default if val is None else val
+
+
+def resolve_roi_enabled(default: bool) -> bool:
+    val = _env_bool("CSGOBOT_ROI_ZOOM")
+    return default if val is None else val
+
+
+def resolve_roi_fraction(default: float) -> float:
+    raw = os.environ.get("CSGOBOT_ROI_FRACTION", "").strip()
+    if raw:
+        return max(0.25, min(1.0, float(raw)))
+    return default
+
+
 def resolve_lead_enabled(default: bool) -> bool:
     val = _env_bool("CSGOBOT_LEAD_ENABLED")
     return default if val is None else val
