@@ -120,15 +120,27 @@ Legacy `CSGOBOT_DEAD_ZONE` → `aim_dead_zone_high`.
 
 Симптом «дёргается на бегу» → `git pull` 6c; debug: `lead_stable=False` в `aim:` log.
 
+## Hybrid head aim (PR-H1)
+
+Близко + уверенная голова → **head**; далеко / tiny bbox / low conf → **body** (6f long-range сохранён).
+
+| Параметр | Default | Env |
+|----------|---------|-----|
+| Prioritize heads (hybrid) | `true` | `CSGOBOT_PRIORITIZE_HEADS=0` → nearest only |
+| Head aim min conf | `0.8` | `CSGOBOT_HEAD_AIM_MIN_CONF` |
+| Min bbox height (head) | `28` | `CSGOBOT_MIN_BBOX_HEIGHT` |
+| Long-range body bias | `on` | `CSGOBOT_LONG_RANGE_BODY=0` |
+
+Shoot confidence отдельно: head `0.65`, body `0.55` (fire_controller) — не путать с **aim** conf 0.8.
+
+Лог: `head_aim_min_conf=0.8 heads=True`.
+
 ## Детекция (env) — PR-6f long range
 
 | Параметр | Default | Env |
 |----------|---------|-----|
 | Confidence (detect) | `0.50` | `CSGOBOT_CONFIDENCE` |
-| Prioritize heads | `false` | `CSGOBOT_PRIORITIZE_HEADS=1` |
 | Max assist dist | `320` | `CSGOBOT_MAX_DIST` |
-| Min bbox height (head) | `28` | `CSGOBOT_MIN_BBOX_HEIGHT` |
-| Long-range body bias | `on` | `CSGOBOT_LONG_RANGE_BODY=0` |
 | ROI center zoom | `on` (0.75) | `CSGOBOT_ROI_ZOOM=0`, `CSGOBOT_ROI_FRACTION` |
 
 Shoot confidence отдельно: head `0.65`, body `0.55` (fire_controller).
@@ -142,14 +154,14 @@ Smoothing делит шаг мыши на N каждый кадр YOLO (не п�
 | Симптом | Что сделать |
 |---------|-------------|
 | Не видит врага вдали | `git pull` 6f; `CSGOBOT_DETECT_DEBUG=1`; ↓ `CSGOBOT_CONFIDENCE` до `0.45` |
-| Видит, но aim по голове-микробоксу | default body-first; или `CSGOBOT_MIN_BBOX_HEIGHT=32` |
+| Видит, но aim по голове-микробоксу | ↑ `CSGOBOT_MIN_BBOX_HEIGHT=32` или hybrid уже body @ range |
 | ROI не помогает | `CSGOBOT_ROI_FRACTION=0.65` (крупнее crop) |
 | Круговая наводка / перелёт | ↑ SMOOTHING (4–6), ↑ DEAD_ZONE (14–16), перекалибровать X360 |
 | Медленно доводит | ↓ SMOOTHING (2–2.5) |
 | Дёргает на месте | ↑ DEAD_ZONE |
-| Не стреляет | ↓ DEAD_ZONE или body-first (default с 6f) |
+| Не стреляет | ↓ DEAD_ZONE; shoot conf head/body отдельно |
 | Aim мимо в сторону | OBS 1280×720, проверить capture region в логе |
-| Промахи по голове | default `PRIORITIZE_HEADS=False` (цель — тело) |
+| Промахи по голове вдали | hybrid: body @ tiny head; ↓ `CSGOBOT_HEAD_AIM_MIN_CONF` только если close fights |
 
 ---
 
@@ -181,7 +193,8 @@ X360 = <calibrated>
 SMOOTHING = 3.0      # 4.0 если FPS > 35 и перелёт
 DEAD_ZONE = 12.0
 MAX_ASSIST_DISTANCE = 320
-PRIORITIZE_HEADS = False
+PRIORITIZE_HEADS = True
+HEAD_AIM_MIN_CONF = 0.8
 AUTO_SHOOT = True
 SHOOT_COOLDOWN_SEC = 0.1
 ```

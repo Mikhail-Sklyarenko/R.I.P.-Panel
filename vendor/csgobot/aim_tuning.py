@@ -135,6 +135,13 @@ def resolve_prioritize_heads(default: bool) -> bool:
     return default if val is None else val
 
 
+def resolve_head_aim_min_conf(default: float) -> float:
+    raw = os.environ.get("CSGOBOT_HEAD_AIM_MIN_CONF", "").strip()
+    if raw:
+        return max(0.05, min(1.0, float(raw)))
+    return default
+
+
 def resolve_max_assist_distance(default: int) -> int:
     raw = os.environ.get("CSGOBOT_MAX_DIST", "").strip()
     if raw:

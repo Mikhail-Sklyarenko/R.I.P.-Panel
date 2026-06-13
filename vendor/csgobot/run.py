@@ -68,7 +68,8 @@ X360 = 7792  # fallback ~sens 2.1; override via CS2_SENSITIVITY / panel Config #
 
 # Aim settings
 CURRENT_TEAM = Team.CT  # Your starting team
-PRIORITIZE_HEADS = False  # body-first for long range; env CSGOBOT_PRIORITIZE_HEADS=1
+PRIORITIZE_HEADS = True  # hybrid head @ conf≥HEAD_AIM_MIN_CONF; env CSGOBOT_PRIORITIZE_HEADS=0
+HEAD_AIM_MIN_CONF = 0.8  # aim at head only when detect conf ≥ this
 MAX_ASSIST_DISTANCE = 320  # override: CSGOBOT_MAX_DIST
 MIN_BBOX_HEIGHT_FOR_HEAD = 28.0
 LONG_RANGE_BODY_BIAS = True
@@ -142,6 +143,7 @@ def create_config() -> AppConfig:
         resolve_body_fallback_sec,
         resolve_confidence,
         resolve_dead_zone,
+        resolve_head_aim_min_conf,
         resolve_lead_enabled,
         resolve_lead_min_speed,
         resolve_lead_ms,
@@ -208,6 +210,7 @@ def create_config() -> AppConfig:
     aim_config = AimConfig(
         current_team=CURRENT_TEAM,
         prioritize_heads=prioritize_heads,
+        head_aim_min_conf=resolve_head_aim_min_conf(HEAD_AIM_MIN_CONF),
         long_range_body_bias=resolve_long_range_body_bias(LONG_RANGE_BODY_BIAS),
         min_bbox_height_for_head=resolve_min_bbox_height_for_head(
             MIN_BBOX_HEIGHT_FOR_HEAD
@@ -385,6 +388,7 @@ def main() -> int:
         f"Detect: conf={config.detector.confidence_threshold} "
         f"max_dist={config.aim.max_assist_distance} "
         f"heads={config.aim.prioritize_heads} "
+        f"head_aim_min_conf={config.aim.head_aim_min_conf} "
         f"min_bbox_h={config.aim.min_bbox_height_for_head} "
         f"roi={config.detector.roi_enabled} frac={config.detector.roi_fraction}"
     )

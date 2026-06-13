@@ -106,8 +106,9 @@ class AimConfig:
     # Team settings
     current_team: Team = Team.CT
 
-    # Target priority
-    prioritize_heads: bool = False
+    # Target priority (PR-H1: hybrid — head if conf≥0.8 + large bbox; else body @ range)
+    prioritize_heads: bool = True
+    head_aim_min_conf: float = 0.8
     long_range_body_bias: bool = True
     min_bbox_height_for_head: float = 28.0
 

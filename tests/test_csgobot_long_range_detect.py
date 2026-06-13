@@ -173,7 +173,8 @@ def test_create_config_6f_defaults(monkeypatch) -> None:
 
     cfg = create_config()
     assert cfg.detector.confidence_threshold == 0.50
-    assert cfg.aim.prioritize_heads is False
+    assert cfg.aim.prioritize_heads is True
+    assert cfg.aim.head_aim_min_conf == 0.8
     assert cfg.aim.max_assist_distance == 320
     assert cfg.detector.roi_enabled is True
     assert cfg.detector.roi_fraction == 0.75

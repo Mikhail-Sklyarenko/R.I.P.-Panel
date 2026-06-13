@@ -163,6 +163,23 @@ class TargetSelector:
 
         return enemies
 
+    def _qualifying_heads(self, enemies: List[Target]) -> List[Target]:
+        """Heads eligible for aim priority (conf + optional long-range bbox gate)."""
+        min_conf = float(getattr(self.config, "head_aim_min_conf", 0.8))
+        heads = [
+            t for t in enemies
+            if t.is_head and t.confidence >= min_conf
+        ]
+        if not heads:
+            return []
+
+        if getattr(self.config, "long_range_body_bias", True):
+            min_h = float(getattr(self.config, "min_bbox_height_for_head", 28.0))
+            large = [t for t in heads if t.height >= min_h]
+            return large
+
+        return heads
+
     def select_best_target(
         self,
         detections: Dict[str, List[Dict]],
@@ -196,26 +213,20 @@ class TargetSelector:
         if not enemies:
             return None
 
-        # If prioritizing heads, check if any heads are close enough
+        # Hybrid head priority (PR-H1): conf≥head_aim_min_conf + large bbox @ range
         if self.config.prioritize_heads:
-            heads = [t for t in enemies if t.is_head]
-            if heads and getattr(self.config, "long_range_body_bias", True):
-                min_h = float(getattr(self.config, "min_bbox_height_for_head", 28.0))
-                large_heads = [t for t in heads if t.height >= min_h]
-                if large_heads:
-                    heads = large_heads
-                else:
-                    heads = []
+            heads = self._qualifying_heads(enemies)
 
             if heads:
-                # Get nearest head
                 nearest_head = min(heads, key=lambda t: t.distance)
                 nearest_body = min(enemies, key=lambda t: t.distance)
 
-                # Prefer head if it's not too much further than nearest target
-                # (within 1.5x the distance of nearest target)
                 if nearest_head.distance <= nearest_body.distance * 1.5:
                     return nearest_head
+
+            bodies = [t for t in enemies if not t.is_head]
+            if bodies:
+                return min(bodies, key=lambda t: t.distance)
 
         # Return nearest target
         return min(enemies, key=lambda t: t.distance)
@@ -258,8 +269,12 @@ class TargetSelector:
             enemies = [t for t in enemies if t.distance <= max_distance]
 
         # Sort by: heads first (if prioritized), then by distance
+        qualifying: set[int] = set()
+        if self.config.prioritize_heads:
+            qualifying = set(id(t) for t in self._qualifying_heads(enemies))
+
         def sort_key(t: Target) -> Tuple[int, float]:
-            head_priority = 0 if (self.config.prioritize_heads and t.is_head) else 1
+            head_priority = 0 if id(t) in qualifying else 1
             return (head_priority, t.distance)
 
         return sorted(enemies, key=sort_key)
