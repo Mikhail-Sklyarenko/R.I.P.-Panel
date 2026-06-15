@@ -37,7 +37,7 @@ from aiming.aim_pipeline import AimPipelineState, process_aim_frame
 from aiming.fire_actions import apply_fire_action
 from aiming.fire_controller import FireAction, FireController
 from aiming.combat_aim import maybe_switch_to_body
-from aim_tuning import aim_debug_enabled, team_debug_enabled
+from aim_tuning import aim_debug_enabled, team_debug_enabled, map_debug_enabled
 from team.hud_team_detect import (
     TeamDetectState,
     detect_team_hud,
@@ -46,6 +46,14 @@ from team.hud_team_detect import (
 )
 from team.paths import resolve_team_probes_path
 from team.probes import load_team_probes
+from map.hud_map_detect import (
+    MapDetectState,
+    detect_map_hud,
+    update_map_hysteresis,
+)
+from map.paths import resolve_map_regions_path, resolve_map_templates_dir
+from map.regions import load_map_regions
+from map.template_match import load_map_templates
 from patrol import (
     PatrolMode,
     PatrolRunner,
@@ -353,6 +361,13 @@ def detection_process(
     team_probe_set = None
     team_detect_state: Optional[TeamDetectState] = None
     last_team_debug_log = 0.0
+    map_regions = None
+    map_templates: tuple = ()
+    map_detect_state: Optional[MapDetectState] = None
+    last_map_debug_log = 0.0
+    patrol_key_down = None
+    patrol_key_up = None
+    patrol_press = None
 
     if config.team_detect.enabled:
         try:
@@ -370,6 +385,24 @@ def detection_process(
         except Exception as e:
             logger.error("team_detect: failed to load probes (%s); disabled", e)
             config.team_detect.enabled = False
+
+    if config.map_detect.enabled:
+        try:
+            regions_path = resolve_map_regions_path(config.map_detect.regions_path)
+            templates_dir = resolve_map_templates_dir(config.map_detect.templates_path)
+            map_regions = load_map_regions(regions_path)
+            map_templates = load_map_templates(templates_dir)
+            map_detect_state = MapDetectState.from_script(config.patrol.script_name)
+            shared_state["patrol_script"] = config.patrol.script_name
+            logger.info(
+                "map_detect: loaded %d templates from %s regions=%s",
+                len(map_templates),
+                templates_dir.name,
+                regions_path.name,
+            )
+        except Exception as e:
+            logger.error("map_detect: failed to load (%s); disabled", e)
+            config.map_detect.enabled = False
 
     if config.autobuy.enabled:
         try:
@@ -390,27 +423,36 @@ def detection_process(
         try:
             import pydirectinput
 
-            patrol_path = resolve_patrol_path(
-                config.patrol.script_name,
-                config.patrol.script_path,
-            )
-            patrol_script = load_patrol(patrol_path)
-            patrol_runner = PatrolRunner(
-                patrol_script,
-                key_down=pydirectinput.keyDown,
-                key_up=pydirectinput.keyUp,
-            )
+            patrol_key_down = pydirectinput.keyDown
+            patrol_key_up = pydirectinput.keyUp
+            patrol_press = pydirectinput.press
+
+            def _load_patrol_runner(script_name: str) -> PatrolRunner:
+                patrol_path = resolve_patrol_path(
+                    script_name,
+                    config.patrol.script_path,
+                )
+                patrol_script = load_patrol(patrol_path)
+                logger.info(
+                    "patrol: loaded %s (%d steps) from %s",
+                    patrol_script.name,
+                    len(patrol_script.steps),
+                    patrol_path,
+                )
+                return PatrolRunner(
+                    patrol_script,
+                    key_down=patrol_key_down,
+                    key_up=patrol_key_up,
+                )
+
+            patrol_runner = _load_patrol_runner(config.patrol.script_name)
             unstuck_seq = UnstuckSequence(
-                press=pydirectinput.press,
-                key_down=pydirectinput.keyDown,
-                key_up=pydirectinput.keyUp,
+                press=patrol_press,
+                key_down=patrol_key_down,
+                key_up=patrol_key_up,
             )
             stuck_detector = StuckDetector(
                 motion_threshold=config.patrol.stuck_motion_threshold,
-            )
-            logger.info(
-                f"patrol: loaded {patrol_script.name} "
-                f"({len(patrol_script.steps)} steps) from {patrol_path}"
             )
         except Exception as e:
             logger.error(f"patrol: failed to load ({e}); disabled")
@@ -424,6 +466,67 @@ def detection_process(
                 continue
 
             now = time.monotonic()
+
+            if (
+                config.map_detect.enabled
+                and map_regions is not None
+                and map_detect_state is not None
+                and map_templates
+                and config.patrol.enabled
+                and patrol_runner is not None
+                and patrol_key_down is not None
+                and patrol_key_up is not None
+            ):
+                detected, detect_source = detect_map_hud(
+                    img,
+                    map_regions,
+                    map_templates,
+                    use_ocr_fallback=config.map_detect.use_ocr_fallback,
+                )
+                map_changed, map_pending = update_map_hysteresis(
+                    map_detect_state,
+                    detected,
+                    confirm_frames=config.map_detect.confirm_frames,
+                    lock_after_confirm=config.map_detect.lock_after_confirm,
+                )
+                if map_changed is not None:
+                    try:
+                        patrol_runner.pause()
+                        patrol_path = resolve_patrol_path(
+                            map_changed,
+                            config.patrol.script_path,
+                        )
+                        patrol_script = load_patrol(patrol_path)
+                        patrol_runner = PatrolRunner(
+                            patrol_script,
+                            key_down=patrol_key_down,
+                            key_up=patrol_key_up,
+                        )
+                        patrol_mode = PatrolMode.PATROL
+                        stuck_since = None
+                        if stuck_detector is not None:
+                            stuck_detector.reset()
+                        shared_state["patrol_script"] = map_changed
+                        logger.info(
+                            "map: auto patrol %s via %s (%d/%d frames)",
+                            map_changed,
+                            detect_source or "unknown",
+                            config.map_detect.confirm_frames,
+                            config.map_detect.confirm_frames,
+                        )
+                    except Exception as exc:
+                        logger.error("map: patrol reload failed (%s)", exc)
+                if map_debug_enabled() and now - last_map_debug_log >= 3.0:
+                    logger.info(
+                        "map: detect=%s source=%s pending=%d/%d script=%s locked=%s",
+                        detected or "none",
+                        detect_source or "none",
+                        map_pending,
+                        config.map_detect.confirm_frames,
+                        map_detect_state.confirmed_script,
+                        map_detect_state.locked,
+                    )
+                    last_map_debug_log = now
 
             if (
                 config.team_detect.enabled

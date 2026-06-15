@@ -1,0 +1,25 @@
+# HUD map OCR regions @ 1280x720 — Panorama RU DM (ArmoryFarm 2026-06)
+meta:
+  base_width: 1280
+  base_height: 720
+  calibration: operator_screenshots_2026-06
+
+template_threshold: 0.55
+
+match_ready:
+  min_probe_votes: 1
+  visible_probes:
+    - {x: 401, y: 269, rgb: [77, 194, 81], tolerance: 60}
+    - {x: 640, y: 300, rgb: [39, 58, 21], tolerance: 40}
+  ocr:
+    x: 360
+    y: 302
+    w: 520
+    h: 32
+
+scoreboard:
+  ocr:
+    x: 450
+    y: 50
+    w: 220
+    h: 36

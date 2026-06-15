@@ -110,6 +110,10 @@ Env без правки `run.py`: `CS2_SENSITIVITY`, `CSGOBOT_X360`, `CSGOBOT_SM
 
 **Auto team CT/T (PR-T1):** color probes на HUD @ 1280×720 — синхронизирует YOLO `enemy_classes` и autobuy при смене стороны в DM. По умолчанию **включено** (`AUTO_TEAM_DETECT = True`). Hysteresis 3 кадра; Ctrl+T = manual override 5 s. Env: `CSGOBOT_AUTO_TEAM=0` (выкл), `CSGOBOT_TEAM_DEBUG=1` (лог scores). Probes: `resources/csgobot/team_probes_1280x720.yaml`; калибровка: `scripts/sample_probe_rgb.py` + эталоны `tests/fixtures/csgobot_team/`.
 
+**Auto map patrol (PR-M1):** template match + optional Tesseract на попапе «матч готов» и заголовке scoreboard (Tab). `dust2` / `mirage` → `resources/patrol/{map}.yaml`, иначе `generic_dm`. По умолчанию **включено** (`AUTO_MAP_DETECT = True`), hysteresis 3 кадра, lock после подтверждения. Env: `CSGOBOT_AUTO_MAP=0` (выкл), `CSGOBOT_MAP_DEBUG=1` (лог), `CSGOBOT_PATROL_SCRIPT=dust2` (фикс. скрипт, без автодетекта). Ресурсы: `resources/csgobot/map_regions_1280x720.yaml`, `resources/csgobot/map_templates/`. Пересборка шаблонов: `python scripts/build_map_templates.py`. Фикстуры: `tests/fixtures/csgobot_map/`.
+
+**Roadmap:** `docs/COMBAT_ROADMAP.md` — следующие PR: **E1** (E2E) → **L1–L4** (Look).
+
 **Fire (PR-6d):** default `CSGOBOT_SHOOT_MODE=hold` (зажим LMB). Альтернативы: `burst`, `tap`. См. `docs/AIM_TUNING.md`.
 
 Окно с рамками: `SHOW_PREVIEW = True` (для фарма по умолчанию **False**).

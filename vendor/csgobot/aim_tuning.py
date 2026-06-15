@@ -121,6 +121,20 @@ def resolve_auto_team_enabled(default: bool) -> bool:
     return default if val is None else val
 
 
+def resolve_auto_map_enabled(default: bool) -> bool:
+    val = _env_bool("CSGOBOT_AUTO_MAP")
+    return default if val is None else val
+
+
+def map_debug_enabled() -> bool:
+    return os.environ.get("CSGOBOT_MAP_DEBUG", "").lower() in ("1", "true", "yes")
+
+
+def resolve_patrol_script_override() -> str | None:
+    raw = os.environ.get("CSGOBOT_PATROL_SCRIPT", "").strip()
+    return raw if raw else None
+
+
 def _env_bool(name: str) -> bool | None:
     raw = os.environ.get(name, "").strip().lower()
     if not raw:

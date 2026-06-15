@@ -17,6 +17,7 @@ from config import (
     PatrolConfig,
     AutoBuyConfig,
     TeamDetectConfig,
+    MapDetectConfig,
     Team,
     PreviewConfig,
     HotkeyConfig,
@@ -105,6 +106,9 @@ AUTO_BUY_KEY = "insert"
 AUTO_TEAM_DETECT = True
 TEAM_DETECT_CONFIRM_FRAMES = 3
 TEAM_MANUAL_OVERRIDE_SEC = 5.0
+AUTO_MAP_DETECT = True
+MAP_DETECT_CONFIRM_FRAMES = 3
+MAP_DETECT_LOCK = True
 AUTO_MOVE = False  # legacy random tap; use PATROL when enabled
 MOVE_INTERVAL_SEC = 8.0
 DEAD_ZONE = 12.0  # legacy; maps to AIM_DEAD_ZONE_HIGH if unset
@@ -169,6 +173,8 @@ def create_config() -> AppConfig:
         resolve_shoot_cooldown_sec,
         resolve_shoot_dead_zone,
         resolve_auto_team_enabled,
+        resolve_auto_map_enabled,
+        resolve_patrol_script_override,
         resolve_shoot_mode,
         resolve_smoothing,
         resolve_x360,
@@ -283,6 +289,39 @@ def create_config() -> AppConfig:
         unstuck_cooldown_sec=UNSTUCK_COOLDOWN_SEC,
     )
 
+    patrol_override = resolve_patrol_script_override()
+    map_detect_enabled = resolve_auto_map_enabled(AUTO_MAP_DETECT) and not patrol_override
+    if patrol_override:
+        patrol_config = PatrolConfig(
+            enabled=patrol_config.enabled,
+            script_name=patrol_override,
+            script_path=patrol_config.script_path,
+            combat_clear_sec=patrol_config.combat_clear_sec,
+            pause_on_combat=patrol_config.pause_on_combat,
+            anti_stuck_enabled=patrol_config.anti_stuck_enabled,
+            stuck_sec=patrol_config.stuck_sec,
+            stuck_motion_threshold=patrol_config.stuck_motion_threshold,
+            unstuck_cooldown_sec=patrol_config.unstuck_cooldown_sec,
+        )
+    elif map_detect_enabled:
+        patrol_config = PatrolConfig(
+            enabled=patrol_config.enabled,
+            script_name="generic_dm",
+            script_path=patrol_config.script_path,
+            combat_clear_sec=patrol_config.combat_clear_sec,
+            pause_on_combat=patrol_config.pause_on_combat,
+            anti_stuck_enabled=patrol_config.anti_stuck_enabled,
+            stuck_sec=patrol_config.stuck_sec,
+            stuck_motion_threshold=patrol_config.stuck_motion_threshold,
+            unstuck_cooldown_sec=patrol_config.unstuck_cooldown_sec,
+        )
+
+    map_detect_config = MapDetectConfig(
+        enabled=map_detect_enabled,
+        confirm_frames=MAP_DETECT_CONFIRM_FRAMES,
+        lock_after_confirm=MAP_DETECT_LOCK,
+    )
+
     from controls.autobuy import (
         resolve_autobuy_enabled,
         resolve_autobuy_interval,
@@ -321,6 +360,7 @@ def create_config() -> AppConfig:
         aim=aim_config,
         patrol=patrol_config,
         team_detect=team_detect_config,
+        map_detect=map_detect_config,
         autobuy=autobuy_config,
         preview=preview_config,
         hotkeys=hotkey_config,
@@ -437,6 +477,28 @@ def main() -> int:
             config.team_detect.enabled = False
     else:
         logger.info("Team detect: disabled (CSGOBOT_AUTO_TEAM=0 or run.py)")
+    from map.paths import resolve_map_regions_path, resolve_map_templates_dir
+    from map.regions import load_map_regions
+    from map.template_match import load_map_templates
+
+    if config.map_detect.enabled:
+        try:
+            regions_path = resolve_map_regions_path(config.map_detect.regions_path)
+            templates_dir = resolve_map_templates_dir(config.map_detect.templates_path)
+            load_map_regions(regions_path)
+            templates = load_map_templates(templates_dir)
+            logger.info(
+                "Map detect: enabled confirm_frames=%d lock=%s templates=%d path=%s",
+                config.map_detect.confirm_frames,
+                config.map_detect.lock_after_confirm,
+                len(templates),
+                templates_dir.name,
+            )
+        except Exception as exc:
+            logger.warning("Map detect: failed to load resources (%s); disabled", exc)
+            config.map_detect.enabled = False
+    else:
+        logger.info("Map detect: disabled (CSGOBOT_AUTO_MAP=0 or CSGOBOT_PATROL_SCRIPT)")
     logger.info(
         f"Autobuy: enabled={config.autobuy.enabled} "
         f"interval={config.autobuy.interval_sec}s "

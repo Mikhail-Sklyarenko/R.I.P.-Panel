@@ -212,5 +212,6 @@ SHOOT_COOLDOWN_SEC = 0.1
 
 ## Связанные документы
 
+- `docs/COMBAT_ROADMAP.md` — порядок PR (E1 → Look L1–L4; M1 done)
 - `docs/CSGOBOT_SETUP.md` — OBS, CUDA, auto_shoot, patrol  
 - `docs/AI_PC_PROFILE.md` — профиль ArmoryFarm  

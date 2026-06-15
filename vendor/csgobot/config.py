@@ -221,6 +221,17 @@ class TeamDetectConfig:
 
 
 @dataclass
+class MapDetectConfig:
+    """Auto-select patrol YAML from DM map (dust2 / mirage / generic_dm)."""
+    enabled: bool = True
+    confirm_frames: int = 3
+    lock_after_confirm: bool = True
+    use_ocr_fallback: bool = True
+    regions_path: str = ""
+    templates_path: str = ""
+
+
+@dataclass
 class AutoBuyConfig:
     """DM rifle autobuy (Insert → buy_rifle_dm in fsm.cfg)."""
     enabled: bool = True
@@ -262,6 +273,7 @@ class AppConfig:
     aim: AimConfig = field(default_factory=AimConfig)
     patrol: PatrolConfig = field(default_factory=PatrolConfig)
     team_detect: TeamDetectConfig = field(default_factory=TeamDetectConfig)
+    map_detect: MapDetectConfig = field(default_factory=MapDetectConfig)
     autobuy: AutoBuyConfig = field(default_factory=AutoBuyConfig)
     preview: PreviewConfig = field(default_factory=PreviewConfig)
     hotkeys: HotkeyConfig = field(default_factory=HotkeyConfig)

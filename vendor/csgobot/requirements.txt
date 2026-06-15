@@ -20,4 +20,5 @@ pynput>=1.7.0
 
 # Configuration
 pyyaml>=6.0
+# Optional OCR fallback for map detect: pip install pytesseract (+ Tesseract binary)
 # tomli>=2.0.0  # Only needed if using TOML config files
