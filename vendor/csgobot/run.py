@@ -103,6 +103,8 @@ UNSTUCK_COOLDOWN_SEC = 3.0
 AUTO_BUY_RIFLE = True
 AUTO_BUY_INTERVAL_SEC = 1.0
 AUTO_BUY_KEY = "insert"
+AUTO_BUY_RESPAWN_DELAYS_SEC = (0.4, 0.9, 1.4)
+AUTO_BUY_RESPAWN_COOLDOWN_SEC = 0.5
 AUTO_TEAM_DETECT = True
 TEAM_DETECT_CONFIRM_FRAMES = 3
 TEAM_MANUAL_OVERRIDE_SEC = 5.0
@@ -325,6 +327,8 @@ def create_config() -> AppConfig:
     from controls.autobuy import (
         resolve_autobuy_enabled,
         resolve_autobuy_interval,
+        resolve_respawn_burst_cooldown,
+        resolve_respawn_burst_delays,
     )
 
     autobuy_config = AutoBuyConfig(
@@ -333,6 +337,12 @@ def create_config() -> AppConfig:
         buy_key=AUTO_BUY_KEY,
         ct_key=AUTO_BUY_KEY,
         t_key=AUTO_BUY_KEY,
+        respawn_burst_delays_sec=resolve_respawn_burst_delays(
+            AUTO_BUY_RESPAWN_DELAYS_SEC,
+        ),
+        respawn_burst_cooldown_sec=resolve_respawn_burst_cooldown(
+            AUTO_BUY_RESPAWN_COOLDOWN_SEC,
+        ),
     )
 
     team_detect_config = TeamDetectConfig(

@@ -126,7 +126,7 @@ Must **not** appear: `loot_failed`, `session_failed`, long idle on main menu whe
 | Screen jitters on running targets | PR-6c defaults; `CSGOBOT_AIM_DEBUG=1` → check `lead_stable`, `move=False` in band |
 | Misses on running enemies | `CSGOBOT_LEAD_MS=100`; `CSGOBOT_BODY_FALLBACK_MS=200`; `CSGOBOT_AIM_DEBUG=1` |
 | No detect at long range | PR-6f: ROI zoom + conf 0.50; `CSGOBOT_DETECT_DEBUG=1`; try `CSGOBOT_CONFIDENCE=0.45` |
-| Bot farms with pistol/SMG | PR autobuy: `git pull`; restart CS2; log `autobuy: startup burst` / `respawn burst` |
+| Bot farms with pistol/SMG | PR autobuy: `git pull`; restart CS2; log `autobuy: startup burst` / `autobuy: respawn stagger` |
 | Slow single-tap fire | PR-6d default `hold`; or `CSGOBOT_SHOOT_MODE=burst` + `BURST_SIZE=5` |
 | `WARN: PyTorch CPU-only` | Install torch+cu124 in csgobot venv; optional **csgobot_require_cuda** in Config #3 |
 | False `csgobot: finished ok` after 1s | Fixed — should show `early exit` + stderr tail |

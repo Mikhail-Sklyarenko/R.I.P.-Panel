@@ -15,6 +15,8 @@ from controls.autobuy import (  # noqa: E402
     buy_key_for_team,
     resolve_autobuy_enabled,
     resolve_autobuy_interval,
+    resolve_respawn_burst_cooldown,
+    resolve_respawn_burst_delays,
     update_autobuy,
 )
 
@@ -87,14 +89,14 @@ def test_periodic_burst_respects_interval() -> None:
     assert len(pressed) == 2
 
 
-def test_respawn_burst_on_combat_end() -> None:
+def test_respawn_stagger_schedules_delayed_presses() -> None:
     cfg = AutoBuyConfig(
         enabled=True,
         interval_sec=10.0,
         burst_count=1,
         burst_gap_sec=0.0,
-        respawn_burst_count=3,
-        respawn_burst_cooldown_sec=1.0,
+        respawn_burst_delays_sec=(0.4, 0.9, 1.4),
+        respawn_burst_cooldown_sec=0.5,
     )
     pressed: list[str] = []
     state = AutoBuyState()
@@ -108,7 +110,7 @@ def test_respawn_burst_on_combat_end() -> None:
         now=1.0,
         press=pressed.append,
     )
-    assert len(pressed) == 1
+    assert pressed == ["insert"]
 
     update_autobuy(
         state,
@@ -119,7 +121,151 @@ def test_respawn_burst_on_combat_end() -> None:
         now=2.0,
         press=pressed.append,
     )
-    assert len(pressed) == 4
+    assert pressed == ["insert"]
+
+    update_autobuy(
+        state,
+        config=cfg,
+        team="t",
+        in_combat=False,
+        activated=True,
+        now=2.39,
+        press=pressed.append,
+    )
+    assert pressed == ["insert"]
+
+    update_autobuy(
+        state,
+        config=cfg,
+        team="t",
+        in_combat=False,
+        activated=True,
+        now=2.4,
+        press=pressed.append,
+    )
+    assert pressed == ["insert", "insert"]
+
+    update_autobuy(
+        state,
+        config=cfg,
+        team="t",
+        in_combat=False,
+        activated=True,
+        now=2.95,
+        press=pressed.append,
+    )
+    assert pressed == ["insert", "insert", "insert"]
+
+    update_autobuy(
+        state,
+        config=cfg,
+        team="t",
+        in_combat=False,
+        activated=True,
+        now=3.4,
+        press=pressed.append,
+    )
+    assert pressed == ["insert", "insert", "insert", "insert"]
+
+
+def test_respawn_stagger_respects_cooldown() -> None:
+    cfg = AutoBuyConfig(
+        enabled=True,
+        interval_sec=10.0,
+        burst_count=1,
+        burst_gap_sec=0.0,
+        respawn_burst_delays_sec=(0.2,),
+        respawn_burst_cooldown_sec=0.5,
+    )
+    pressed: list[str] = []
+    state = AutoBuyState()
+
+    update_autobuy(
+        state,
+        config=cfg,
+        team="ct",
+        in_combat=True,
+        activated=True,
+        now=0.0,
+        press=pressed.append,
+    )
+    update_autobuy(
+        state,
+        config=cfg,
+        team="ct",
+        in_combat=False,
+        activated=True,
+        now=1.0,
+        press=pressed.append,
+    )
+    update_autobuy(
+        state,
+        config=cfg,
+        team="ct",
+        in_combat=True,
+        activated=True,
+        now=1.1,
+        press=pressed.append,
+    )
+    update_autobuy(
+        state,
+        config=cfg,
+        team="ct",
+        in_combat=False,
+        activated=True,
+        now=1.2,
+        press=pressed.append,
+    )
+    assert pressed == ["insert", "insert"]
+
+    update_autobuy(
+        state,
+        config=cfg,
+        team="ct",
+        in_combat=True,
+        activated=True,
+        now=1.3,
+        press=pressed.append,
+    )
+    update_autobuy(
+        state,
+        config=cfg,
+        team="ct",
+        in_combat=False,
+        activated=True,
+        now=1.4,
+        press=pressed.append,
+    )
+    assert pressed == ["insert", "insert"]
+
+    update_autobuy(
+        state,
+        config=cfg,
+        team="ct",
+        in_combat=True,
+        activated=True,
+        now=1.5,
+        press=pressed.append,
+    )
+    update_autobuy(
+        state,
+        config=cfg,
+        team="ct",
+        in_combat=False,
+        activated=True,
+        now=1.6,
+        press=pressed.append,
+    )
+    update_autobuy(
+        state,
+        config=cfg,
+        team="ct",
+        in_combat=False,
+        activated=True,
+        now=1.81,
+        press=pressed.append,
+    )
+    assert pressed == ["insert", "insert", "insert"]
 
 
 def test_team_change_triggers_burst() -> None:
@@ -151,13 +297,19 @@ def test_team_change_triggers_burst() -> None:
 def test_env_resolvers_autobuy(monkeypatch) -> None:
     monkeypatch.setenv("CSGOBOT_AUTO_BUY", "0")
     monkeypatch.setenv("CSGOBOT_AUTO_BUY_INTERVAL", "2")
+    monkeypatch.setenv("CSGOBOT_AUTOBUY_RESPAWN_DELAYS_MS", "100,250")
+    monkeypatch.setenv("CSGOBOT_AUTOBUY_RESPAWN_COOLDOWN_MS", "800")
     assert resolve_autobuy_enabled(True) is False
     assert resolve_autobuy_interval(1.0) == 2.0
+    assert resolve_respawn_burst_delays() == (0.1, 0.25)
+    assert resolve_respawn_burst_cooldown(0.5) == 0.8
 
 
 def test_create_config_autobuy_defaults(monkeypatch) -> None:
     monkeypatch.delenv("CSGOBOT_AUTO_BUY", raising=False)
     monkeypatch.delenv("CSGOBOT_AUTO_BUY_INTERVAL", raising=False)
+    monkeypatch.delenv("CSGOBOT_AUTOBUY_RESPAWN_DELAYS_MS", raising=False)
+    monkeypatch.delenv("CSGOBOT_AUTOBUY_RESPAWN_COOLDOWN_MS", raising=False)
     from run import create_config  # noqa: E402
 
     cfg = create_config()
@@ -165,3 +317,5 @@ def test_create_config_autobuy_defaults(monkeypatch) -> None:
     assert cfg.autobuy.interval_sec == 1.0
     assert cfg.autobuy.buy_key == "insert"
     assert cfg.autobuy.burst_count == 2
+    assert cfg.autobuy.respawn_burst_delays_sec == (0.4, 0.9, 1.4)
+    assert cfg.autobuy.respawn_burst_cooldown_sec == 0.5
