@@ -35,7 +35,7 @@ bind insert "buy_rifle_dm"
 
 **Respawn:** csgobot планирует Insert через **0,4 / 0,9 / 1,4 с** после combat→idle (вероятный респавн). Cooldown **0,5 с** (было 1,5 с). Периодический burst **1 s** остаётся.
 
-Env: `CSGOBOT_AUTO_BUY=0`, `CSGOBOT_AUTO_BUY_INTERVAL=0.8`, `CSGOBOT_AUTOBUY_RESPAWN_DELAYS_MS=400,900,1400`, `CSGOBOT_AUTOBUY_RESPAWN_COOLDOWN_MS=500`.
+Env: `CSGOBOT_AUTO_BUY=0`, `CSGOBOT_AUTO_BUY_INTERVAL=0.8`, `CSGOBOT_AUTOBUY_RESPAWN_DELAYS_MS=120,280,450`, `CSGOBOT_AUTOBUY_RESPAWN_COOLDOWN_MS=500`, `CSGOBOT_AUTOBUY_PATROL_FREEZE_MS=1200` (пауза патруля после buy).
 
 При `cs2_vac_safe_launch=true` convars могут не деплоиться — binds в `farm_panel.cfg` (копия fsm.cfg) работают всегда.
 

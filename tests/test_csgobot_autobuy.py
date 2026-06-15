@@ -5,6 +5,8 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+import pytest
+
 _CSGOBOT = Path(__file__).resolve().parents[1] / "vendor" / "csgobot"
 if str(_CSGOBOT) not in sys.path:
     sys.path.insert(0, str(_CSGOBOT))
@@ -17,6 +19,7 @@ from controls.autobuy import (  # noqa: E402
     resolve_autobuy_interval,
     resolve_respawn_burst_cooldown,
     resolve_respawn_burst_delays,
+    resolve_respawn_patrol_freeze,
     update_autobuy,
 )
 
@@ -121,7 +124,8 @@ def test_respawn_stagger_schedules_delayed_presses() -> None:
         now=2.0,
         press=pressed.append,
     )
-    assert pressed == ["f5"]
+    assert pressed == ["f5", "f5"]
+    assert state.patrol_freeze_until == pytest.approx(2.0 + cfg.respawn_patrol_freeze_sec)
 
     update_autobuy(
         state,
@@ -132,7 +136,7 @@ def test_respawn_stagger_schedules_delayed_presses() -> None:
         now=2.39,
         press=pressed.append,
     )
-    assert pressed == ["f5"]
+    assert pressed == ["f5", "f5"]
 
     update_autobuy(
         state,
@@ -143,7 +147,7 @@ def test_respawn_stagger_schedules_delayed_presses() -> None:
         now=2.4,
         press=pressed.append,
     )
-    assert pressed == ["f5", "f5"]
+    assert pressed == ["f5", "f5", "f5"]
 
     update_autobuy(
         state,
@@ -154,7 +158,7 @@ def test_respawn_stagger_schedules_delayed_presses() -> None:
         now=2.95,
         press=pressed.append,
     )
-    assert pressed == ["f5", "f5", "f5"]
+    assert pressed == ["f5", "f5", "f5", "f5"]
 
     update_autobuy(
         state,
@@ -165,7 +169,7 @@ def test_respawn_stagger_schedules_delayed_presses() -> None:
         now=3.4,
         press=pressed.append,
     )
-    assert pressed == ["f5", "f5", "f5", "f5"]
+    assert pressed == ["f5", "f5", "f5", "f5", "f5"]
 
 
 def test_respawn_stagger_respects_cooldown() -> None:
@@ -216,7 +220,7 @@ def test_respawn_stagger_respects_cooldown() -> None:
         now=1.2,
         press=pressed.append,
     )
-    assert pressed == ["f5", "f5"]
+    assert pressed == ["f5", "f5", "f5"]
 
     update_autobuy(
         state,
@@ -236,7 +240,7 @@ def test_respawn_stagger_respects_cooldown() -> None:
         now=1.4,
         press=pressed.append,
     )
-    assert pressed == ["f5", "f5"]
+    assert pressed == ["f5", "f5", "f5"]
 
     update_autobuy(
         state,
@@ -265,7 +269,7 @@ def test_respawn_stagger_respects_cooldown() -> None:
         now=1.81,
         press=pressed.append,
     )
-    assert pressed == ["f5", "f5", "f5"]
+    assert pressed == ["f5", "f5", "f5", "f5", "f5"]
 
 
 def test_team_change_triggers_burst() -> None:
@@ -299,10 +303,12 @@ def test_env_resolvers_autobuy(monkeypatch) -> None:
     monkeypatch.setenv("CSGOBOT_AUTO_BUY_INTERVAL", "2")
     monkeypatch.setenv("CSGOBOT_AUTOBUY_RESPAWN_DELAYS_MS", "100,250")
     monkeypatch.setenv("CSGOBOT_AUTOBUY_RESPAWN_COOLDOWN_MS", "800")
+    monkeypatch.setenv("CSGOBOT_AUTOBUY_PATROL_FREEZE_MS", "1500")
     assert resolve_autobuy_enabled(True) is False
     assert resolve_autobuy_interval(1.0) == 2.0
     assert resolve_respawn_burst_delays() == (0.1, 0.25)
     assert resolve_respawn_burst_cooldown(0.5) == 0.8
+    assert resolve_respawn_patrol_freeze(1.2) == 1.5
 
 
 def test_create_config_autobuy_defaults(monkeypatch) -> None:
@@ -317,5 +323,6 @@ def test_create_config_autobuy_defaults(monkeypatch) -> None:
     assert cfg.autobuy.interval_sec == 1.0
     assert cfg.autobuy.buy_key == "f5"
     assert cfg.autobuy.burst_count == 2
-    assert cfg.autobuy.respawn_burst_delays_sec == (0.4, 0.9, 1.4)
+    assert cfg.autobuy.respawn_burst_delays_sec == (0.12, 0.28, 0.45)
     assert cfg.autobuy.respawn_burst_cooldown_sec == 0.5
+    assert cfg.autobuy.respawn_patrol_freeze_sec == 1.2

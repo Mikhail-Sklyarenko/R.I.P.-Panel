@@ -603,6 +603,22 @@ def detection_process(
             if in_combat:
                 last_enemy_seen = now
 
+            if autobuy_press is not None:
+                autobuy_state = update_autobuy(
+                    autobuy_state,
+                    config=config.autobuy,
+                    team=current_team_str,
+                    in_combat=in_combat,
+                    activated=activated.is_set(),
+                    now=now,
+                    press=autobuy_press,
+                )
+
+            patrol_buy_freeze = (
+                autobuy_press is not None
+                and autobuy_state.patrol_freeze_until > now
+            )
+
             if not activated.is_set():
                 if fire_controller.is_holding:
                     fire_action = fire_controller.force_release(now)
@@ -637,7 +653,13 @@ def detection_process(
                     prev_mode == PatrolMode.COMBAT
                     and patrol_mode == PatrolMode.PATROL
                 ):
-                    patrol_runner.resume()
+                    if patrol_buy_freeze:
+                        patrol_runner.pause()
+                    else:
+                        patrol_runner.resume()
+
+                if patrol_buy_freeze:
+                    patrol_runner.pause()
 
                 unstuck_running = False
                 if unstuck_seq is not None and unstuck_seq.is_running:
@@ -648,13 +670,20 @@ def detection_process(
                         if stuck_detector is not None:
                             stuck_detector.reset()
                         patrol_runner.reset()
-                        patrol_runner.resume()
+                        if patrol_buy_freeze:
+                            patrol_runner.pause()
+                        else:
+                            patrol_runner.resume()
                         logger.info("patrol: unstuck sequence completed")
 
-                if not unstuck_running and should_patrol_tick(
-                    patrol_enabled=config.patrol.enabled,
-                    activated=activated.is_set(),
-                    mode=patrol_mode,
+                if (
+                    not patrol_buy_freeze
+                    and not unstuck_running
+                    and should_patrol_tick(
+                        patrol_enabled=config.patrol.enabled,
+                        activated=activated.is_set(),
+                        mode=patrol_mode,
+                    )
                 ):
                     is_moving = patrol_runner.current_key is not None
                     if (
@@ -703,17 +732,6 @@ def detection_process(
                     last_move_time = now
                 except Exception as e:
                     logger.debug(f"auto_move failed: {e}")
-
-            if autobuy_press is not None:
-                autobuy_state = update_autobuy(
-                    autobuy_state,
-                    config=config.autobuy,
-                    team=current_team_str,
-                    in_combat=in_combat,
-                    activated=activated.is_set(),
-                    now=now,
-                    press=autobuy_press,
-                )
 
             if activated.is_set() and enemy_target is not None:
                 target = enemy_target
