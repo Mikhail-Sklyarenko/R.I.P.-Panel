@@ -658,9 +658,6 @@ def detection_process(
                     else:
                         patrol_runner.resume()
 
-                if patrol_buy_freeze:
-                    patrol_runner.pause()
-
                 unstuck_running = False
                 if unstuck_seq is not None and unstuck_seq.is_running:
                     unstuck_running = unstuck_seq.tick(now)
@@ -675,6 +672,20 @@ def detection_process(
                         else:
                             patrol_runner.resume()
                         logger.info("patrol: unstuck sequence completed")
+
+                if patrol_buy_freeze:
+                    patrol_runner.pause()
+                elif (
+                    patrol_runner.is_paused
+                    and not unstuck_running
+                    and not in_combat
+                    and should_patrol_tick(
+                        patrol_enabled=config.patrol.enabled,
+                        activated=activated.is_set(),
+                        mode=patrol_mode,
+                    )
+                ):
+                    patrol_runner.resume()
 
                 if (
                     not patrol_buy_freeze

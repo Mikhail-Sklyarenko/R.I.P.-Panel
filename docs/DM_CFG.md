@@ -21,7 +21,11 @@
 |------|------|------------|
 | convars + cfg exec | `cs2_machine_convars.vcfg` + `fsm.cfg` | `cl_dm_buyrandomweapons 0` |
 | cfg | `fsm.cfg` | `buy_rifle_dm` alias, `bind f5` + `scancode63` |
-| csgobot | `CSGOBOT_AUTO_BUY=1` (default) | burst F5 каждые 1 s + на respawn |
+| csgobot | `CSGOBOT_AUTO_BUY=1` (default) | spawn window F5 + patrol freeze 12 s |
+
+После смерти бот **не жмёт F5 сразу** (ещё мёртв/камера), а планирует покупки на 1.5–11 s и **стоит на месте** ~12 s — иначе WASD закрывает buy («0 сек — нельзя купить»).
+
+Env: `CSGOBOT_AUTOBUY_RESPAWN_DELAYS_MS=1500,2000,2500,...`, `CSGOBOT_AUTOBUY_PATROL_FREEZE_MS=12000`, `CSGOBOT_AUTOBUY_STARTUP_FREEZE_MS=2000`.
 
 ```cfg
 cl_dm_buyrandomweapons 0
@@ -35,7 +39,7 @@ bind insert "buy_rifle_dm"
 
 **Respawn:** csgobot планирует Insert через **0,4 / 0,9 / 1,4 с** после combat→idle (вероятный респавн). Cooldown **0,5 с** (было 1,5 с). Периодический burst **1 s** остаётся.
 
-Env: `CSGOBOT_AUTO_BUY=0`, `CSGOBOT_AUTO_BUY_INTERVAL=0.8`, `CSGOBOT_AUTOBUY_RESPAWN_DELAYS_MS=120,280,450`, `CSGOBOT_AUTOBUY_RESPAWN_COOLDOWN_MS=500`, `CSGOBOT_AUTOBUY_PATROL_FREEZE_MS=1200` (пауза патруля после buy).
+Env: `CSGOBOT_AUTO_BUY=0`, `CSGOBOT_AUTO_BUY_INTERVAL=0.8`, `CSGOBOT_AUTOBUY_RESPAWN_DELAYS_MS=1500,2000,2500,3000,3500,4000,5000,6000,8000,10000,11000`, `CSGOBOT_AUTOBUY_RESPAWN_COOLDOWN_MS=500`, `CSGOBOT_AUTOBUY_PATROL_FREEZE_MS=12000`, `CSGOBOT_AUTOBUY_STARTUP_FREEZE_MS=2000`.
 
 При `cs2_vac_safe_launch=true` convars могут не деплоиться — binds в `farm_panel.cfg` (копия fsm.cfg) работают всегда.
 

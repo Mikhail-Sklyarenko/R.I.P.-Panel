@@ -12,8 +12,10 @@ from config import AutoBuyConfig
 
 logger = logging.getLogger("DetectionProcess")
 
-_DEFAULT_RESPAWN_DELAYS_SEC = (0.12, 0.28, 0.45)
-_DEFAULT_PATROL_FREEZE_SEC = 1.2
+# Death → spawn can take several seconds; buy only works alive + before WASD.
+_DEFAULT_SPAWN_BUY_DELAYS_SEC = (1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 5.0, 6.0, 8.0, 10.0, 11.0)
+_DEFAULT_SPAWN_PATROL_FREEZE_SEC = 12.0
+_DEFAULT_STARTUP_PATROL_FREEZE_SEC = 2.0
 
 
 def _env_bool(name: str) -> bool | None:
@@ -38,7 +40,7 @@ def resolve_autobuy_interval(default: float) -> float:
 
 
 def resolve_respawn_burst_delays(
-    default: tuple[float, ...] = _DEFAULT_RESPAWN_DELAYS_SEC,
+    default: tuple[float, ...] = _DEFAULT_SPAWN_BUY_DELAYS_SEC,
 ) -> tuple[float, ...]:
     raw = os.environ.get("CSGOBOT_AUTOBUY_RESPAWN_DELAYS_MS", "").strip()
     if not raw:
@@ -56,8 +58,19 @@ def resolve_respawn_burst_cooldown(default: float) -> float:
     return default
 
 
-def resolve_respawn_patrol_freeze(default: float = _DEFAULT_PATROL_FREEZE_SEC) -> float:
+def resolve_respawn_patrol_freeze(
+    default: float = _DEFAULT_SPAWN_PATROL_FREEZE_SEC,
+) -> float:
     raw = os.environ.get("CSGOBOT_AUTOBUY_PATROL_FREEZE_MS", "").strip()
+    if raw:
+        return max(0.0, float(raw) / 1000.0)
+    return default
+
+
+def resolve_startup_patrol_freeze(
+    default: float = _DEFAULT_STARTUP_PATROL_FREEZE_SEC,
+) -> float:
+    raw = os.environ.get("CSGOBOT_AUTOBUY_STARTUP_FREEZE_MS", "").strip()
     if raw:
         return max(0.0, float(raw) / 1000.0)
     return default
@@ -115,7 +128,7 @@ def _flush_scheduled_presses(
     return len(due)
 
 
-def _schedule_respawn_presses(
+def _schedule_presses(
     state: AutoBuyState,
     *,
     key: str,
@@ -129,41 +142,33 @@ def _schedule_respawn_presses(
     state.scheduled_presses.sort(key=lambda item: item[0])
 
 
-def _arm_patrol_freeze(
-    state: AutoBuyState,
-    *,
-    config: AutoBuyConfig,
-    now: float,
-) -> None:
-    until = now + config.respawn_patrol_freeze_sec
+def _arm_patrol_freeze_until(state: AutoBuyState, *, until: float) -> None:
     if until > state.patrol_freeze_until:
         state.patrol_freeze_until = until
 
 
-def _trigger_respawn_buy(
+def _schedule_spawn_buy_window(
     state: AutoBuyState,
     *,
     config: AutoBuyConfig,
     key: str,
     now: float,
-    press: Callable[[str], None],
 ) -> None:
-    burst_press(press, key, config.burst_count, config.burst_gap_sec)
-    follow_up = tuple(delay for delay in config.respawn_burst_delays_sec if delay > 0)
-    if follow_up:
-        _schedule_respawn_presses(
-            state,
-            key=key,
-            now=now,
-            delays_sec=follow_up,
-        )
-    _arm_patrol_freeze(state, config=config, now=now)
+    """
+    After death (combat→idle): schedule F5 across death-cam + spawn + invuln window.
+
+    No immediate press while dead/spectating — movement stays frozen until window ends.
+    """
+    delays = tuple(delay for delay in config.respawn_burst_delays_sec if delay > 0)
+    if delays:
+        _schedule_presses(state, key=key, now=now, delays_sec=delays)
+    freeze_until = now + config.respawn_patrol_freeze_sec
+    _arm_patrol_freeze_until(state, until=freeze_until)
     logger.info(
-        "autobuy: respawn burst key=%s x%d freeze=%.1fs follow=%s",
+        "autobuy: spawn window key=%s freeze=%.1fs buys=%s",
         key,
-        config.burst_count,
         config.respawn_patrol_freeze_sec,
-        ",".join(f"{delay:.2f}s" for delay in follow_up) or "none",
+        ",".join(f"{delay:.1f}s" for delay in delays) or "none",
     )
 
 
@@ -178,9 +183,9 @@ def update_autobuy(
     press: Callable[[str], None],
 ) -> AutoBuyState:
     """
-    Periodic burst buy + immediate respawn burst before patrol can move.
+    Periodic burst buy + spawn-window scheduling after combat ends (death).
 
-    DM buy window closes on first WASD movement — freeze patrol briefly after buy.
+    DM buy closes on WASD — hold patrol through spawn invulnerability, buy while still.
     """
     if not config.enabled or not activated:
         return state
@@ -190,7 +195,10 @@ def update_autobuy(
 
     if not state.started:
         burst_press(press, key, config.burst_count, config.burst_gap_sec)
-        _arm_patrol_freeze(state, config=config, now=now)
+        _arm_patrol_freeze_until(
+            state,
+            until=now + config.startup_patrol_freeze_sec,
+        )
         logger.info("autobuy: startup burst key=%s x%d", key, config.burst_count)
         state.started = True
         state.last_team = team
@@ -200,7 +208,10 @@ def update_autobuy(
 
     if team != state.last_team:
         burst_press(press, key, config.burst_count, config.burst_gap_sec)
-        _arm_patrol_freeze(state, config=config, now=now)
+        _arm_patrol_freeze_until(
+            state,
+            until=now + config.startup_patrol_freeze_sec,
+        )
         logger.info("autobuy: team_change burst team=%s key=%s", team, key)
         state.last_team = team
         state.last_pulse = now
@@ -209,12 +220,11 @@ def update_autobuy(
 
     if state.was_in_combat and not in_combat:
         if now - state.last_respawn_burst >= config.respawn_burst_cooldown_sec:
-            _trigger_respawn_buy(
+            _schedule_spawn_buy_window(
                 state,
                 config=config,
                 key=key,
                 now=now,
-                press=press,
             )
             state.last_respawn_burst = now
             state.last_pulse = now

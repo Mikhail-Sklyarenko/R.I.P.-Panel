@@ -103,9 +103,10 @@ UNSTUCK_COOLDOWN_SEC = 3.0
 AUTO_BUY_RIFLE = True
 AUTO_BUY_INTERVAL_SEC = 1.0
 AUTO_BUY_KEY = "f5"  # pydirectinput breaks Insert; F5 → buy_rifle_dm in fsm.cfg
-AUTO_BUY_RESPAWN_DELAYS_SEC = (0.12, 0.28, 0.45)
+AUTO_BUY_RESPAWN_DELAYS_SEC = (1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 5.0, 6.0, 8.0, 10.0, 11.0)
 AUTO_BUY_RESPAWN_COOLDOWN_SEC = 0.5
-AUTO_BUY_PATROL_FREEZE_SEC = 1.2
+AUTO_BUY_PATROL_FREEZE_SEC = 12.0
+AUTO_BUY_STARTUP_FREEZE_SEC = 2.0
 AUTO_TEAM_DETECT = True
 TEAM_DETECT_CONFIRM_FRAMES = 3
 TEAM_MANUAL_OVERRIDE_SEC = 5.0
@@ -331,6 +332,7 @@ def create_config() -> AppConfig:
         resolve_respawn_burst_cooldown,
         resolve_respawn_burst_delays,
         resolve_respawn_patrol_freeze,
+        resolve_startup_patrol_freeze,
     )
 
     autobuy_config = AutoBuyConfig(
@@ -347,6 +349,9 @@ def create_config() -> AppConfig:
         ),
         respawn_patrol_freeze_sec=resolve_respawn_patrol_freeze(
             AUTO_BUY_PATROL_FREEZE_SEC,
+        ),
+        startup_patrol_freeze_sec=resolve_startup_patrol_freeze(
+            AUTO_BUY_STARTUP_FREEZE_SEC,
         ),
     )
 

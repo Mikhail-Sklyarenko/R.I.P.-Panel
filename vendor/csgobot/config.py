@@ -239,9 +239,12 @@ class AutoBuyConfig:
     buy_key: str = "f5"
     burst_count: int = 2
     burst_gap_sec: float = 0.12
-    respawn_burst_delays_sec: tuple[float, ...] = (0.12, 0.28, 0.45)
+    respawn_burst_delays_sec: tuple[float, ...] = (
+        1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 5.0, 6.0, 8.0, 10.0, 11.0,
+    )
     respawn_burst_cooldown_sec: float = 0.5
-    respawn_patrol_freeze_sec: float = 1.2
+    respawn_patrol_freeze_sec: float = 12.0
+    startup_patrol_freeze_sec: float = 2.0
     ct_key: str = "f5"
     t_key: str = "f5"
 

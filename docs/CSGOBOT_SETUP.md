@@ -106,7 +106,7 @@ Env без правки `run.py`: `CS2_SENSITIVITY`, `CSGOBOT_X360`, `CSGOBOT_SM
 
 **Long-range detect (PR-6f):** default detect conf `0.50`, ROI center zoom, body-first aim. Env: `CSGOBOT_DETECT_DEBUG`, `CSGOBOT_ROI_ZOOM`, `CSGOBOT_ROI_FRACTION`, `CSGOBOT_MIN_BBOX_HEIGHT`, `CSGOBOT_LONG_RANGE_BODY`.
 
-**Autobuy rifle (DM):** `cl_dm_buyrandomweapons 0` + **F5**→`buy_rifle_dm` in `fsm.cfg`. csgobot жмёт **F5** сразу при респавне, **пауза патруля 1.2 s** (окно buy закрывается от WASD), follow-up @ 0.12/0.28/0.45 s. Env: `CSGOBOT_AUTO_BUY`, `CSGOBOT_AUTO_BUY_INTERVAL`, `CSGOBOT_AUTOBUY_RESPAWN_DELAYS_MS`, `CSGOBOT_AUTOBUY_RESPAWN_COOLDOWN_MS`, `CSGOBOT_AUTOBUY_PATROL_FREEZE_MS`. См. `docs/DM_CFG.md`.
+**Autobuy rifle (DM):** F5→`buy_rifle_dm`. После смерти — **окно спавна**: F5 @ 1.5–11 s, **пауза патруля 12 s** (неуязвимость + buy до WASD). Env: `CSGOBOT_AUTOBUY_RESPAWN_DELAYS_MS`, `CSGOBOT_AUTOBUY_PATROL_FREEZE_MS` (12000), `CSGOBOT_AUTOBUY_STARTUP_FREEZE_MS`. См. `docs/DM_CFG.md`.
 
 **Auto team CT/T (PR-T1):** color probes на HUD @ 1280×720 — синхронизирует YOLO `enemy_classes` и autobuy при смене стороны в DM. По умолчанию **включено** (`AUTO_TEAM_DETECT = True`). Hysteresis 3 кадра; Ctrl+T = manual override 5 s. Env: `CSGOBOT_AUTO_TEAM=0` (выкл), `CSGOBOT_TEAM_DEBUG=1` (лог scores). Probes: `resources/csgobot/team_probes_1280x720.yaml`; калибровка: `scripts/sample_probe_rgb.py` + эталоны `tests/fixtures/csgobot_team/`.
 
