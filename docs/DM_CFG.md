@@ -20,12 +20,14 @@
 | Слой | Файл | Что делает |
 |------|------|------------|
 | convars + cfg exec | `cs2_machine_convars.vcfg` + `fsm.cfg` | `cl_dm_buyrandomweapons 0` |
-| cfg | `fsm.cfg` | `buy_rifle_dm` alias, `bind insert` |
-| csgobot | `CSGOBOT_AUTO_BUY=1` (default) | burst Insert каждые 1 s + на respawn |
+| cfg | `fsm.cfg` | `buy_rifle_dm` alias, `bind f5` + `scancode63` |
+| csgobot | `CSGOBOT_AUTO_BUY=1` (default) | burst F5 каждые 1 s + на respawn |
 
 ```cfg
 cl_dm_buyrandomweapons 0
 alias buy_rifle_dm "buy ak47; buy m4a1; buy vesthelm"
+bind f5 "buy_rifle_dm"
+bind scancode63 "buy_rifle_dm"
 bind insert "buy_rifle_dm"
 ```
 

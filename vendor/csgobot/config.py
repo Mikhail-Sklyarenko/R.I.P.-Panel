@@ -236,13 +236,13 @@ class AutoBuyConfig:
     """DM rifle autobuy (Insert → buy_rifle_dm in fsm.cfg)."""
     enabled: bool = True
     interval_sec: float = 1.0
-    buy_key: str = "insert"
+    buy_key: str = "f5"
     burst_count: int = 2
     burst_gap_sec: float = 0.12
     respawn_burst_delays_sec: tuple[float, ...] = (0.4, 0.9, 1.4)
     respawn_burst_cooldown_sec: float = 0.5
-    ct_key: str = "insert"
-    t_key: str = "insert"
+    ct_key: str = "f5"
+    t_key: str = "f5"
 
 
 @dataclass

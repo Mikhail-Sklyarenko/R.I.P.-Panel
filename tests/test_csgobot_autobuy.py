@@ -42,7 +42,7 @@ def test_startup_burst_fires_once() -> None:
         press=pressed.append,
     )
     assert state.started is True
-    assert pressed == ["insert", "insert"]
+    assert pressed == ["f5", "f5"]
 
 
 def test_periodic_burst_respects_interval() -> None:
@@ -110,7 +110,7 @@ def test_respawn_stagger_schedules_delayed_presses() -> None:
         now=1.0,
         press=pressed.append,
     )
-    assert pressed == ["insert"]
+    assert pressed == ["f5"]
 
     update_autobuy(
         state,
@@ -121,7 +121,7 @@ def test_respawn_stagger_schedules_delayed_presses() -> None:
         now=2.0,
         press=pressed.append,
     )
-    assert pressed == ["insert"]
+    assert pressed == ["f5"]
 
     update_autobuy(
         state,
@@ -132,7 +132,7 @@ def test_respawn_stagger_schedules_delayed_presses() -> None:
         now=2.39,
         press=pressed.append,
     )
-    assert pressed == ["insert"]
+    assert pressed == ["f5"]
 
     update_autobuy(
         state,
@@ -143,7 +143,7 @@ def test_respawn_stagger_schedules_delayed_presses() -> None:
         now=2.4,
         press=pressed.append,
     )
-    assert pressed == ["insert", "insert"]
+    assert pressed == ["f5", "f5"]
 
     update_autobuy(
         state,
@@ -154,7 +154,7 @@ def test_respawn_stagger_schedules_delayed_presses() -> None:
         now=2.95,
         press=pressed.append,
     )
-    assert pressed == ["insert", "insert", "insert"]
+    assert pressed == ["f5", "f5", "f5"]
 
     update_autobuy(
         state,
@@ -165,7 +165,7 @@ def test_respawn_stagger_schedules_delayed_presses() -> None:
         now=3.4,
         press=pressed.append,
     )
-    assert pressed == ["insert", "insert", "insert", "insert"]
+    assert pressed == ["f5", "f5", "f5", "f5"]
 
 
 def test_respawn_stagger_respects_cooldown() -> None:
@@ -216,7 +216,7 @@ def test_respawn_stagger_respects_cooldown() -> None:
         now=1.2,
         press=pressed.append,
     )
-    assert pressed == ["insert", "insert"]
+    assert pressed == ["f5", "f5"]
 
     update_autobuy(
         state,
@@ -236,7 +236,7 @@ def test_respawn_stagger_respects_cooldown() -> None:
         now=1.4,
         press=pressed.append,
     )
-    assert pressed == ["insert", "insert"]
+    assert pressed == ["f5", "f5"]
 
     update_autobuy(
         state,
@@ -265,7 +265,7 @@ def test_respawn_stagger_respects_cooldown() -> None:
         now=1.81,
         press=pressed.append,
     )
-    assert pressed == ["insert", "insert", "insert"]
+    assert pressed == ["f5", "f5", "f5"]
 
 
 def test_team_change_triggers_burst() -> None:
@@ -291,7 +291,7 @@ def test_team_change_triggers_burst() -> None:
         now=2.0,
         press=pressed.append,
     )
-    assert pressed.count("insert") == 4
+    assert pressed.count("f5") == 4
 
 
 def test_env_resolvers_autobuy(monkeypatch) -> None:
@@ -315,7 +315,7 @@ def test_create_config_autobuy_defaults(monkeypatch) -> None:
     cfg = create_config()
     assert cfg.autobuy.enabled is True
     assert cfg.autobuy.interval_sec == 1.0
-    assert cfg.autobuy.buy_key == "insert"
+    assert cfg.autobuy.buy_key == "f5"
     assert cfg.autobuy.burst_count == 2
     assert cfg.autobuy.respawn_burst_delays_sec == (0.4, 0.9, 1.4)
     assert cfg.autobuy.respawn_burst_cooldown_sec == 0.5

@@ -26,6 +26,7 @@ from config import (
 from grabbers import get_grabber
 from controls.mouse import get_mouse_controls
 from controls.autobuy import AutoBuyState, update_autobuy
+from controls.game_input import make_game_key_press
 from utils.fps import FPSCounter
 from utils.win32 import get_window_rect
 
@@ -406,9 +407,7 @@ def detection_process(
 
     if config.autobuy.enabled:
         try:
-            import pydirectinput
-
-            autobuy_press = pydirectinput.press
+            autobuy_press = make_game_key_press()
             logger.info(
                 "autobuy: enabled key=%s interval=%.1fs burst=%d",
                 config.autobuy.buy_key,

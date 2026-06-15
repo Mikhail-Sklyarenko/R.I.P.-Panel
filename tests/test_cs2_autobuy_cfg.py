@@ -22,8 +22,10 @@ def test_fsm_has_team_agnostic_rifle_alias() -> None:
     assert 'alias buy_rifle_dm "buy ak47; buy m4a1; buy vesthelm"' in text
 
 
-def test_fsm_binds_insert_key() -> None:
+def test_fsm_binds_autobuy_keys() -> None:
     text = _fsm_cfg()
+    assert 'bind f5 "buy_rifle_dm"' in text
+    assert 'bind scancode63 "buy_rifle_dm"' in text
     assert 'bind insert "buy_rifle_dm"' in text
 
 
