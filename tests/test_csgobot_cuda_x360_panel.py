@@ -63,11 +63,12 @@ def test_start_ai_passes_cs2_sensitivity_env(monkeypatch) -> None:
         emitted.append((event, detail))
 
     with patch("modules.combat.csgobot_ai.subprocess.Popen", return_value=proc) as popen:
-        ok = csgobot_ai.start_ai({"emit": emit, "config": cfg})
+        ok = csgobot_ai.start_ai({"emit": emit, "config": cfg, "hwnd": 424242})
 
     assert ok is True
     _, kwargs = popen.call_args
     assert kwargs["env"]["CS2_SENSITIVITY"] == "3.0"
+    assert kwargs["env"]["CSGOBOT_CS2_HWND"] == "424242"
     assert any("CS2_SENSITIVITY=3.0" in d for _, d in emitted)
 
 

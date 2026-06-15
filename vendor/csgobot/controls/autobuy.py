@@ -13,9 +13,12 @@ from config import AutoBuyConfig
 logger = logging.getLogger("DetectionProcess")
 
 # Death → spawn can take several seconds; buy only works alive + before WASD.
-_DEFAULT_SPAWN_BUY_DELAYS_SEC = (1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 5.0, 6.0, 8.0, 10.0, 11.0)
+_DEFAULT_SPAWN_BUY_DELAYS_SEC = (
+    0.3, 0.5, 0.8, 1.0, 1.2, 1.5, 2.0, 2.5, 3.0, 4.0, 5.0, 6.0, 8.0, 10.0, 11.0,
+)
 _DEFAULT_SPAWN_PATROL_FREEZE_SEC = 12.0
 _DEFAULT_STARTUP_PATROL_FREEZE_SEC = 2.0
+_FREEZE_BUY_INTERVAL_SEC = 0.35
 
 
 def _env_bool(name: str) -> bool | None:
@@ -92,6 +95,7 @@ class AutoBuyState:
     started: bool = False
     scheduled_presses: list[tuple[float, str]] = field(default_factory=list)
     patrol_freeze_until: float = 0.0
+    spawn_freeze_active: bool = False
 
 
 def burst_press(
@@ -164,6 +168,7 @@ def _schedule_spawn_buy_window(
         _schedule_presses(state, key=key, now=now, delays_sec=delays)
     freeze_until = now + config.respawn_patrol_freeze_sec
     _arm_patrol_freeze_until(state, until=freeze_until)
+    state.spawn_freeze_active = True
     logger.info(
         "autobuy: spawn window key=%s freeze=%.1fs buys=%s",
         key,
@@ -189,6 +194,9 @@ def update_autobuy(
     """
     if not config.enabled or not activated:
         return state
+
+    if state.patrol_freeze_until <= now:
+        state.spawn_freeze_active = False
 
     key = buy_key_for_team(team, config)
     _flush_scheduled_presses(state, now, press)
@@ -231,7 +239,11 @@ def update_autobuy(
 
     state.was_in_combat = in_combat
 
-    if now - state.last_pulse >= config.interval_sec:
+    buy_interval = config.interval_sec
+    if state.spawn_freeze_active and state.patrol_freeze_until > now:
+        buy_interval = min(buy_interval, _FREEZE_BUY_INTERVAL_SEC)
+
+    if now - state.last_pulse >= buy_interval:
         burst_press(press, key, config.burst_count, config.burst_gap_sec)
         state.last_pulse = now
 

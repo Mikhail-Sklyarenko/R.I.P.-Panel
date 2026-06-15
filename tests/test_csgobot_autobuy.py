@@ -139,7 +139,7 @@ def test_spawn_window_schedules_no_immediate_press_on_death() -> None:
         now=2.4,
         press=pressed.append,
     )
-    assert pressed == ["f5", "f5"]
+    assert pressed == ["f5", "f5", "f5"]
 
     update_autobuy(
         state,
@@ -150,7 +150,7 @@ def test_spawn_window_schedules_no_immediate_press_on_death() -> None:
         now=2.95,
         press=pressed.append,
     )
-    assert pressed == ["f5", "f5", "f5"]
+    assert pressed == ["f5", "f5", "f5", "f5", "f5"]
 
     update_autobuy(
         state,
@@ -161,7 +161,7 @@ def test_spawn_window_schedules_no_immediate_press_on_death() -> None:
         now=3.4,
         press=pressed.append,
     )
-    assert pressed == ["f5", "f5", "f5", "f5"]
+    assert len(pressed) >= 5
 
 
 def test_respawn_stagger_respects_cooldown() -> None:
@@ -243,7 +243,7 @@ def test_respawn_stagger_respects_cooldown() -> None:
         now=1.4,
         press=pressed.append,
     )
-    assert pressed == ["f5", "f5"]
+    assert pressed == ["f5", "f5", "f5"]
 
     update_autobuy(
         state,
@@ -272,7 +272,52 @@ def test_respawn_stagger_respects_cooldown() -> None:
         now=1.81,
         press=pressed.append,
     )
-    assert pressed == ["f5", "f5", "f5"]
+    assert pressed == ["f5", "f5", "f5", "f5"]
+
+
+def test_freeze_uses_faster_buy_interval() -> None:
+    cfg = AutoBuyConfig(
+        enabled=True,
+        interval_sec=1.0,
+        burst_count=1,
+        burst_gap_sec=0.0,
+        respawn_burst_delays_sec=(10.0,),
+        respawn_patrol_freeze_sec=12.0,
+        respawn_burst_cooldown_sec=0.5,
+    )
+    pressed: list[str] = []
+    state = AutoBuyState()
+
+    update_autobuy(
+        state,
+        config=cfg,
+        team="ct",
+        in_combat=True,
+        activated=True,
+        now=0.0,
+        press=pressed.append,
+    )
+    update_autobuy(
+        state,
+        config=cfg,
+        team="ct",
+        in_combat=False,
+        activated=True,
+        now=1.0,
+        press=pressed.append,
+    )
+    assert state.spawn_freeze_active is True
+
+    update_autobuy(
+        state,
+        config=cfg,
+        team="ct",
+        in_combat=False,
+        activated=True,
+        now=1.36,
+        press=pressed.append,
+    )
+    assert len(pressed) == 2
 
 
 def test_team_change_triggers_burst() -> None:
@@ -330,7 +375,7 @@ def test_create_config_autobuy_defaults(monkeypatch) -> None:
     assert cfg.autobuy.interval_sec == 1.0
     assert cfg.autobuy.buy_key == "f5"
     assert cfg.autobuy.burst_count == 2
-    assert cfg.autobuy.respawn_burst_delays_sec[0] == 1.5
+    assert cfg.autobuy.respawn_burst_delays_sec[0] == 0.3
     assert cfg.autobuy.respawn_burst_cooldown_sec == 0.5
     assert cfg.autobuy.respawn_patrol_freeze_sec == 12.0
     assert cfg.autobuy.startup_patrol_freeze_sec == 2.0

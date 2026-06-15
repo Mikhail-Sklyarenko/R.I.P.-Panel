@@ -32,6 +32,47 @@ def find_window(title: str) -> Optional[int]:
     return win32gui.FindWindow(None, title) or None
 
 
+def focus_window_hwnd(hwnd: int) -> bool:
+    """Bring CS2 to foreground so buy binds receive SendInput."""
+    if not hwnd:
+        return False
+    try:
+        import time
+
+        import win32con
+        import win32gui
+        import win32process
+
+        if not win32gui.IsWindow(hwnd):
+            return False
+        if win32gui.GetForegroundWindow() == hwnd:
+            return True
+        foreground = win32gui.GetForegroundWindow()
+        fg_thread = win32process.GetWindowThreadProcessId(foreground)[0]
+        target_thread = win32process.GetWindowThreadProcessId(hwnd)[0]
+        attach_fn = getattr(win32process, "AttachThreadInput", None)
+        attached = False
+        if (
+            attach_fn is not None
+            and fg_thread
+            and target_thread
+            and fg_thread != target_thread
+        ):
+            attach_fn(fg_thread, target_thread, True)
+            attached = True
+        try:
+            win32gui.ShowWindow(hwnd, win32con.SW_SHOW)
+            win32gui.BringWindowToTop(hwnd)
+            win32gui.SetForegroundWindow(hwnd)
+        finally:
+            if attached and attach_fn is not None:
+                attach_fn(fg_thread, target_thread, False)
+        time.sleep(0.05)
+        return win32gui.GetForegroundWindow() == hwnd
+    except Exception:
+        return False
+
+
 def get_foreground_window_title() -> str:
     import win32gui
     hwnd = win32gui.GetForegroundWindow()

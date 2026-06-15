@@ -262,6 +262,12 @@ def _apply_child_env_from_ctx(ctx: dict[str, Any], child_env: dict[str, str]) ->
     x360_override = os.environ.get("CSGOBOT_X360", "").strip()
     if x360_override:
         child_env["CSGOBOT_X360"] = x360_override
+    hwnd = ctx.get("hwnd") or ctx.get("cs2_hwnd")
+    if hwnd is not None:
+        try:
+            child_env["CSGOBOT_CS2_HWND"] = str(int(hwnd))
+        except (TypeError, ValueError):
+            pass
 
 
 def _aim_env_summary(ctx: dict[str, Any]) -> str:
