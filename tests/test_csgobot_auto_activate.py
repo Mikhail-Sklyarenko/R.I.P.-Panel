@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import subprocess
 import sys
 from contextlib import contextmanager
 from pathlib import Path
@@ -113,6 +114,8 @@ def test_start_ai_passes_auto_activate_env(monkeypatch) -> None:
     assert ok is True
     _, kwargs = popen.call_args
     assert kwargs["env"]["CSGOBOT_AUTO_ACTIVATE"] == "1"
+    assert kwargs["stderr"] is not None
+    assert kwargs["stderr"] is not subprocess.PIPE
 
 
 def test_start_ai_obs_missing_returns_fallback(monkeypatch) -> None:
@@ -186,15 +189,23 @@ def test_start_ai_stderr_saved_and_in_fallback(monkeypatch, tmp_path) -> None:
     proc = MagicMock()
     proc.poll.return_value = 0
     proc.returncode = 0
-    proc.stderr = MagicMock()
-    proc.stderr.read.return_value = stderr_body.encode("utf-8")
 
     emitted: list[tuple[EventType, str]] = []
 
     def emit(event: EventType, detail: str = "", **kwargs) -> None:
         emitted.append((event, detail))
 
-    with patch("modules.combat.csgobot_ai.subprocess.Popen", return_value=proc):
+    def popen_side_effect(*args, **kwargs):
+        stderr_f = kwargs.get("stderr")
+        if stderr_f is not None:
+            stderr_f.write(stderr_body)
+            stderr_f.flush()
+        return proc
+
+    with patch(
+        "modules.combat.csgobot_ai.subprocess.Popen",
+        side_effect=popen_side_effect,
+    ):
         ok = csgobot_ai.start_ai({"emit": emit, "session_id": "stderr1"})
 
     assert ok is False

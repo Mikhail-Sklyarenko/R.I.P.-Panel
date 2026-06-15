@@ -8,7 +8,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
-from typing import Any, Callable, Protocol
+from typing import Any, Callable, IO, Protocol
 
 from config.paths import get_app_root, get_logs_dir
 from core.events import EventType
@@ -16,6 +16,7 @@ from core.events import EventType
 _STDERR_READ_LIMIT = 8192
 _STDERR_TAIL_EMIT = 200
 _PROCESS: subprocess.Popen[Any] | None = None
+_PROCESS_STDERR_FILE: IO[str] | None = None
 
 
 class _Emit(Protocol):
@@ -69,24 +70,47 @@ def _stderr_log_path(session_id: str) -> Path:
     return get_logs_dir() / f"csgobot_{session_id}.stderr.txt"
 
 
-def _read_process_stderr(proc: subprocess.Popen[Any]) -> str:
-    if proc.stderr is None:
-        return ""
-    try:
-        raw = proc.stderr.read(_STDERR_READ_LIMIT)
-    except Exception:
-        return ""
-    if isinstance(raw, bytes):
-        return raw.decode("utf-8", errors="replace")
-    return raw or ""
-
-
-def _save_stderr(stderr: str, session_id: str) -> Path | None:
-    if not stderr.strip():
-        return None
+def _open_stderr_log(session_id: str) -> IO[str]:
     path = _stderr_log_path(session_id)
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(stderr, encoding="utf-8")
+    return open(path, "w", encoding="utf-8", buffering=1)
+
+
+def _close_stderr_log_file() -> None:
+    global _PROCESS_STDERR_FILE
+    if _PROCESS_STDERR_FILE is None:
+        return
+    try:
+        _PROCESS_STDERR_FILE.flush()
+        _PROCESS_STDERR_FILE.close()
+    except OSError:
+        pass
+    _PROCESS_STDERR_FILE = None
+
+
+def _read_stderr_log(session_id: str) -> str:
+    _close_stderr_log_file()
+    path = _stderr_log_path(session_id)
+    if not path.is_file():
+        return ""
+    try:
+        text = path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return ""
+    if len(text) > _STDERR_READ_LIMIT:
+        return text[-_STDERR_READ_LIMIT:]
+    return text
+
+
+def _stderr_log_path_if_nonempty(session_id: str) -> Path | None:
+    path = _stderr_log_path(session_id)
+    if not path.is_file():
+        return None
+    try:
+        if path.stat().st_size <= 0:
+            return None
+    except OSError:
+        return None
     return path
 
 
@@ -272,8 +296,9 @@ def _finalize_process(
     True = normal completion; False = fallback.
     """
     code = proc.returncode
-    stderr_text = _read_process_stderr(proc)
-    log_path = _save_stderr(stderr_text, _session_id(ctx))
+    sid = _session_id(ctx)
+    stderr_text = _read_stderr_log(sid)
+    log_path = _stderr_log_path_if_nonempty(sid)
     elapsed = time.monotonic() - started_at
     stderr_hint = _format_stderr_hint(stderr_text, log_path)
 
@@ -304,7 +329,7 @@ def start_ai(ctx: dict[str, Any]) -> bool:
     Запуск subprocess; блок до завершения/таймаута.
     True = AI отработал; False = нужен fallback (simple).
     """
-    global _PROCESS
+    global _PROCESS, _PROCESS_STDERR_FILE
     emit: _Emit | None = ctx.get("emit")
 
     if sys.platform != "win32":
@@ -366,23 +391,28 @@ def start_ai(ctx: dict[str, Any]) -> bool:
     child_env = os.environ.copy()
     child_env["CSGOBOT_AUTO_ACTIVATE"] = "1"
     _apply_child_env_from_ctx(ctx, child_env)
+    sid = _session_id(ctx)
+    stderr_path = _stderr_log_path(sid)
     try:
+        _close_stderr_log_file()
+        _PROCESS_STDERR_FILE = _open_stderr_log(sid)
         _PROCESS = subprocess.Popen(
             cmd,
             cwd=str(_csgobot_dir()),
             env=child_env,
             stdout=subprocess.DEVNULL,
-            stderr=subprocess.PIPE,
+            stderr=_PROCESS_STDERR_FILE,
             creationflags=creationflags,
         )
     except OSError:
+        _close_stderr_log_file()
         _PROCESS = None
         return False
 
     if emit:
         emit(
             EventType.COMBAT_AI_STARTED,
-            "csgobot: subprocess started (auto_activate)",
+            f"csgobot: subprocess started (auto_activate); log: {stderr_path}",
         )
         emit(EventType.FARMING, _aim_env_summary(ctx))
 
@@ -418,6 +448,7 @@ def start_ai(ctx: dict[str, Any]) -> bool:
 def stop_ai() -> None:
     global _PROCESS
     if _PROCESS is None:
+        _close_stderr_log_file()
         return
     if _PROCESS.poll() is None:
         _PROCESS.terminate()
@@ -427,3 +458,4 @@ def stop_ai() -> None:
             _PROCESS.kill()
             _PROCESS.wait(timeout=3.0)
     _PROCESS = None
+    _close_stderr_log_file()

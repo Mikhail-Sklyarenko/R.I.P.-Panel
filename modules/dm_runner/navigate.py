@@ -268,14 +268,15 @@ class DmNavigator:
         if isinstance(self.driver, SimDriver):
             return
         frame = img if img is not None else self.driver.capture()
-        if detect_state(
-            frame,
-            ScreenState.IN_DM,
-            self.coords,
-            min_match=self.config.in_dm_min_match,
-        ):
-            return
+        # Team-pick must win over soft in_dm (1/2 probes) or random is never clicked.
         if not detect_probe_key(frame, self.coords, "team_select"):
+            if detect_state(
+                frame,
+                ScreenState.IN_DM,
+                self.coords,
+                min_match=self.config.in_dm_min_match,
+            ):
+                return
             return
         try:
             pt = self.coords.click("team_random")

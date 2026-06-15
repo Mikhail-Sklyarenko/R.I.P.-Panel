@@ -128,6 +128,35 @@ def test_wait_for_in_dm_timeout_logs_probe_rgb() -> None:
     assert timeout_calls[0].kwargs["timeout_sec"] == 0.05
 
 
+def test_wait_for_in_dm_team_select_blocks_soft_peek() -> None:
+    """Team-pick screen must not count toward in_dm soft_peek (false early join)."""
+    coords = load_nav_coords("1280x720")
+    team = Image.open(AI_PC_1280 / "team_select.png").convert("RGB")
+    team720 = team.resize((1280, 720), Image.Resampling.LANCZOS)
+    driver = MagicMock()
+    driver.capture.return_value = team720
+    artifacts = MagicMock()
+
+    with patch("modules.ui_nav.detectors.time.sleep"):
+        with pytest.raises(UiNavTimeoutError, match="timeout waiting for in_dm"):
+            wait_for_in_dm(
+                driver,
+                coords,
+                artifacts,
+                timeout_sec=0.2,
+                poll_sec=0.01,
+                soft_min_match=1,
+                soft_peek_polls=3,
+            )
+
+    soft_ok = [
+        c
+        for c in artifacts.log_step.call_args_list
+        if c.args and c.args[0] == "in_dm_soft_peek_ok"
+    ]
+    assert soft_ok == []
+
+
 def test_dm_retry_skips_map_wait_when_soft_in_dm_on_frame(data_dir, monkeypatch) -> None:
     monkeypatch.setenv("DM_NAV_SIM", "1")
     from modules.dm_runner.navigate import DmNavigator
