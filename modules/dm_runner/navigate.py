@@ -288,34 +288,17 @@ class DmNavigator:
         time.sleep(2.0)
 
     def _dm_startup_autobuy(self) -> None:
-        """F5 → buy_rifle_dm via panel hwnd (before csgobot subprocess starts)."""
+        """F5/o → buy_rifle_dm via DirectInput after spawn buy window."""
         if isinstance(self.driver, SimDriver) or not self.hwnd:
             return
-        if sys.platform != "win32":
-            return
-        from modules.ui_nav.actions import press_function_key
+        from modules.dm_runner.autobuy import run_startup_autobuy
 
-        bursts: tuple[tuple[float, int], ...] = (
-            (0.0, 2),
-            (2.0, 1),
-            (4.0, 1),
+        run_startup_autobuy(
+            self.hwnd,
+            spawn_wait_sec=float(self.config.dm_autobuy_spawn_wait_sec),
+            on_progress=self._nav_progress,
+            log_step=self.artifacts.log_step,
         )
-        last_wait = 0.0
-        for wait_sec, count in bursts:
-            delay = max(0.0, wait_sec - last_wait)
-            if delay:
-                time.sleep(delay)
-            last_wait = wait_sec
-            for i in range(count):
-                try:
-                    press_function_key(self.hwnd, "f5")
-                except UiNavError as exc:
-                    self._nav_progress(f"dm nav: autobuy f5 failed ({exc})")
-                    return
-                if i + 1 < count:
-                    time.sleep(0.15)
-        self._nav_progress("dm nav: autobuy startup f5 done")
-        self.artifacts.log_step("dm_autobuy_startup")
 
     def _emit_in_dm_if_already_on_frame(self) -> bool:
         """Retry fast-path: skip map_load_delay when soft/strict in_dm visible."""

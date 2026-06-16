@@ -133,7 +133,7 @@ def make_game_key_press(*, focus_before_press: bool = True) -> Callable[[str], N
 
         vk = _VK_BY_KEY.get(name)
         if vk is not None:
-            _press_vk(vk)
+            pydirectinput.press(name)
             return
 
         scan = _EXTENDED_SCAN.get(name)

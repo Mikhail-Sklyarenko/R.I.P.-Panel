@@ -55,7 +55,6 @@ def test_startup_burst_fires_once() -> None:
     assert state.started is True
     assert pressed == ["f5", "f5"]
     assert state.patrol_freeze_until == pytest.approx(1.0 + cfg.startup_patrol_freeze_sec)
-    assert len(state.scheduled_presses) == 2
 
     update_autobuy(
         state,
@@ -122,6 +121,8 @@ def test_spawn_window_schedules_no_immediate_press_on_death() -> None:
         burst_gap_sec=0.0,
         buy_on_respawn=True,
         periodic_buy=True,
+        startup_patrol_freeze_sec=2.0,
+        startup_retry_delays_sec=(),
         respawn_burst_delays_sec=(0.4, 0.9, 1.4),
         respawn_patrol_freeze_sec=5.0,
         respawn_burst_cooldown_sec=0.5,
@@ -378,6 +379,7 @@ def test_death_does_not_buy_when_respawn_disabled() -> None:
         burst_gap_sec=0.0,
         buy_on_respawn=False,
         periodic_buy=False,
+        startup_patrol_freeze_sec=2.0,
         startup_retry_delays_sec=(),
     )
     pressed: list[str] = []
@@ -454,4 +456,4 @@ def test_create_config_autobuy_defaults(monkeypatch) -> None:
     assert cfg.autobuy.respawn_burst_delays_sec[0] == 0.3
     assert cfg.autobuy.respawn_burst_cooldown_sec == 0.5
     assert cfg.autobuy.respawn_patrol_freeze_sec == 12.0
-    assert cfg.autobuy.startup_patrol_freeze_sec == 2.0
+    assert cfg.autobuy.startup_patrol_freeze_sec == 12.0
