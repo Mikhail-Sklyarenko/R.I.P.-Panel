@@ -45,16 +45,17 @@ def test_scheduler_fires_when_elapsed() -> None:
     sched = SpawnAutobuyScheduler(spawn_mono=t0, offsets_sec=(0.0, 1.0))
 
     with patch("modules.dm_runner.autobuy.sys.platform", "win32"):
-        with patch(
-            "modules.dm_runner.autobuy.press_game_bind",
-            side_effect=lambda _hwnd, key: pressed.append(key),
-        ):
-            sched.tick(1, on_progress=None)
-            assert pressed == ["f5", "o"]
-
-            with patch("modules.dm_runner.autobuy.time.monotonic", return_value=t0 + 1.1):
+        with patch("modules.ui_nav.actions.focus_window"):
+            with patch(
+                "modules.dm_runner.autobuy.press_game_bind",
+                side_effect=lambda _hwnd, key, **kw: pressed.append(key),
+            ):
                 sched.tick(1, on_progress=None)
-            assert pressed == ["f5", "o", "f5", "o"]
+                assert pressed == ["f5", "o", "p"]
+
+                with patch("modules.dm_runner.autobuy.time.monotonic", return_value=t0 + 1.1):
+                    sched.tick(1, on_progress=None)
+                assert pressed == ["f5", "o", "p", "f5", "o", "p"]
 
 
 def test_startup_autobuy_legacy_helper() -> None:
@@ -63,17 +64,18 @@ def test_startup_autobuy_legacy_helper() -> None:
 
     with patch("modules.dm_runner.autobuy.sys.platform", "win32"):
         with patch("modules.dm_runner.autobuy.time.sleep"):
-            with patch(
-                "modules.dm_runner.autobuy.press_game_bind",
-                side_effect=lambda _hwnd, key: pressed.append(key),
-            ):
-                ok = run_startup_autobuy(
-                    4242,
-                    spawn_wait_sec=0.0,
-                    buy_delays_sec=(0.0,),
-                    buy_keys=("f5",),
-                    on_progress=progress.append,
-                )
+            with patch("modules.ui_nav.actions.focus_window"):
+                with patch(
+                    "modules.dm_runner.autobuy.press_game_bind",
+                    side_effect=lambda _hwnd, key, **kw: pressed.append(key),
+                ):
+                    ok = run_startup_autobuy(
+                        4242,
+                        spawn_wait_sec=0.0,
+                        buy_delays_sec=(0.0,),
+                        buy_keys=("f5",),
+                        on_progress=progress.append,
+                    )
 
     assert ok is True
     assert pressed == ["f5"]

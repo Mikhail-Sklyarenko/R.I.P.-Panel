@@ -188,12 +188,14 @@ def test_dm_retry_skips_map_wait_when_soft_in_dm_on_frame(data_dir, monkeypatch)
         raise UiNavTimeoutError("timeout waiting for in_dm")
 
     with patch.object(nav.driver, "capture", return_value=soft_img):
-        with patch(
-            "modules.dm_runner.navigate.wait_for_in_dm",
-            side_effect=wait_side_effect,
-        ):
-            with patch.object(nav, "_prepare_cs2_window"):
-                nav.navigate_to_dm_with_retries()
+        with patch.object(nav, "_ensure_team_joined"):
+            with patch.object(nav, "_hold_buy_window_before_combat"):
+                with patch(
+                    "modules.dm_runner.navigate.wait_for_in_dm",
+                    side_effect=wait_side_effect,
+                ):
+                    with patch.object(nav, "_prepare_cs2_window"):
+                        nav.navigate_to_dm_with_retries()
 
     assert wait_calls["n"] == 1
     in_dm_events = [(e, d) for e, d in emitted if e == EventType.IN_DM]
@@ -227,7 +229,7 @@ def test_dm_retry_fast_path_blocks_while_team_select_visible(data_dir, monkeypat
             hwnd=12345,
         )
         with patch.object(nav.driver, "capture", return_value=team720):
-            with patch.object(nav, "_try_join_team_if_needed"):
+            with patch.object(nav, "_ensure_team_joined"):
                 assert nav._emit_in_dm_if_already_on_frame() is False
 
 

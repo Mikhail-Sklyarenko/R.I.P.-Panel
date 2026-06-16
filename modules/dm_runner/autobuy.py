@@ -10,12 +10,12 @@ from typing import Callable
 from modules.ui_nav.errors import UiNavError
 from modules.ui_nav.game_keys import press_game_bind
 
-# Keys bound to buy_rifle_dm in resources/cs2/fsm.cfg (F5 + letter fallback).
-_BUY_KEYS = ("f5", "o")
+# Keys bound to buy_rifle_dm in resources/cs2/fsm.cfg (F5 + letter fallbacks).
+_BUY_KEYS = ("f5", "o", "p")
 
 # Seconds after spawn HUD (in_dm) — player is alive, invuln + buy menu open.
 _DEFAULT_BUY_OFFSETS_SEC = (0.5, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 8.0, 10.0)
-_DEFAULT_BUY_WINDOW_SEC = 12.0
+_DEFAULT_BUY_WINDOW_SEC = 8.0
 
 
 def parse_buy_offsets(raw: str | None, default: tuple[float, ...] = _DEFAULT_BUY_OFFSETS_SEC) -> tuple[float, ...]:
@@ -91,10 +91,16 @@ class SpawnAutobuyScheduler:
         log_step: Callable[..., None] | None,
     ) -> None:
         if on_progress:
-            on_progress(f"dm nav: autobuy @+{offset:.0f}s from team join")
+            on_progress(f"dm nav: autobuy @+{offset:.1f}s from spawn")
+        try:
+            from modules.ui_nav.actions import focus_window
+
+            focus_window(hwnd)
+        except UiNavError:
+            pass
         for key in self.buy_keys:
             try:
-                press_game_bind(hwnd, key)
+                press_game_bind(hwnd, key, focus=False)
                 self.sent = True
             except UiNavError as exc:
                 if on_progress:

@@ -124,10 +124,16 @@ class AppConfig(BaseModel):
         description="Buy key times (sec) after spawn HUD — inside DM invuln window",
     )
     dm_autobuy_window_sec: int = Field(
-        default=12,
+        default=8,
         ge=5,
         le=30,
-        description="Stand-still buy window (sec) after spawn before combat AI starts",
+        description="Stand-still buy window (sec) after spawn HUD before combat AI",
+    )
+    dm_team_select_timeout_sec: int = Field(
+        default=45,
+        ge=10,
+        le=120,
+        description="Max wait for team-pick overlay (Случайный выбор)",
     )
     cs_resolution: str = Field(
         default="360x270", description="Разрешение CS2 для ui_nav coords"

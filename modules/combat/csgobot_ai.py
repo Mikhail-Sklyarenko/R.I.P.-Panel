@@ -330,64 +330,24 @@ def _finalize_process(
     return True
 
 
-def start_ai(ctx: dict[str, Any]) -> bool:
-    """
-    Запуск subprocess; блок до завершения/таймаута.
-    True = AI отработал; False = нужен fallback (simple).
-    """
-    global _PROCESS, _PROCESS_STDERR_FILE
-    emit: _Emit | None = ctx.get("emit")
+_PROCESS_PRELOADED = False
 
-    if sys.platform != "win32":
-        return False
-    if not is_installed():
-        return False
+
+def _spawn_subprocess(ctx: dict[str, Any]) -> bool:
+    """Start csgobot child process if not already running."""
+    global _PROCESS, _PROCESS_STDERR_FILE, _PROCESS_PRELOADED
+
+    if _PROCESS is not None and _PROCESS.poll() is None:
+        return True
+
+    if _PROCESS is not None:
+        stop_ai()
+
+    run_py = _run_py()
     py = python_executable()
     if py is None:
         return False
 
-    obs_ok, obs_detail = check_obs_virtual_camera()
-    if not obs_ok:
-        if emit:
-            emit(
-                EventType.COMBAT_FALLBACK,
-                f"csgobot: OBS Virtual Camera not found — {obs_detail}",
-            )
-        return False
-
-    preflight_ok, preflight_msgs = check_csgobot_preflight()
-    if not preflight_ok:
-        detail = "csgobot: preflight failed — " + "; ".join(preflight_msgs[:3])
-        if emit:
-            emit(EventType.COMBAT_FALLBACK, detail)
-        return False
-    for warn in preflight_msgs:
-        if emit:
-            emit(EventType.FARMING, f"csgobot: preflight warn — {warn}")
-
-    config = _panel_config(ctx)
-    require_cuda = bool(getattr(config, "csgobot_require_cuda", False)) if config else False
-    test_mode = bool(getattr(config, "test_mode", False)) if config else False
-    cuda_ok, cuda_info = check_cuda_torch()
-    if not cuda_ok and not test_mode:
-        hint = str(cuda_info.get("install_hint") or cuda_info.get("error") or "install CUDA torch")
-        detail = f"csgobot: PyTorch CPU — expect low FPS; {hint}"
-        if require_cuda:
-            if emit:
-                emit(EventType.COMBAT_FALLBACK, detail)
-            return False
-        if emit:
-            emit(EventType.FARMING, detail + " (see FARM_PC_CHECKLIST.md)")
-    elif cuda_ok and cuda_info.get("device") and emit:
-        emit(
-            EventType.FARMING,
-            f"csgobot: CUDA ok — {cuda_info.get('device')}",
-        )
-
-    if _PROCESS is not None and _PROCESS.poll() is None:
-        stop_ai()
-
-    run_py = _run_py()
     cmd = [str(py), str(run_py.name)]
     creationflags = (
         subprocess.CREATE_NO_WINDOW
@@ -398,7 +358,6 @@ def start_ai(ctx: dict[str, Any]) -> bool:
     child_env["CSGOBOT_AUTO_ACTIVATE"] = "1"
     _apply_child_env_from_ctx(ctx, child_env)
     sid = _session_id(ctx)
-    stderr_path = _stderr_log_path(sid)
     try:
         _close_stderr_log_file()
         _PROCESS_STDERR_FILE = _open_stderr_log(sid)
@@ -415,11 +374,109 @@ def start_ai(ctx: dict[str, Any]) -> bool:
         _PROCESS = None
         return False
 
+    _PROCESS_PRELOADED = True
+    return True
+
+
+def preload_ai(ctx: dict[str, Any]) -> bool:
+    """Start csgobot during DM map load so YOLO warms up before spawn buy ends."""
+    emit: _Emit | None = ctx.get("emit")
+
+    if sys.platform != "win32" or not is_installed():
+        return False
+    if python_executable() is None:
+        return False
+
+    obs_ok, obs_detail = check_obs_virtual_camera()
+    if not obs_ok:
+        return False
+
+    preflight_ok, _ = check_csgobot_preflight()
+    if not preflight_ok:
+        return False
+
+    if not _spawn_subprocess(ctx):
+        return False
+
     if emit:
+        sid = _session_id(ctx)
         emit(
-            EventType.COMBAT_AI_STARTED,
-            f"csgobot: subprocess started (auto_activate); log: {stderr_path}",
+            EventType.FARMING,
+            f"csgobot: preloading during map load (log: {_stderr_log_path(sid)})",
         )
+    return True
+
+
+def start_ai(ctx: dict[str, Any]) -> bool:
+    """
+    Запуск subprocess; блок до завершения/таймаута.
+    True = AI отработал; False = нужен fallback (simple).
+    """
+    global _PROCESS, _PROCESS_STDERR_FILE, _PROCESS_PRELOADED
+    emit: _Emit | None = ctx.get("emit")
+    preloaded = _PROCESS is not None and _PROCESS.poll() is None and _PROCESS_PRELOADED
+
+    if sys.platform != "win32":
+        return False
+    if not is_installed():
+        return False
+    py = python_executable()
+    if py is None:
+        return False
+
+    if not preloaded:
+        obs_ok, obs_detail = check_obs_virtual_camera()
+        if not obs_ok:
+            if emit:
+                emit(
+                    EventType.COMBAT_FALLBACK,
+                    f"csgobot: OBS Virtual Camera not found — {obs_detail}",
+                )
+            return False
+
+        preflight_ok, preflight_msgs = check_csgobot_preflight()
+        if not preflight_ok:
+            detail = "csgobot: preflight failed — " + "; ".join(preflight_msgs[:3])
+            if emit:
+                emit(EventType.COMBAT_FALLBACK, detail)
+            return False
+        for warn in preflight_msgs:
+            if emit:
+                emit(EventType.FARMING, f"csgobot: preflight warn — {warn}")
+
+        config = _panel_config(ctx)
+        require_cuda = bool(getattr(config, "csgobot_require_cuda", False)) if config else False
+        test_mode = bool(getattr(config, "test_mode", False)) if config else False
+        cuda_ok, cuda_info = check_cuda_torch()
+        if not cuda_ok and not test_mode:
+            hint = str(cuda_info.get("install_hint") or cuda_info.get("error") or "install CUDA torch")
+            detail = f"csgobot: PyTorch CPU — expect low FPS; {hint}"
+            if require_cuda:
+                if emit:
+                    emit(EventType.COMBAT_FALLBACK, detail)
+                return False
+            if emit:
+                emit(EventType.FARMING, detail + " (see FARM_PC_CHECKLIST.md)")
+        elif cuda_ok and cuda_info.get("device") and emit:
+            emit(
+                EventType.FARMING,
+                f"csgobot: CUDA ok — {cuda_info.get('device')}",
+            )
+
+        if not _spawn_subprocess(ctx):
+            return False
+    else:
+        _PROCESS_PRELOADED = False
+
+    sid = _session_id(ctx)
+    stderr_path = _stderr_log_path(sid)
+    if emit:
+        detail = (
+            "csgobot: joined preloaded subprocess"
+            if preloaded
+            else f"csgobot: subprocess started (auto_activate); log: {stderr_path}"
+        )
+        emit(EventType.COMBAT_AI_STARTED, detail)
         emit(EventType.FARMING, _aim_env_summary(ctx))
 
     started_at = time.monotonic()
@@ -452,7 +509,7 @@ def start_ai(ctx: dict[str, Any]) -> bool:
 
 
 def stop_ai() -> None:
-    global _PROCESS
+    global _PROCESS, _PROCESS_PRELOADED
     if _PROCESS is None:
         _close_stderr_log_file()
         return
@@ -464,4 +521,5 @@ def stop_ai() -> None:
             _PROCESS.kill()
             _PROCESS.wait(timeout=3.0)
     _PROCESS = None
+    _PROCESS_PRELOADED = False
     _close_stderr_log_file()

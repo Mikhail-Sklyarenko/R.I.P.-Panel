@@ -11,7 +11,7 @@ from modules.ui_nav.errors import UiNavError, UiNavPlatformError
 _F_KEYS = frozenset({f"f{i}" for i in range(1, 13)})
 
 
-def press_game_bind(hwnd: int, key: str) -> None:
+def press_game_bind(hwnd: int, key: str, *, focus: bool = True) -> None:
     """Focus CS2 and press a bind key (F5, o, …) so in-game binds fire."""
     if sys.platform != "win32":
         raise UiNavPlatformError("press_game_bind is Windows-only")
@@ -20,7 +20,8 @@ def press_game_bind(hwnd: int, key: str) -> None:
     if not name:
         raise UiNavError("empty bind key")
 
-    focus_window(hwnd)
+    if focus:
+        focus_window(hwnd)
 
     try:
         import pydirectinput

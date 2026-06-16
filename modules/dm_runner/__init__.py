@@ -38,6 +38,12 @@ def run(ctx: dict[str, Any] | None = None) -> bool:
     emit: _Emit | None = ctx.get("emit")
     login = str(ctx.get("login", ""))
     config: AppConfig = ctx.get("config") or load_config()
+
+    def _preload_combat() -> None:
+        from modules.combat import csgobot_ai
+
+        csgobot_ai.preload_ai(ctx)
+
     try:
         nav = DmNavigator(
             config=config,
@@ -49,6 +55,7 @@ def run(ctx: dict[str, Any] | None = None) -> bool:
             menu_probe_warn=bool(ctx.get("cs2_menu_probe_warn")),
             menu_confirmed=bool(ctx.get("cs2_menu_confirmed")),
             should_stop=lambda: bool(ctx.get("stop_requested")),
+            on_team_joined=_preload_combat,
         )
     except UiNavError as exc:
         if emit:
