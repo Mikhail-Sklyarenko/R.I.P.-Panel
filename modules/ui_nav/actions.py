@@ -206,6 +206,40 @@ def close_window(hwnd: int) -> None:
     _win32_ui_call(hwnd, "close_window", _do)
 
 
+def press_function_key(hwnd: int, key: str) -> None:
+    """Function keys for CS2 binds (e.g. f5 → buy_rifle_dm)."""
+    if sys.platform != "win32":
+        raise UiNavPlatformError("press_function_key is Windows-only")
+    import win32api
+    import win32con
+
+    vk_by_key = {
+        "f1": 0x70,
+        "f2": 0x71,
+        "f3": 0x72,
+        "f4": 0x73,
+        "f5": 0x74,
+        "f6": 0x75,
+        "f7": 0x76,
+        "f8": 0x77,
+        "f9": 0x78,
+        "f10": 0x79,
+        "f11": 0x7A,
+        "f12": 0x7B,
+    }
+    vk = vk_by_key.get(key.lower().strip())
+    if vk is None:
+        raise UiNavError(f"unsupported function key: {key}")
+
+    def _do() -> None:
+        focus_window(hwnd)
+        win32api.keybd_event(vk, 0, 0, 0)
+        win32api.keybd_event(vk, 0, win32con.KEYEVENTF_KEYUP, 0)
+        time.sleep(0.12)
+
+    _win32_ui_call(hwnd, f"press_{key.lower()}", _do)
+
+
 def press_key(hwnd: int, key: str) -> None:
     """key: single char e.g. 'j' for disconnect bind."""
     if sys.platform != "win32":

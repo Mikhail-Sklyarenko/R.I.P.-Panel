@@ -268,19 +268,17 @@ class DmNavigator:
         if isinstance(self.driver, SimDriver):
             return
         frame = img if img is not None else self.driver.capture()
-        # Team-pick must win over soft in_dm (1/2 probes) or random is never clicked.
         if not detect_probe_key(frame, self.coords, "team_select"):
-            if detect_state(
-                frame,
-                ScreenState.IN_DM,
-                self.coords,
-                min_match=self.config.in_dm_min_match,
-            ):
+            # Strict in_dm only — soft 1/2 probes must not skip team random click.
+            if detect_state(frame, ScreenState.IN_DM, self.coords):
                 return
             return
         try:
             pt = self.coords.click("team_random")
         except KeyError:
+            self._nav_progress(
+                "dm nav: team_random missing in coords — set cs_resolution profile"
+            )
             return
         self._nav_progress(
             f"dm nav: team select → random @({pt.x},{pt.y})"
@@ -289,9 +287,42 @@ class DmNavigator:
         self.artifacts.log_step("team_random_click", x=pt.x, y=pt.y)
         time.sleep(2.0)
 
+    def _dm_startup_autobuy(self) -> None:
+        """F5 → buy_rifle_dm via panel hwnd (before csgobot subprocess starts)."""
+        if isinstance(self.driver, SimDriver) or not self.hwnd:
+            return
+        if sys.platform != "win32":
+            return
+        from modules.ui_nav.actions import press_function_key
+
+        bursts: tuple[tuple[float, int], ...] = (
+            (0.0, 2),
+            (2.0, 1),
+            (4.0, 1),
+        )
+        last_wait = 0.0
+        for wait_sec, count in bursts:
+            delay = max(0.0, wait_sec - last_wait)
+            if delay:
+                time.sleep(delay)
+            last_wait = wait_sec
+            for i in range(count):
+                try:
+                    press_function_key(self.hwnd, "f5")
+                except UiNavError as exc:
+                    self._nav_progress(f"dm nav: autobuy f5 failed ({exc})")
+                    return
+                if i + 1 < count:
+                    time.sleep(0.15)
+        self._nav_progress("dm nav: autobuy startup f5 done")
+        self.artifacts.log_step("dm_autobuy_startup")
+
     def _emit_in_dm_if_already_on_frame(self) -> bool:
         """Retry fast-path: skip map_load_delay when soft/strict in_dm visible."""
         img = self.driver.capture()
+        self._try_join_team_if_needed(img)
+        if detect_probe_key(img, self.coords, "team_select"):
+            return False
         if not detect_state(
             img,
             ScreenState.IN_DM,
@@ -304,6 +335,7 @@ class DmNavigator:
             self._nav_progress("dm nav: in_dm on frame; skip wait")
         else:
             self._nav_progress("dm nav: soft in_dm on frame; skip wait")
+        self._dm_startup_autobuy()
         self._e(EventType.IN_DM, self._in_dm_detail(soft_peek=not strict))
         return True
 
@@ -321,6 +353,7 @@ class DmNavigator:
             on_progress=self._nav_progress,
             on_poll=self._try_join_team_if_needed,
         )
+        self._dm_startup_autobuy()
         self._e(EventType.IN_DM, self._in_dm_detail(soft_peek=result.soft_peek))
 
     def _click_target(self, name: str) -> None:

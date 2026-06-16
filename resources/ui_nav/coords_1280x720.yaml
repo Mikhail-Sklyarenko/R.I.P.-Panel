@@ -26,6 +26,7 @@ detectors:
     - {x: 52, y: 704, rgb: [14, 17, 28], tolerance: 40}
   team_select:
     - {x: 640, y: 16, rgb: [62, 91, 113], tolerance: 55}
+    - {x: 1152, y: 688, rgb: [241, 243, 247], tolerance: 60}
   level_up:
     - {x: 640, y: 192, rgb: [255, 210, 60], tolerance: 70}
     - {x: 640, y: 253, rgb: [40, 120, 200], tolerance: 80}

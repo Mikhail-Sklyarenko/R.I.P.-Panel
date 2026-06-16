@@ -34,7 +34,12 @@ def test_buy_key_uses_team_agnostic_default() -> None:
 
 
 def test_startup_burst_fires_once() -> None:
-    cfg = AutoBuyConfig(enabled=True, burst_count=2, burst_gap_sec=0.0)
+    cfg = AutoBuyConfig(
+        enabled=True,
+        burst_count=2,
+        burst_gap_sec=0.0,
+        startup_retry_delays_sec=(1.0, 2.0),
+    )
     pressed: list[str] = []
     state = AutoBuyState()
 
@@ -50,6 +55,18 @@ def test_startup_burst_fires_once() -> None:
     assert state.started is True
     assert pressed == ["f5", "f5"]
     assert state.patrol_freeze_until == pytest.approx(1.0 + cfg.startup_patrol_freeze_sec)
+    assert len(state.scheduled_presses) == 2
+
+    update_autobuy(
+        state,
+        config=cfg,
+        team="ct",
+        in_combat=False,
+        activated=True,
+        now=2.1,
+        press=pressed.append,
+    )
+    assert pressed == ["f5", "f5", "f5"]
 
 
 def test_periodic_burst_respects_interval() -> None:
@@ -361,6 +378,7 @@ def test_death_does_not_buy_when_respawn_disabled() -> None:
         burst_gap_sec=0.0,
         buy_on_respawn=False,
         periodic_buy=False,
+        startup_retry_delays_sec=(),
     )
     pressed: list[str] = []
     state = AutoBuyState()

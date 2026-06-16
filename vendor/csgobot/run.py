@@ -111,6 +111,7 @@ AUTO_BUY_RESPAWN_DELAYS_SEC = (
 AUTO_BUY_RESPAWN_COOLDOWN_SEC = 0.5
 AUTO_BUY_PATROL_FREEZE_SEC = 12.0
 AUTO_BUY_STARTUP_FREEZE_SEC = 2.0
+AUTO_BUY_STARTUP_RETRY_DELAYS_SEC = (2.0, 4.0, 6.0)
 AUTO_TEAM_DETECT = True
 TEAM_DETECT_CONFIRM_FRAMES = 3
 TEAM_MANUAL_OVERRIDE_SEC = 5.0
@@ -361,6 +362,7 @@ def create_config() -> AppConfig:
         startup_patrol_freeze_sec=resolve_startup_patrol_freeze(
             AUTO_BUY_STARTUP_FREEZE_SEC,
         ),
+        startup_retry_delays_sec=AUTO_BUY_STARTUP_RETRY_DELAYS_SEC,
     )
 
     team_detect_config = TeamDetectConfig(

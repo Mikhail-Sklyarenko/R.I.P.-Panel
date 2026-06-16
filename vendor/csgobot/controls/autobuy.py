@@ -213,11 +213,21 @@ def update_autobuy(
 
     if not state.started:
         burst_press(press, key, config.burst_count, config.burst_gap_sec)
+        retry_delays = tuple(
+            delay for delay in config.startup_retry_delays_sec if delay > 0
+        )
+        if retry_delays:
+            _schedule_presses(state, key=key, now=now, delays_sec=retry_delays)
         _arm_patrol_freeze_until(
             state,
             until=now + config.startup_patrol_freeze_sec,
         )
-        logger.info("autobuy: startup burst key=%s x%d", key, config.burst_count)
+        logger.info(
+            "autobuy: startup burst key=%s x%d retries=%s",
+            key,
+            config.burst_count,
+            ",".join(f"{delay:.1f}s" for delay in retry_delays) or "none",
+        )
         state.started = True
         state.last_team = team
         state.last_pulse = now

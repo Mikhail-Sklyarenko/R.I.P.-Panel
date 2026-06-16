@@ -201,6 +201,36 @@ def test_dm_retry_skips_map_wait_when_soft_in_dm_on_frame(data_dir, monkeypatch)
     assert in_dm_events[0][1] == "dm_runner: in_dm (soft_peek)"
 
 
+def test_dm_retry_fast_path_blocks_while_team_select_visible(data_dir, monkeypatch) -> None:
+    monkeypatch.setenv("DM_NAV_SIM", "0")
+    monkeypatch.setattr("sys.platform", "win32")
+    from modules.dm_runner.navigate import DmNavigator
+
+    coords = load_nav_coords("1280x720")
+    team = Image.open(AI_PC_1280 / "team_select.png").convert("RGB")
+    team720 = team.resize((1280, 720), Image.Resampling.LANCZOS)
+
+    with patch(
+        "modules.dm_runner.navigate.load_nav_coords_for_hwnd",
+        return_value=coords,
+    ):
+        nav = DmNavigator(
+            config=AppConfig(
+                map_load_delay_sec=10,
+                game_search_timeout_sec=10,
+                search_retries=2,
+                in_dm_min_match=1,
+                cs_resolution="1280x720",
+            ),
+            session_id="team_fast",
+            login="u1",
+            hwnd=12345,
+        )
+        with patch.object(nav.driver, "capture", return_value=team720):
+            with patch.object(nav, "_try_join_team_if_needed"):
+                assert nav._emit_in_dm_if_already_on_frame() is False
+
+
 @pytest.fixture
 def data_dir(tmp_path, monkeypatch):
     monkeypatch.setenv("FARM_PANEL_DATA_DIR", str(tmp_path))
