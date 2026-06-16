@@ -10,13 +10,15 @@ from typing import Callable
 from modules.ui_nav.errors import UiNavError
 from modules.ui_nav.game_keys import press_game_bind
 
-# Keys bound to buy_rifle_dm in resources/cs2/fsm.cfg (F5 + letter fallbacks).
-_BUY_KEYS = ("f5", "o", "p")
-_BUY_CONSOLE_CMD = "buy ak47; buy m4a1; buy vesthelm"
+# User-confirmed working bind on farm PC; fire first for lowest latency.
+_BUY_KEYS = ("p", "f5", "o")
 
-# Seconds after spawn HUD (in_dm) — player is alive, invuln + buy menu open.
-_DEFAULT_BUY_OFFSETS_SEC = (0.5, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 8.0, 10.0)
-_DEFAULT_BUY_WINDOW_SEC = 8.0
+# Seconds after spawn detect — first burst at 0s (invuln is short).
+_DEFAULT_BUY_OFFSETS_SEC = (0.0, 0.15, 0.35, 0.6, 1.0, 1.5, 2.5, 4.0, 6.0)
+_DEFAULT_BUY_WINDOW_SEC = 10.0
+_EARLY_BUY_AFTER_TEAM_SEC = 2.0
+_EARLY_BUY_INTERVAL_SEC = 0.35
+_EARLY_BUY_MAX_SEC = 28.0
 
 
 def parse_buy_offsets(raw: str | None, default: tuple[float, ...] = _DEFAULT_BUY_OFFSETS_SEC) -> tuple[float, ...]:
@@ -26,6 +28,11 @@ def parse_buy_offsets(raw: str | None, default: tuple[float, ...] = _DEFAULT_BUY
     if not parts:
         return default
     return tuple(max(0.0, float(part)) for part in parts)
+
+
+def press_spawn_buy(hwnd: int, *, focus: bool = True) -> None:
+    """Single fast buy burst — prefer bind p (buy_rifle_dm)."""
+    press_game_bind(hwnd, _BUY_KEYS[0], focus=focus)
 
 
 @dataclass
@@ -99,20 +106,6 @@ class SpawnAutobuyScheduler:
             focus_window(hwnd)
         except UiNavError:
             pass
-        try:
-            from modules.ui_nav.cs2_console import run_cs2_console_commands
-
-            run_cs2_console_commands(hwnd, _BUY_CONSOLE_CMD)
-            self.sent = True
-            if log_step:
-                log_step("dm_autobuy_console", offset_sec=offset, cmd=_BUY_CONSOLE_CMD)
-            return
-        except UiNavError as exc:
-            if on_progress:
-                on_progress(f"dm nav: autobuy console failed ({exc}); trying binds")
-        except Exception as exc:
-            if on_progress:
-                on_progress(f"dm nav: autobuy console failed ({exc}); trying binds")
         for key in self.buy_keys:
             try:
                 press_game_bind(hwnd, key, focus=False)
@@ -154,7 +147,7 @@ def hold_buy_window(
         if should_stop and should_stop():
             break
         sched.tick(hwnd, on_progress=on_progress, log_step=log_step)
-        time.sleep(0.2)
+        time.sleep(0.1)
 
     sent = sched.finish(hwnd, on_progress=on_progress, log_step=log_step)
     return sched, sent

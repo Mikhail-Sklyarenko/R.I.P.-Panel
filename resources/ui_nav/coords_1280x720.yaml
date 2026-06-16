@@ -12,7 +12,7 @@ clicks:
   mode_deathmatch: {x: 667, y: 95}
   start_search: {x: 1125, y: 691}
   leave_match: {x: 1255, y: 19}
-  team_random: {x: 1152, y: 688}
+  team_random: {x: 1104, y: 672}
 
 detectors:
   main_menu:

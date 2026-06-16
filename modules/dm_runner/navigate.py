@@ -59,6 +59,8 @@ class DmNavigator:
         self.on_team_joined = on_team_joined
         self._menu_nav_done = False
         self._spawn_autobuy = None
+        self._team_done_mono: float | None = None
+        self._last_early_buy_mono = 0.0
         self.coords = load_nav_coords_for_hwnd(
             hwnd,
             config.cs_resolution,
@@ -267,19 +269,61 @@ class DmNavigator:
         return "dm_runner: in_dm"
 
     def _bootstrap_cs2_farm_cfg(self) -> None:
-        """Re-copy and exec farm_panel.cfg so binds exist even if +exec ran too early."""
-        if isinstance(self.driver, SimDriver) or not self.hwnd:
+        """Re-copy farm_panel.cfg into game/csgo/cfg (binds already from +exec at launch)."""
+        if isinstance(self.driver, SimDriver):
             return
-        from modules.launcher.cs2 import FARM_PANEL_CFG, redeploy_farm_cfg
-        from modules.ui_nav.cs2_console import run_cs2_console_commands
+        from modules.launcher.cs2 import redeploy_farm_cfg
 
         try:
-            redeploy_farm_cfg(self.config)
-            run_cs2_console_commands(self.hwnd, f"exec {FARM_PANEL_CFG}")
-            self._nav_progress("dm nav: exec farm_panel.cfg (binds reapplied)")
-            self.artifacts.log_step("farm_cfg_exec")
+            path = redeploy_farm_cfg(self.config)
+            self._nav_progress(f"dm nav: deployed {path.name}")
+            self.artifacts.log_step("farm_cfg_deploy")
         except Exception as exc:
             self._nav_progress(f"dm nav: farm_panel.cfg warn ({exc})")
+
+    def _click_team_random_if_visible(self, img=None) -> bool:
+        if isinstance(self.driver, SimDriver):
+            return False
+        frame = img if img is not None else self.driver.capture()
+        if not detect_probe_key(frame, self.coords, "team_select", min_match=1):
+            return False
+        try:
+            pt = self.coords.click("team_random")
+        except KeyError:
+            return False
+        self._nav_progress(f"dm nav: team select (poll) → random @({pt.x},{pt.y})")
+        self.driver.click(pt)
+        self.artifacts.log_step("team_random_poll_click", x=pt.x, y=pt.y)
+        return True
+
+    def _try_early_spawn_buy(self) -> None:
+        """Press p during map load — spawn HUD often appears before in_dm wait ends."""
+        if isinstance(self.driver, SimDriver) or not self.hwnd or self._team_done_mono is None:
+            return
+        from modules.dm_runner.autobuy import (
+            _EARLY_BUY_AFTER_TEAM_SEC,
+            _EARLY_BUY_INTERVAL_SEC,
+            _EARLY_BUY_MAX_SEC,
+            press_spawn_buy,
+        )
+
+        elapsed = time.monotonic() - self._team_done_mono
+        if elapsed < _EARLY_BUY_AFTER_TEAM_SEC or elapsed > _EARLY_BUY_MAX_SEC:
+            return
+        now = time.monotonic()
+        if now - self._last_early_buy_mono < _EARLY_BUY_INTERVAL_SEC:
+            return
+        self._last_early_buy_mono = now
+        try:
+            press_spawn_buy(self.hwnd, focus=True)
+            self._nav_progress(f"dm nav: early buy p (+{elapsed:.1f}s after team)")
+            self.artifacts.log_step("dm_autobuy_early_p", elapsed_after_team=round(elapsed, 2))
+            if self._spawn_autobuy is None:
+                self._arm_spawn_autobuy(reason="early buy during load")
+            elif self._spawn_autobuy:
+                self._spawn_autobuy.sent = True
+        except UiNavError as exc:
+            self._nav_progress(f"dm nav: early buy p failed ({exc})")
 
     def _ensure_team_joined(self) -> None:
         """Blocking team-pick phase before map load / spawn."""
@@ -295,6 +339,7 @@ class DmNavigator:
             log_step=self.artifacts.log_step,
             should_stop=self.should_stop,
         )
+        self._team_done_mono = time.monotonic()
         if self.on_team_joined:
             self.on_team_joined()
 
@@ -317,12 +362,19 @@ class DmNavigator:
             offsets_sec=offsets,
         )
         self._nav_progress(f"dm nav: autobuy armed ({reason})")
+        self._spawn_autobuy.tick(
+            self.hwnd,
+            on_progress=self._nav_progress,
+            log_step=self.artifacts.log_step,
+        )
 
     def _on_in_dm_poll(self, img=None) -> None:
-        """Tick autobuy while waiting for spawn HUD during map load."""
+        """Team join + early buy while waiting for spawn HUD during map load."""
         if isinstance(self.driver, SimDriver):
             return
         frame = img if img is not None else self.driver.capture()
+        self._click_team_random_if_visible(frame)
+        self._try_early_spawn_buy()
         if self._spawn_autobuy is None and self._spawn_hud_visible(frame):
             self._arm_spawn_autobuy(reason="spawn HUD during load")
         if self._spawn_autobuy is not None:
@@ -373,8 +425,8 @@ class DmNavigator:
         self._confirm_search_started()
 
         self._set_sim_phase(ScreenState.IN_DM)
-        self._bootstrap_cs2_farm_cfg()
         self._ensure_team_joined()
+        self._bootstrap_cs2_farm_cfg()
         result = wait_for_in_dm(
             self.driver,
             self.coords,

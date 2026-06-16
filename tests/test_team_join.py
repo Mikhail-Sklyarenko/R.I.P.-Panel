@@ -42,6 +42,30 @@ def test_wait_team_select_timeout() -> None:
         "modules.dm_runner.team_join.detect_probe_key",
         return_value=True,
     ):
-        with patch("modules.dm_runner.team_join.time.monotonic", side_effect=[0.0, 100.0]):
-            with pytest.raises(UiNavTimeoutError):
-                wait_team_select_done(driver, coords, timeout_sec=5.0, click_retry_sec=0.0)
+        with patch("modules.dm_runner.team_join.time.monotonic", side_effect=[0.0, 0.1, 100.0]):
+            with patch("modules.dm_runner.team_join.time.sleep"):
+                with pytest.raises(UiNavTimeoutError):
+                    wait_team_select_done(driver, coords, timeout_sec=5.0, click_retry_sec=0.0)
+
+
+def test_wait_team_select_keeps_clicking_when_probe_never_matches() -> None:
+    coords = load_nav_coords("1280x720")
+    driver = MagicMock()
+    driver.capture.return_value = object()
+    clock = iter([0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 100.0])
+
+    with patch(
+        "modules.dm_runner.team_join.detect_probe_key",
+        return_value=False,
+    ):
+        with patch("modules.dm_runner.team_join.time.monotonic", side_effect=lambda: next(clock, 100.0)):
+            with patch("modules.dm_runner.team_join.time.sleep"):
+                with pytest.raises(UiNavTimeoutError):
+                    wait_team_select_done(
+                        driver,
+                        coords,
+                        timeout_sec=2.0,
+                        click_retry_sec=0.0,
+                    )
+
+    assert driver.click.call_count >= 3

@@ -120,11 +120,11 @@ class AppConfig(BaseModel):
         description="Deprecated extra delay before buy; use dm_autobuy_offsets_sec",
     )
     dm_autobuy_offsets_sec: str = Field(
-        default="0.5,1,2,3,4,5,6,8,10",
+        default="0,0.15,0.35,0.6,1,1.5,2.5,4,6",
         description="Buy key times (sec) after spawn HUD — inside DM invuln window",
     )
     dm_autobuy_window_sec: int = Field(
-        default=8,
+        default=10,
         ge=5,
         le=30,
         description="Stand-still buy window (sec) after spawn HUD before combat AI",
