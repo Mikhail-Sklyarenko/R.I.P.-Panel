@@ -17,6 +17,8 @@ from controls.autobuy import (  # noqa: E402
     buy_key_for_team,
     resolve_autobuy_enabled,
     resolve_autobuy_interval,
+    resolve_buy_on_respawn,
+    resolve_periodic_buy,
     resolve_respawn_burst_cooldown,
     resolve_respawn_burst_delays,
     resolve_respawn_patrol_freeze,
@@ -56,6 +58,7 @@ def test_periodic_burst_respects_interval() -> None:
         interval_sec=1.0,
         burst_count=1,
         burst_gap_sec=0.0,
+        periodic_buy=True,
     )
     pressed: list[str] = []
     state = AutoBuyState()
@@ -100,6 +103,8 @@ def test_spawn_window_schedules_no_immediate_press_on_death() -> None:
         interval_sec=10.0,
         burst_count=1,
         burst_gap_sec=0.0,
+        buy_on_respawn=True,
+        periodic_buy=True,
         respawn_burst_delays_sec=(0.4, 0.9, 1.4),
         respawn_patrol_freeze_sec=5.0,
         respawn_burst_cooldown_sec=0.5,
@@ -170,6 +175,7 @@ def test_respawn_stagger_respects_cooldown() -> None:
         interval_sec=10.0,
         burst_count=1,
         burst_gap_sec=0.0,
+        buy_on_respawn=True,
         respawn_burst_delays_sec=(0.2,),
         respawn_burst_cooldown_sec=0.5,
     )
@@ -243,7 +249,7 @@ def test_respawn_stagger_respects_cooldown() -> None:
         now=1.4,
         press=pressed.append,
     )
-    assert pressed == ["f5", "f5", "f5"]
+    assert pressed == ["f5", "f5"]
 
     update_autobuy(
         state,
@@ -272,7 +278,7 @@ def test_respawn_stagger_respects_cooldown() -> None:
         now=1.81,
         press=pressed.append,
     )
-    assert pressed == ["f5", "f5", "f5", "f5"]
+    assert pressed == ["f5", "f5", "f5"]
 
 
 def test_freeze_uses_faster_buy_interval() -> None:
@@ -281,6 +287,8 @@ def test_freeze_uses_faster_buy_interval() -> None:
         interval_sec=1.0,
         burst_count=1,
         burst_gap_sec=0.0,
+        buy_on_respawn=True,
+        periodic_buy=True,
         respawn_burst_delays_sec=(10.0,),
         respawn_patrol_freeze_sec=12.0,
         respawn_burst_cooldown_sec=0.5,
@@ -346,6 +354,50 @@ def test_team_change_triggers_burst() -> None:
     assert pressed.count("f5") == 4
 
 
+def test_death_does_not_buy_when_respawn_disabled() -> None:
+    cfg = AutoBuyConfig(
+        enabled=True,
+        burst_count=1,
+        burst_gap_sec=0.0,
+        buy_on_respawn=False,
+        periodic_buy=False,
+    )
+    pressed: list[str] = []
+    state = AutoBuyState()
+
+    update_autobuy(
+        state,
+        config=cfg,
+        team="ct",
+        in_combat=False,
+        activated=True,
+        now=1.0,
+        press=pressed.append,
+    )
+    assert pressed == ["f5"]
+
+    update_autobuy(
+        state,
+        config=cfg,
+        team="ct",
+        in_combat=True,
+        activated=True,
+        now=5.0,
+        press=pressed.append,
+    )
+    update_autobuy(
+        state,
+        config=cfg,
+        team="ct",
+        in_combat=False,
+        activated=True,
+        now=6.0,
+        press=pressed.append,
+    )
+    assert pressed == ["f5"]
+    assert state.patrol_freeze_until == pytest.approx(3.0)
+
+
 def test_env_resolvers_autobuy(monkeypatch) -> None:
     monkeypatch.setenv("CSGOBOT_AUTO_BUY", "0")
     monkeypatch.setenv("CSGOBOT_AUTO_BUY_INTERVAL", "2")
@@ -353,8 +405,12 @@ def test_env_resolvers_autobuy(monkeypatch) -> None:
     monkeypatch.setenv("CSGOBOT_AUTOBUY_RESPAWN_COOLDOWN_MS", "800")
     monkeypatch.setenv("CSGOBOT_AUTOBUY_PATROL_FREEZE_MS", "1500")
     monkeypatch.setenv("CSGOBOT_AUTOBUY_STARTUP_FREEZE_MS", "900")
+    monkeypatch.setenv("CSGOBOT_AUTOBUY_RESPAWN", "1")
+    monkeypatch.setenv("CSGOBOT_AUTOBUY_PERIODIC", "0")
     assert resolve_autobuy_enabled(True) is False
     assert resolve_autobuy_interval(1.0) == 2.0
+    assert resolve_buy_on_respawn(False) is True
+    assert resolve_periodic_buy(True) is False
     assert resolve_respawn_burst_delays() == (0.1, 0.25)
     assert resolve_respawn_burst_cooldown(0.5) == 0.8
     assert resolve_respawn_patrol_freeze(12.0) == 1.5
@@ -375,6 +431,8 @@ def test_create_config_autobuy_defaults(monkeypatch) -> None:
     assert cfg.autobuy.interval_sec == 1.0
     assert cfg.autobuy.buy_key == "f5"
     assert cfg.autobuy.burst_count == 2
+    assert cfg.autobuy.buy_on_respawn is False
+    assert cfg.autobuy.periodic_buy is False
     assert cfg.autobuy.respawn_burst_delays_sec[0] == 0.3
     assert cfg.autobuy.respawn_burst_cooldown_sec == 0.5
     assert cfg.autobuy.respawn_patrol_freeze_sec == 12.0

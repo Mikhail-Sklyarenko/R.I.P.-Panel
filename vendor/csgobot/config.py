@@ -245,6 +245,8 @@ class AutoBuyConfig:
     respawn_burst_cooldown_sec: float = 0.5
     respawn_patrol_freeze_sec: float = 12.0
     startup_patrol_freeze_sec: float = 2.0
+    buy_on_respawn: bool = False
+    periodic_buy: bool = False
     ct_key: str = "f5"
     t_key: str = "f5"
 

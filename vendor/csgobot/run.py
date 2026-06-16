@@ -103,6 +103,8 @@ UNSTUCK_COOLDOWN_SEC = 3.0
 AUTO_BUY_RIFLE = True
 AUTO_BUY_INTERVAL_SEC = 1.0
 AUTO_BUY_KEY = "f5"  # pydirectinput breaks Insert; F5 → buy_rifle_dm in fsm.cfg
+AUTO_BUY_ON_RESPAWN = False  # DM keeps weapons after death — startup buy only
+AUTO_BUY_PERIODIC = False
 AUTO_BUY_RESPAWN_DELAYS_SEC = (
     0.3, 0.5, 0.8, 1.0, 1.2, 1.5, 2.0, 2.5, 3.0, 4.0, 5.0, 6.0, 8.0, 10.0, 11.0,
 )
@@ -331,6 +333,8 @@ def create_config() -> AppConfig:
     from controls.autobuy import (
         resolve_autobuy_enabled,
         resolve_autobuy_interval,
+        resolve_buy_on_respawn,
+        resolve_periodic_buy,
         resolve_respawn_burst_cooldown,
         resolve_respawn_burst_delays,
         resolve_respawn_patrol_freeze,
@@ -343,6 +347,8 @@ def create_config() -> AppConfig:
         buy_key=AUTO_BUY_KEY,
         ct_key=AUTO_BUY_KEY,
         t_key=AUTO_BUY_KEY,
+        buy_on_respawn=resolve_buy_on_respawn(AUTO_BUY_ON_RESPAWN),
+        periodic_buy=resolve_periodic_buy(AUTO_BUY_PERIODIC),
         respawn_burst_delays_sec=resolve_respawn_burst_delays(
             AUTO_BUY_RESPAWN_DELAYS_SEC,
         ),
@@ -523,8 +529,8 @@ def main() -> int:
         logger.info("Map detect: disabled (CSGOBOT_AUTO_MAP=0 or CSGOBOT_PATROL_SCRIPT)")
     logger.info(
         f"Autobuy: enabled={config.autobuy.enabled} "
-        f"interval={config.autobuy.interval_sec}s "
-        f"key={config.autobuy.buy_key} burst={config.autobuy.burst_count}"
+        f"key={config.autobuy.buy_key} burst={config.autobuy.burst_count} "
+        f"respawn={config.autobuy.buy_on_respawn} periodic={config.autobuy.periodic_buy}"
     )
     try:
         import torch

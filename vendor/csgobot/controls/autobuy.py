@@ -1,4 +1,4 @@
-"""DM rifle autobuy — burst buy on interval, team change, and respawn heuristic."""
+"""DM rifle autobuy — one-time startup buy (weapons persist after death in DM)."""
 
 from __future__ import annotations
 
@@ -28,6 +28,16 @@ def _env_bool(name: str) -> bool | None:
     if raw in ("0", "false", "no", "off"):
         return False
     return None
+
+
+def resolve_buy_on_respawn(default: bool) -> bool:
+    val = _env_bool("CSGOBOT_AUTOBUY_RESPAWN")
+    return default if val is None else val
+
+
+def resolve_periodic_buy(default: bool) -> bool:
+    val = _env_bool("CSGOBOT_AUTOBUY_PERIODIC")
+    return default if val is None else val
 
 
 def resolve_autobuy_enabled(default: bool) -> bool:
@@ -188,9 +198,9 @@ def update_autobuy(
     press: Callable[[str], None],
 ) -> AutoBuyState:
     """
-    Periodic burst buy + spawn-window scheduling after combat ends (death).
+    Startup burst buy; optional team-change / periodic / respawn buys.
 
-    DM buy closes on WASD — hold patrol through spawn invulnerability, buy while still.
+    DM default: startup only — loadout persists after death, no freeze on respawn.
     """
     if not config.enabled or not activated:
         return state
@@ -226,7 +236,11 @@ def update_autobuy(
         state.was_in_combat = in_combat
         return state
 
-    if state.was_in_combat and not in_combat:
+    if (
+        config.buy_on_respawn
+        and state.was_in_combat
+        and not in_combat
+    ):
         if now - state.last_respawn_burst >= config.respawn_burst_cooldown_sec:
             _schedule_spawn_buy_window(
                 state,
@@ -238,6 +252,9 @@ def update_autobuy(
             state.last_pulse = now
 
     state.was_in_combat = in_combat
+
+    if not config.periodic_buy:
+        return state
 
     buy_interval = config.interval_sec
     if state.spawn_freeze_active and state.patrol_freeze_until > now:
