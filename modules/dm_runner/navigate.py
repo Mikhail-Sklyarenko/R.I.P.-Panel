@@ -56,6 +56,7 @@ class DmNavigator:
         self.menu_confirmed = menu_confirmed
         self.should_stop = should_stop
         self._menu_nav_done = False
+        self._spawn_autobuy = None
         self.coords = load_nav_coords_for_hwnd(
             hwnd,
             config.cs_resolution,
@@ -285,17 +286,37 @@ class DmNavigator:
         )
         self.driver.click(pt)
         self.artifacts.log_step("team_random_click", x=pt.x, y=pt.y)
+        self._arm_spawn_autobuy()
         time.sleep(2.0)
 
-    def _dm_startup_autobuy(self) -> None:
-        """F5/o → buy_rifle_dm via DirectInput after spawn buy window."""
-        if isinstance(self.driver, SimDriver) or not self.hwnd:
-            return
-        from modules.dm_runner.autobuy import run_startup_autobuy
+    def _arm_spawn_autobuy(self) -> None:
+        from modules.dm_runner.autobuy import SpawnAutobuyScheduler, parse_buy_offsets
 
-        run_startup_autobuy(
+        offsets = parse_buy_offsets(self.config.dm_autobuy_offsets_sec)
+        self._spawn_autobuy = SpawnAutobuyScheduler(
+            spawn_mono=time.monotonic(),
+            offsets_sec=offsets,
+        )
+
+    def _on_in_dm_poll(self, img=None) -> None:
+        """Team join + buy binds during map load (inside invuln window)."""
+        self._try_join_team_if_needed(img)
+        if self._spawn_autobuy is not None:
+            self._spawn_autobuy.tick(
+                self.hwnd,
+                on_progress=self._nav_progress,
+                log_step=self.artifacts.log_step,
+            )
+
+    def _finish_spawn_autobuy(self) -> None:
+        if self._spawn_autobuy is None:
+            return
+        extra = float(self.config.dm_autobuy_spawn_wait_sec)
+        if extra > 0:
+            self._nav_progress(f"dm nav: autobuy legacy wait {extra:.0f}s")
+            time.sleep(extra)
+        self._spawn_autobuy.finish(
             self.hwnd,
-            spawn_wait_sec=float(self.config.dm_autobuy_spawn_wait_sec),
             on_progress=self._nav_progress,
             log_step=self.artifacts.log_step,
         )
@@ -318,7 +339,7 @@ class DmNavigator:
             self._nav_progress("dm nav: in_dm on frame; skip wait")
         else:
             self._nav_progress("dm nav: soft in_dm on frame; skip wait")
-        self._dm_startup_autobuy()
+        self._finish_spawn_autobuy()
         self._e(EventType.IN_DM, self._in_dm_detail(soft_peek=not strict))
         return True
 
@@ -334,9 +355,9 @@ class DmNavigator:
             timeout_sec=float(self.config.map_load_delay_sec),
             soft_min_match=self.config.in_dm_min_match,
             on_progress=self._nav_progress,
-            on_poll=self._try_join_team_if_needed,
+            on_poll=self._on_in_dm_poll,
         )
-        self._dm_startup_autobuy()
+        self._finish_spawn_autobuy()
         self._e(EventType.IN_DM, self._in_dm_detail(soft_peek=result.soft_peek))
 
     def _click_target(self, name: str) -> None:

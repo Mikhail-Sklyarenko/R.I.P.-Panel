@@ -114,10 +114,14 @@ class AppConfig(BaseModel):
         default=5, ge=1, description="FSM SEARCH_RETRIES_BEFORE_SHUFFLE"
     )
     dm_autobuy_spawn_wait_sec: int = Field(
-        default=10,
+        default=0,
         ge=0,
         le=30,
-        description="Seconds after in_dm before F5 buy (DM spawn invuln window)",
+        description="Deprecated extra delay before buy; use dm_autobuy_offsets_sec",
+    )
+    dm_autobuy_offsets_sec: str = Field(
+        default="3,5,7,9,11",
+        description="Buy key times (sec) after team random click — inside DM invuln window",
     )
     cs_resolution: str = Field(
         default="360x270", description="Разрешение CS2 для ui_nav coords"

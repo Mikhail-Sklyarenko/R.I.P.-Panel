@@ -457,3 +457,4 @@ def test_create_config_autobuy_defaults(monkeypatch) -> None:
     assert cfg.autobuy.respawn_burst_cooldown_sec == 0.5
     assert cfg.autobuy.respawn_patrol_freeze_sec == 12.0
     assert cfg.autobuy.startup_patrol_freeze_sec == 12.0
+    assert cfg.autobuy.startup_retry_delays_sec == ()
