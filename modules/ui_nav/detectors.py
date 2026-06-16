@@ -196,7 +196,7 @@ def wait_for_in_dm(
         probe_results = probe_match_results(img, ScreenState.IN_DM, coords)
         last_probe_results = probe_results
         soft_hit = sum(1 for r in probe_results if r.matched) >= soft_required
-        if detect_probe_key(img, coords, "team_select"):
+        if detect_probe_key(img, coords, "team_select", min_match=1):
             soft_hit = False
         if soft_hit:
             consecutive_soft += 1

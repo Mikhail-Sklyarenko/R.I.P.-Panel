@@ -57,12 +57,12 @@ def test_build_cs2_command_uses_steam_applaunch_vac_safe(tmp_path) -> None:
     assert cmd[1:3] == ["-applaunch", "730"]
     assert cmd[-1] == FARM_PANEL_CFG
     assert (cfg_dir / FARM_PANEL_CFG).is_file()
-    assert "-windowed" not in cmd
+    assert "-console" in cmd
     assert not (cfg_dir / "video.txt").exists()
 
 
 def test_build_cs2_command_legacy_deploy_when_vac_safe_off(tmp_path) -> None:
-    from modules.launcher.cs2 import build_cs2_command
+    from modules.launcher.cs2 import FARM_PANEL_CFG, build_cs2_command
 
     win64 = tmp_path / "CS2" / "game" / "bin" / "win64"
     cfg_dir = tmp_path / "CS2" / "game" / "csgo" / "cfg"
@@ -79,7 +79,7 @@ def test_build_cs2_command_legacy_deploy_when_vac_safe_off(tmp_path) -> None:
         cs2_vac_safe_launch=False,
     )
     cmd = build_cs2_command(cfg)
-    assert str(FSM_CFG.resolve()) in cmd
+    assert cmd[-1] == FARM_PANEL_CFG
     assert (cfg_dir / "video.txt").is_file()
 
 

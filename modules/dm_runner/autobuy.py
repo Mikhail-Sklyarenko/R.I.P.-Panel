@@ -12,6 +12,7 @@ from modules.ui_nav.game_keys import press_game_bind
 
 # Keys bound to buy_rifle_dm in resources/cs2/fsm.cfg (F5 + letter fallbacks).
 _BUY_KEYS = ("f5", "o", "p")
+_BUY_CONSOLE_CMD = "buy ak47; buy m4a1; buy vesthelm"
 
 # Seconds after spawn HUD (in_dm) — player is alive, invuln + buy menu open.
 _DEFAULT_BUY_OFFSETS_SEC = (0.5, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 8.0, 10.0)
@@ -98,6 +99,20 @@ class SpawnAutobuyScheduler:
             focus_window(hwnd)
         except UiNavError:
             pass
+        try:
+            from modules.ui_nav.cs2_console import run_cs2_console_commands
+
+            run_cs2_console_commands(hwnd, _BUY_CONSOLE_CMD)
+            self.sent = True
+            if log_step:
+                log_step("dm_autobuy_console", offset_sec=offset, cmd=_BUY_CONSOLE_CMD)
+            return
+        except UiNavError as exc:
+            if on_progress:
+                on_progress(f"dm nav: autobuy console failed ({exc}); trying binds")
+        except Exception as exc:
+            if on_progress:
+                on_progress(f"dm nav: autobuy console failed ({exc}); trying binds")
         for key in self.buy_keys:
             try:
                 press_game_bind(hwnd, key, focus=False)

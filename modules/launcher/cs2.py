@@ -106,7 +106,15 @@ def deploy_cs2_configs(
     if not convars_src.is_file():
         raise LauncherError(f"missing resource: {convars_src}")
     shutil.copy2(convars_src, cfg_dir / convars_src.name)
-    return str(fsm_cfg.resolve())
+    return FARM_PANEL_CFG
+
+
+def redeploy_farm_cfg(config: AppConfig) -> Path:
+    """Copy resources/cs2/fsm.cfg → game/csgo/cfg/farm_panel.cfg."""
+    vac_safe = bool(config.cs2_vac_safe_launch)
+    exe = resolve_cs2_exe(config)
+    deploy_cs2_configs(exe, config.cs_resolution, vac_safe=vac_safe)
+    return find_csgo_cfg_dir(exe) / FARM_PANEL_CFG
 
 
 def build_cs2_command(config: AppConfig) -> list[str]:

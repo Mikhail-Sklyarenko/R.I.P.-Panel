@@ -266,6 +266,21 @@ class DmNavigator:
             return "dm_runner: in_dm (soft_peek)"
         return "dm_runner: in_dm"
 
+    def _bootstrap_cs2_farm_cfg(self) -> None:
+        """Re-copy and exec farm_panel.cfg so binds exist even if +exec ran too early."""
+        if isinstance(self.driver, SimDriver) or not self.hwnd:
+            return
+        from modules.launcher.cs2 import FARM_PANEL_CFG, redeploy_farm_cfg
+        from modules.ui_nav.cs2_console import run_cs2_console_commands
+
+        try:
+            redeploy_farm_cfg(self.config)
+            run_cs2_console_commands(self.hwnd, f"exec {FARM_PANEL_CFG}")
+            self._nav_progress("dm nav: exec farm_panel.cfg (binds reapplied)")
+            self.artifacts.log_step("farm_cfg_exec")
+        except Exception as exc:
+            self._nav_progress(f"dm nav: farm_panel.cfg warn ({exc})")
+
     def _ensure_team_joined(self) -> None:
         """Blocking team-pick phase before map load / spawn."""
         if isinstance(self.driver, SimDriver):
@@ -358,6 +373,7 @@ class DmNavigator:
         self._confirm_search_started()
 
         self._set_sim_phase(ScreenState.IN_DM)
+        self._bootstrap_cs2_farm_cfg()
         self._ensure_team_joined()
         result = wait_for_in_dm(
             self.driver,

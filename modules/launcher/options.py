@@ -38,6 +38,7 @@ def get_steam_launch_argv(*, classic_ui: bool = False) -> list[str]:
 
 def get_cs2_launch_argv(*, vac_safe: bool = False) -> list[str]:
     if vac_safe:
-        return []
+        # Dev console for in-game `exec farm_panel.cfg` / buy commands when binds drift.
+        return ["-console"]
     raw = _parse_launch_options_file().get("cs2", "")
     return shlex.split(raw, posix=False) if raw else []

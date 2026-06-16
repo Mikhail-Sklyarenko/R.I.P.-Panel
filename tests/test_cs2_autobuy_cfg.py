@@ -28,6 +28,7 @@ def test_fsm_binds_autobuy_keys() -> None:
     assert 'bind scancode63 "buy_rifle_dm"' in text
     assert 'bind insert "buy_rifle_dm"' in text
     assert 'bind o "buy_rifle_dm"' in text
+    assert 'bind p "buy_rifle_dm"' in text
 
 
 def test_fsm_buy_commands_present() -> None:
