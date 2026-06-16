@@ -14,7 +14,29 @@ from modules.dm_runner.autobuy import (
 
 def test_parse_buy_offsets() -> None:
     assert parse_buy_offsets("3,5,7") == (3.0, 5.0, 7.0)
-    assert parse_buy_offsets("") == (3.0, 5.0, 7.0, 9.0, 11.0)
+    assert parse_buy_offsets("") == (0.5, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 8.0, 10.0)
+
+
+def test_hold_buy_window_delegates_to_scheduler() -> None:
+    sched = SpawnAutobuyScheduler(spawn_mono=100.0, offsets_sec=(0.0,))
+    clock = iter([100.0, 100.0, 100.6])
+
+    with patch("modules.dm_runner.autobuy.sys.platform", "win32"):
+        with patch.object(sched, "tick") as tick:
+            with patch.object(sched, "finish", return_value=True) as finish:
+                with patch(
+                    "modules.dm_runner.autobuy.time.monotonic",
+                    side_effect=lambda: next(clock, 100.6),
+                ):
+                    with patch("modules.dm_runner.autobuy.time.sleep"):
+                        from modules.dm_runner.autobuy import hold_buy_window
+
+                        out, sent = hold_buy_window(1, sched, window_sec=0.5)
+
+    assert sent is True
+    assert out is sched
+    assert tick.called
+    finish.assert_called_once()
 
 
 def test_scheduler_fires_when_elapsed() -> None:

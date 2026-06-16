@@ -13,8 +13,9 @@ from modules.ui_nav.game_keys import press_game_bind
 # Keys bound to buy_rifle_dm in resources/cs2/fsm.cfg (F5 + letter fallback).
 _BUY_KEYS = ("f5", "o")
 
-# Seconds after «Случайный выбор» while spawn invuln + buy menu is open (stand still).
-_DEFAULT_BUY_OFFSETS_SEC = (3.0, 5.0, 7.0, 9.0, 11.0)
+# Seconds after spawn HUD (in_dm) — player is alive, invuln + buy menu open.
+_DEFAULT_BUY_OFFSETS_SEC = (0.5, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 8.0, 10.0)
+_DEFAULT_BUY_WINDOW_SEC = 12.0
 
 
 def parse_buy_offsets(raw: str | None, default: tuple[float, ...] = _DEFAULT_BUY_OFFSETS_SEC) -> tuple[float, ...]:
@@ -48,8 +49,8 @@ class SpawnAutobuyScheduler:
             return
         if not self._logged_start and on_progress:
             on_progress(
-                "dm nav: autobuy armed from team join "
-                f"({','.join(f'{o:.0f}s' for o in self.offsets_sec)})"
+                "dm nav: autobuy armed on spawn HUD "
+                f"({','.join(f'{o:.1f}s' for o in self.offsets_sec)})"
             )
             self._logged_start = True
 
@@ -103,6 +104,39 @@ class SpawnAutobuyScheduler:
                 return
         if log_step:
             log_step("dm_autobuy_burst", offset_sec=offset, keys=list(self.buy_keys))
+
+
+def hold_buy_window(
+    hwnd: int | None,
+    scheduler: SpawnAutobuyScheduler | None,
+    *,
+    window_sec: float = _DEFAULT_BUY_WINDOW_SEC,
+    on_progress: Callable[[str], None] | None = None,
+    log_step: Callable[..., None] | None = None,
+    should_stop: Callable[[], bool] | None = None,
+) -> tuple[SpawnAutobuyScheduler, bool]:
+    """
+    Stand still and fire scheduled buys until window ends (before combat AI).
+
+    Returns (scheduler, sent_any).
+    """
+    sched = scheduler or SpawnAutobuyScheduler(spawn_mono=time.monotonic())
+    if hwnd is None or sys.platform != "win32":
+        return sched, False
+
+    window = max(0.5, window_sec)
+    deadline = sched.spawn_mono + window
+    if on_progress:
+        on_progress(f"dm nav: buy window {window:.0f}s from spawn (stand still)")
+
+    while time.monotonic() < deadline:
+        if should_stop and should_stop():
+            break
+        sched.tick(hwnd, on_progress=on_progress, log_step=log_step)
+        time.sleep(0.2)
+
+    sent = sched.finish(hwnd, on_progress=on_progress, log_step=log_step)
+    return sched, sent
 
 
 def run_startup_autobuy(

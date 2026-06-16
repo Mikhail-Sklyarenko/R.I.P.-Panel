@@ -286,10 +286,9 @@ class DmNavigator:
         )
         self.driver.click(pt)
         self.artifacts.log_step("team_random_click", x=pt.x, y=pt.y)
-        self._arm_spawn_autobuy()
         time.sleep(2.0)
 
-    def _arm_spawn_autobuy(self) -> None:
+    def _arm_spawn_autobuy(self, *, reason: str = "spawn") -> None:
         from modules.dm_runner.autobuy import SpawnAutobuyScheduler, parse_buy_offsets
 
         offsets = parse_buy_offsets(self.config.dm_autobuy_offsets_sec)
@@ -297,29 +296,27 @@ class DmNavigator:
             spawn_mono=time.monotonic(),
             offsets_sec=offsets,
         )
+        self._nav_progress(f"dm nav: autobuy armed ({reason})")
 
     def _on_in_dm_poll(self, img=None) -> None:
-        """Team join + buy binds during map load (inside invuln window)."""
-        self._try_join_team_if_needed(img)
-        if self._spawn_autobuy is not None:
-            self._spawn_autobuy.tick(
-                self.hwnd,
-                on_progress=self._nav_progress,
-                log_step=self.artifacts.log_step,
-            )
+        """Team join during map load (buy window starts after in_dm confirmed)."""
+        frame = img if img is not None else self.driver.capture()
+        self._try_join_team_if_needed(frame)
 
-    def _finish_spawn_autobuy(self) -> None:
-        if self._spawn_autobuy is None:
+    def _hold_buy_window_before_combat(self) -> None:
+        if isinstance(self.driver, SimDriver) or not self.hwnd:
             return
-        extra = float(self.config.dm_autobuy_spawn_wait_sec)
-        if extra > 0:
-            self._nav_progress(f"dm nav: autobuy legacy wait {extra:.0f}s")
-            time.sleep(extra)
-        self._spawn_autobuy.finish(
+        from modules.dm_runner.autobuy import hold_buy_window
+
+        sched, _ = hold_buy_window(
             self.hwnd,
+            self._spawn_autobuy,
+            window_sec=float(self.config.dm_autobuy_window_sec),
             on_progress=self._nav_progress,
             log_step=self.artifacts.log_step,
+            should_stop=self.should_stop,
         )
+        self._spawn_autobuy = sched
 
     def _emit_in_dm_if_already_on_frame(self) -> bool:
         """Retry fast-path: skip map_load_delay when soft/strict in_dm visible."""
@@ -339,7 +336,8 @@ class DmNavigator:
             self._nav_progress("dm nav: in_dm on frame; skip wait")
         else:
             self._nav_progress("dm nav: soft in_dm on frame; skip wait")
-        self._finish_spawn_autobuy()
+        self._arm_spawn_autobuy(reason="in_dm fast-path")
+        self._hold_buy_window_before_combat()
         self._e(EventType.IN_DM, self._in_dm_detail(soft_peek=not strict))
         return True
 
@@ -357,7 +355,8 @@ class DmNavigator:
             on_progress=self._nav_progress,
             on_poll=self._on_in_dm_poll,
         )
-        self._finish_spawn_autobuy()
+        self._arm_spawn_autobuy(reason="in_dm confirmed")
+        self._hold_buy_window_before_combat()
         self._e(EventType.IN_DM, self._in_dm_detail(soft_peek=result.soft_peek))
 
     def _click_target(self, name: str) -> None:
