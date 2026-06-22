@@ -19,7 +19,10 @@ def _convars() -> str:
 
 def test_fsm_has_team_agnostic_rifle_alias() -> None:
     text = _fsm_cfg()
-    assert 'alias buy_rifle_dm "buy ak47; buy m4a1; buy vesthelm"' in text
+    assert "alias buy_rifle_dm" in text
+    assert "buy ak47" in text
+    assert "buy m4a1_silencer" in text
+    assert "buy vesthelm" in text
 
 
 def test_fsm_binds_autobuy_keys() -> None:
@@ -34,7 +37,8 @@ def test_fsm_binds_autobuy_keys() -> None:
 def test_fsm_buy_commands_present() -> None:
     text = _fsm_cfg()
     assert "buy ak47" in text
-    assert "buy m4a1" in text
+    assert "buy m4a1_silencer" in text
+    assert "buy m4a4" in text
 
 
 def test_fsm_sets_cl_dm_buyrandomweapons_off() -> None:

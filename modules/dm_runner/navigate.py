@@ -368,13 +368,47 @@ class DmNavigator:
         self._click_team_random_if_visible(frame)
         self._try_early_spawn_buy()
 
+    def _reload_farm_cfg_in_game(self) -> None:
+        """Reload binds after redeploy (CT rifle names may differ from launch +exec)."""
+        if isinstance(self.driver, SimDriver) or not self.hwnd:
+            return
+        from modules.ui_nav.cs2_console import run_cs2_console_commands
+
+        try:
+            run_cs2_console_commands(self.hwnd, "exec farm_panel.cfg")
+            self._nav_progress("dm nav: exec farm_panel.cfg (reload binds)")
+            self.artifacts.log_step("farm_cfg_exec")
+        except UiNavError as exc:
+            self._nav_progress(f"dm nav: exec farm_panel.cfg warn ({exc})")
+
+    def _wait_strict_spawn_hud(self, *, timeout_sec: float = 20.0) -> bool:
+        """Alive on map: strict in_dm (timer + health HUD), not load-screen timer only."""
+        if isinstance(self.driver, SimDriver) or not self.hwnd:
+            return True
+        deadline = time.monotonic() + max(3.0, timeout_sec)
+        while time.monotonic() < deadline:
+            if self.should_stop and self.should_stop():
+                return False
+            img = self.driver.capture()
+            if detect_probe_key(img, self.coords, "team_select", min_match=1):
+                time.sleep(0.2)
+                continue
+            if detect_state(img, ScreenState.IN_DM, self.coords):
+                self._nav_progress("dm nav: spawn HUD strict ok")
+                return True
+            time.sleep(0.25)
+        self._nav_progress("dm nav: spawn HUD strict timeout (trying buy anyway)")
+        return False
+
     def _hold_buy_window_before_combat(self) -> None:
         if isinstance(self.driver, SimDriver) or not self.hwnd:
             return
-        from modules.dm_runner.autobuy import hold_buy_window, parse_buy_offsets
+        from modules.dm_runner.autobuy import hold_buy_window
 
-        # Re-anchor buy window to in_dm confirm — load-time arming fires too early.
-        self._arm_spawn_autobuy(reason="in_dm buy window")
+        self._wait_strict_spawn_hud()
+        self._reload_farm_cfg_in_game()
+        # Re-anchor buy window to spawn HUD — not map-load timer.
+        self._arm_spawn_autobuy(reason="spawn HUD buy window")
         sched, _ = hold_buy_window(
             self.hwnd,
             self._spawn_autobuy,
