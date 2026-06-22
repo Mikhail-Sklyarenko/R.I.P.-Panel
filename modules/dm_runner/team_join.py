@@ -9,8 +9,10 @@ from modules.ui_nav.coords import NavCoords
 from modules.ui_nav.detectors import ScreenState, detect_probe_key, detect_state
 from modules.ui_nav.errors import UiNavTimeoutError
 
-# Cap blind LMB clicks — each click is +attack when team overlay is already gone.
-_MAX_BLIND_CLICKS = 3
+# Cap blind LMB when overlay probes miss — each click is +attack in-game.
+_MAX_BLIND_CLICKS = 5
+# Wait for team overlay before first blind click (screen appears after match accept).
+_TEAM_OVERLAY_GRACE_SEC = 2.0
 
 
 class _TeamDriver(Protocol):
@@ -21,7 +23,7 @@ class _TeamDriver(Protocol):
 
 def past_team_select_screen(img, coords: NavCoords) -> bool:
     """True when team overlay is gone and in_dm HUD is visible."""
-    if detect_probe_key(img, coords, "team_select", min_match=2):
+    if detect_probe_key(img, coords, "team_select", min_match=1):
         return False
     return detect_state(img, ScreenState.IN_DM, coords)
 
@@ -61,38 +63,21 @@ def wait_team_select_done(
     coords: NavCoords,
     *,
     timeout_sec: float = 45.0,
-    click_retry_sec: float = 1.0,
+    click_retry_sec: float = 1.2,
     on_progress: Callable[[str], None] | None = None,
     log_step: Callable[..., None] | None = None,
     should_stop: Callable[[], bool] | None = None,
 ) -> int:
     """
-    Click team_random while team_select visible; return when overlay gone.
+    Click team_random until in_dm HUD confirms join.
 
-    Blind clicks are capped: LMB in-game fires the weapon. If color probes miss,
-    exit after clear_streak or when spawn HUD / invuln panel is detected.
+    Never exit on probe miss alone — only past_team_select_screen or timeout.
+    Blind clicks are capped to avoid shooting in-game.
     """
     deadline = time.monotonic() + max(5.0, timeout_sec)
     last_click = 0.0
     clicks = 0
-    saw_team = False
-    clear_streak = 0
-
-    # Immediate click when team screen often appears right after accept.
-    try:
-        _click_team_random(
-            driver,
-            coords,
-            on_progress=on_progress,
-            log_step=log_step,
-            attempt=1,
-            team_visible=False,
-        )
-        clicks = 1
-        last_click = time.monotonic()
-        time.sleep(0.4)
-    except UiNavTimeoutError:
-        raise
+    started = time.monotonic()
 
     while time.monotonic() < deadline:
         if should_stop and should_stop():
@@ -104,32 +89,32 @@ def wait_team_select_done(
                 on_progress("dm nav: team select cleared (in_dm HUD)")
             return clicks
 
-        team_visible = detect_probe_key(img, coords, "team_select", min_match=2)
-        if team_visible:
-            saw_team = True
-            clear_streak = 0
-        else:
-            clear_streak += 1
-
-        if clear_streak >= 2 and clicks >= 1:
-            if on_progress:
-                on_progress("dm nav: team select cleared")
-            return clicks
-
+        team_visible = detect_probe_key(img, coords, "team_select", min_match=1)
         now = time.monotonic()
-        if now - last_click >= click_retry_sec:
-            if team_visible or clicks < _MAX_BLIND_CLICKS:
-                _click_team_random(
-                    driver,
-                    coords,
-                    on_progress=on_progress,
-                    log_step=log_step,
-                    attempt=clicks + 1,
-                    team_visible=team_visible,
-                )
-                last_click = now
-                clicks += 1
-                time.sleep(0.35)
+        elapsed = now - started
+
+        may_blind = (
+            not team_visible
+            and clicks < _MAX_BLIND_CLICKS
+            and elapsed >= _TEAM_OVERLAY_GRACE_SEC
+        )
+        may_team = team_visible and (now - last_click >= click_retry_sec)
+
+        if may_team or may_blind:
+            if may_blind and now - last_click < click_retry_sec:
+                time.sleep(0.25)
+                continue
+            _click_team_random(
+                driver,
+                coords,
+                on_progress=on_progress,
+                log_step=log_step,
+                attempt=clicks + 1,
+                team_visible=team_visible,
+            )
+            last_click = now
+            clicks += 1
+            time.sleep(0.35)
 
         time.sleep(0.25)
 

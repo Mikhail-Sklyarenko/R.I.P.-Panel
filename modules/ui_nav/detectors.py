@@ -120,6 +120,63 @@ def detect_probe_key(
     return matched >= min(max(1, required), len(probes))
 
 
+def wait_for_probe_key(
+    driver: NavDriver,
+    coords: NavCoords,
+    key: str,
+    *,
+    timeout_sec: float = 25.0,
+    poll_sec: float = 0.2,
+    min_match: int | None = None,
+    on_progress: Callable[[str], None] | None = None,
+    should_stop: Callable[[], bool] | None = None,
+) -> bool:
+    """Poll until detectors.<key> probes match (e.g. spawn_invuln buy panel)."""
+    deadline = time.monotonic() + max(1.0, timeout_sec)
+    while time.monotonic() < deadline:
+        if should_stop and should_stop():
+            return False
+        img = driver.capture()
+        if detect_probe_key(img, coords, key, min_match=min_match):
+            return True
+        time.sleep(poll_sec)
+    if on_progress:
+        on_progress(f"dm nav: timeout waiting for {key} ({timeout_sec:.0f}s)")
+    return False
+
+
+def wait_for_strict_in_dm(
+    driver: NavDriver,
+    coords: NavCoords,
+    *,
+    timeout_sec: float = 30.0,
+    poll_sec: float = 0.4,
+    consecutive: int = 2,
+    on_progress: Callable[[str], None] | None = None,
+    should_stop: Callable[[], bool] | None = None,
+) -> bool:
+    """Wait until all in_dm probes match for N consecutive polls (spawn HUD)."""
+    probe_count = len(coords.probes("in_dm")) or 1
+    deadline = time.monotonic() + max(1.0, timeout_sec)
+    streak = 0
+    while time.monotonic() < deadline:
+        if should_stop and should_stop():
+            return False
+        img = driver.capture()
+        if detect_probe_key(img, coords, "team_select", min_match=1):
+            streak = 0
+        elif detect_state(img, ScreenState.IN_DM, coords, min_match=probe_count):
+            streak += 1
+            if streak >= max(1, consecutive):
+                return True
+        else:
+            streak = 0
+        time.sleep(poll_sec)
+    if on_progress:
+        on_progress(f"dm nav: timeout waiting for strict spawn HUD ({timeout_sec:.0f}s)")
+    return False
+
+
 def detect_state(
     img: Image.Image,
     state: ScreenState,
@@ -196,7 +253,7 @@ def wait_for_in_dm(
         probe_results = probe_match_results(img, ScreenState.IN_DM, coords)
         last_probe_results = probe_results
         soft_hit = sum(1 for r in probe_results if r.matched) >= soft_required
-        if detect_probe_key(img, coords, "team_select", min_match=1):
+        if detect_probe_key(img, coords, "team_select", min_match=2):
             soft_hit = False
         if soft_hit:
             consecutive_soft += 1

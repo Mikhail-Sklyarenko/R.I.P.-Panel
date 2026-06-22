@@ -310,7 +310,7 @@ class DmNavigator:
         self._team_done_mono = time.monotonic()
 
     def _spawn_hud_visible(self, img) -> bool:
-        if detect_probe_key(img, self.coords, "team_select", min_match=2):
+        if detect_probe_key(img, self.coords, "team_select", min_match=1):
             return False
         return detect_state(
             img,
@@ -332,15 +332,61 @@ class DmNavigator:
         except UiNavError as exc:
             self._nav_progress(f"dm nav: exec farm_panel.cfg warn ({exc})")
 
-    def _run_simple_startup_autobuy(self) -> None:
-        """After in_dm: exec cfg, press p a few times — player must be on the map."""
+    def _wait_spawn_buy_ready(self) -> str:
+        """
+        Wait for spawn buy window before pressing p.
+
+        Returns anchor reason: invuln | strict_hud | fallback.
+        """
+        if isinstance(self.driver, SimDriver) or not self.hwnd:
+            return "fallback"
+
+        from modules.ui_nav.detectors import wait_for_probe_key, wait_for_strict_in_dm
+
+        self._nav_progress("dm nav: waiting for invuln buy panel…")
+        if wait_for_probe_key(
+            self.driver,
+            self.coords,
+            "spawn_invuln",
+            timeout_sec=float(self.config.dm_spawn_invuln_timeout_sec),
+            min_match=2,
+            on_progress=self._nav_progress,
+            should_stop=self.should_stop,
+        ):
+            self._nav_progress("dm nav: invuln buy panel visible")
+            self.artifacts.log_step("spawn_invuln_ok")
+            return "invuln"
+
+        self._nav_progress("dm nav: invuln panel miss; waiting strict spawn HUD")
+        if wait_for_strict_in_dm(
+            self.driver,
+            self.coords,
+            timeout_sec=20.0,
+            on_progress=self._nav_progress,
+            should_stop=self.should_stop,
+        ):
+            self.artifacts.log_step("spawn_hud_strict_ok")
+            return "strict_hud"
+
+        self._nav_progress("dm nav: spawn buy anchor fallback (no invuln/HUD)")
+        return "fallback"
+
+    def _run_simple_startup_autobuy(self, *, anchor: str = "fallback") -> None:
+        """After spawn buy window: exec cfg, press p — player must be alive on map."""
         if isinstance(self.driver, SimDriver) or not self.hwnd or self._startup_buy_done:
             return
         from modules.dm_runner.autobuy import run_simple_startup_autobuy
 
+        if anchor == "invuln":
+            delay = 0.4
+        elif anchor == "strict_hud":
+            delay = min(2.0, float(self.config.dm_autobuy_delay_sec))
+        else:
+            delay = min(2.0, float(self.config.dm_autobuy_delay_sec))
+
         run_simple_startup_autobuy(
             self.hwnd,
-            delay_sec=float(self.config.dm_autobuy_delay_sec),
+            delay_sec=delay,
             presses=int(self.config.dm_autobuy_presses),
             interval_sec=float(self.config.dm_autobuy_interval_sec),
             before_press=self._reload_farm_cfg_in_game,
@@ -358,8 +404,9 @@ class DmNavigator:
         self._combat_preload_started = True
 
     def _finish_spawn_phase(self, *, soft_peek: bool) -> None:
-        """Autobuy → preload AI → in_dm (strict order)."""
-        self._run_simple_startup_autobuy()
+        """Wait spawn buy window → autobuy → preload AI → in_dm."""
+        anchor = self._wait_spawn_buy_ready()
+        self._run_simple_startup_autobuy(anchor=anchor)
         self._start_combat_preload()
         self._e(EventType.IN_DM, self._in_dm_detail(soft_peek=soft_peek))
 
@@ -370,7 +417,7 @@ class DmNavigator:
         except UiNavTimeoutError:
             pass
         img = self.driver.capture()
-        if detect_probe_key(img, self.coords, "team_select", min_match=2):
+        if detect_probe_key(img, self.coords, "team_select", min_match=1):
             return False
         if not self._spawn_hud_visible(img):
             return False

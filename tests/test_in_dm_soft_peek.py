@@ -33,7 +33,7 @@ def test_armoryfarm_in_dm_hud_fixture_strict_and_soft() -> None:
     team = Image.open(AI_PC_1280 / "team_select.png").convert("RGB")
     team720 = team.resize((1280, 720), Image.Resampling.LANCZOS)
     assert detect_state(team720, ScreenState.IN_DM, coords) is False
-    assert detect_probe_key(team720, coords, "team_select", min_match=2) is True
+    assert detect_probe_key(team720, coords, "team_select", min_match=1) is True
 
 
 def _soft_in_dm_image_one_probe(coords) -> Image.Image:
