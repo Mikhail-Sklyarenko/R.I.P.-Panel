@@ -334,27 +334,31 @@ class DmNavigator:
 
     def _wait_spawn_buy_ready(self) -> str:
         """
-        Wait for spawn buy window before pressing p.
+        Wait for spawn buy window; buy immediately on invuln panel.
 
         Returns anchor reason: invuln | strict_hud | fallback.
         """
         if isinstance(self.driver, SimDriver) or not self.hwnd:
             return "fallback"
 
-        from modules.ui_nav.detectors import wait_for_probe_key, wait_for_strict_in_dm
+        from modules.dm_runner.autobuy import wait_invuln_and_autobuy
+        from modules.ui_nav.detectors import wait_for_strict_in_dm
 
         self._nav_progress("dm nav: waiting for invuln buy panel…")
-        if wait_for_probe_key(
+        if wait_invuln_and_autobuy(
+            self.hwnd,
             self.driver,
             self.coords,
-            "spawn_invuln",
             timeout_sec=float(self.config.dm_spawn_invuln_timeout_sec),
-            min_match=2,
+            presses=int(self.config.dm_autobuy_presses),
+            interval_sec=float(self.config.dm_autobuy_interval_sec),
+            before_press=self._reload_farm_cfg_in_game,
             on_progress=self._nav_progress,
+            log_step=self.artifacts.log_step,
             should_stop=self.should_stop,
         ):
-            self._nav_progress("dm nav: invuln buy panel visible")
             self.artifacts.log_step("spawn_invuln_ok")
+            self._startup_buy_done = True
             return "invuln"
 
         self._nav_progress("dm nav: invuln panel miss; waiting strict spawn HUD")
@@ -372,17 +376,12 @@ class DmNavigator:
         return "fallback"
 
     def _run_simple_startup_autobuy(self, *, anchor: str = "fallback") -> None:
-        """After spawn buy window: exec cfg, press p — player must be alive on map."""
+        """Fallback buy burst when invuln wait did not fire keys."""
         if isinstance(self.driver, SimDriver) or not self.hwnd or self._startup_buy_done:
             return
         from modules.dm_runner.autobuy import run_simple_startup_autobuy
 
-        if anchor == "invuln":
-            delay = 0.4
-        elif anchor == "strict_hud":
-            delay = min(2.0, float(self.config.dm_autobuy_delay_sec))
-        else:
-            delay = min(2.0, float(self.config.dm_autobuy_delay_sec))
+        delay = 0.5 if anchor == "strict_hud" else min(1.0, float(self.config.dm_autobuy_delay_sec))
 
         run_simple_startup_autobuy(
             self.hwnd,

@@ -28,7 +28,7 @@ def test_simple_autobuy_waits_then_presses_p() -> None:
     assert ok is True
     assert len(pressed) == 3
     assert any("autobuy wait" in line and "spawn HUD" in line for line in progress)
-    assert any("autobuy p (1/3)" in line for line in progress)
+    assert any("autobuy o (1/3)" in line for line in progress)
 
 
 def test_simple_autobuy_calls_before_press() -> None:

@@ -9,9 +9,8 @@ from modules.ui_nav.coords import NavCoords
 from modules.ui_nav.detectors import ScreenState, detect_probe_key, detect_state
 from modules.ui_nav.errors import UiNavTimeoutError
 
-# Cap blind LMB when overlay probes miss — each click is +attack in-game.
-_MAX_BLIND_CLICKS = 5
-# Wait for team overlay before first blind click (screen appears after match accept).
+# Blind LMB only while team overlay never seen (probes miss before it appears).
+_MAX_BLIND_CLICKS = 3
 _TEAM_OVERLAY_GRACE_SEC = 2.0
 
 
@@ -22,10 +21,13 @@ class _TeamDriver(Protocol):
 
 
 def past_team_select_screen(img, coords: NavCoords) -> bool:
-    """True when team overlay is gone and in_dm HUD is visible."""
+    """True when team overlay is gone and player is on map (strict HUD or invuln)."""
     if detect_probe_key(img, coords, "team_select", min_match=1):
         return False
-    return detect_state(img, ScreenState.IN_DM, coords)
+    if detect_probe_key(img, coords, "spawn_invuln", min_match=2):
+        return True
+    probe_count = len(coords.probes("in_dm")) or 1
+    return detect_state(img, ScreenState.IN_DM, coords, min_match=probe_count)
 
 
 def _click_team_random(
@@ -69,15 +71,16 @@ def wait_team_select_done(
     should_stop: Callable[[], bool] | None = None,
 ) -> int:
     """
-    Click team_random until in_dm HUD confirms join.
+    Click team_random while overlay visible; never LMB-spam after overlay was seen.
 
-    Never exit on probe miss alone — only past_team_select_screen or timeout.
-    Blind clicks are capped to avoid shooting in-game.
+    Once team_select probes matched, only retry while overlay still visible.
+    After overlay click, wait for spawn HUD — no blind clicks (LMB = shoot in-game).
     """
     deadline = time.monotonic() + max(5.0, timeout_sec)
     last_click = 0.0
     clicks = 0
     started = time.monotonic()
+    saw_team_overlay = False
 
     while time.monotonic() < deadline:
         if should_stop and should_stop():
@@ -86,24 +89,27 @@ def wait_team_select_done(
 
         if past_team_select_screen(img, coords):
             if on_progress:
-                on_progress("dm nav: team select cleared (in_dm HUD)")
+                on_progress("dm nav: team select cleared (spawn HUD)")
             return clicks
 
         team_visible = detect_probe_key(img, coords, "team_select", min_match=1)
+        if team_visible:
+            saw_team_overlay = True
+
         now = time.monotonic()
         elapsed = now - started
 
+        # Never blind-click after team overlay was seen — coords become +attack in-game.
         may_blind = (
-            not team_visible
+            not saw_team_overlay
+            and not team_visible
             and clicks < _MAX_BLIND_CLICKS
             and elapsed >= _TEAM_OVERLAY_GRACE_SEC
+            and now - last_click >= click_retry_sec
         )
         may_team = team_visible and (now - last_click >= click_retry_sec)
 
         if may_team or may_blind:
-            if may_blind and now - last_click < click_retry_sec:
-                time.sleep(0.25)
-                continue
             _click_team_random(
                 driver,
                 coords,
