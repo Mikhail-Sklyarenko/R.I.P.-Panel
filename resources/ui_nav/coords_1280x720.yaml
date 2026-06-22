@@ -25,6 +25,8 @@ detectors:
     - {x: 640, y: 16, rgb: [255, 255, 255], tolerance: 70}
     - {x: 52, y: 704, rgb: [14, 17, 28], tolerance: 40}
   team_select:
+    - {x: 640, y: 16, rgb: [255, 255, 255], tolerance: 70}
+    - {x: 640, y: 26, rgb: [49, 80, 108], tolerance: 70}
     - {x: 1152, y: 688, rgb: [241, 243, 247], tolerance: 70}
     - {x: 1020, y: 688, rgb: [255, 255, 255], tolerance: 70}
   spawn_invuln:

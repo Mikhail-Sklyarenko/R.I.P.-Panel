@@ -6,14 +6,28 @@ import time
 from typing import Callable, Protocol
 
 from modules.ui_nav.coords import NavCoords
-from modules.ui_nav.detectors import detect_probe_key
+from modules.ui_nav.detectors import ScreenState, detect_probe_key, detect_state
 from modules.ui_nav.errors import UiNavTimeoutError
+
+# Cap blind LMB clicks — each click is +attack when team overlay is already gone.
+_MAX_BLIND_CLICKS = 3
 
 
 class _TeamDriver(Protocol):
     def capture(self): ...
 
     def click(self, point) -> None: ...
+
+
+def past_team_select_screen(img, coords: NavCoords) -> bool:
+    """True when team overlay is gone and spawn / in_dm HUD is visible."""
+    if detect_probe_key(img, coords, "team_select", min_match=1):
+        return False
+    if detect_probe_key(img, coords, "spawn_invuln", min_match=2):
+        return True
+    if detect_state(img, ScreenState.IN_DM, coords):
+        return True
+    return False
 
 
 def _click_team_random(
@@ -59,8 +73,8 @@ def wait_team_select_done(
     """
     Click team_random while team_select visible; return when overlay gone.
 
-    If color probes never match (UI drift), keep clicking until timeout — do not
-    exit early after blind clicks.
+    Blind clicks are capped: LMB in-game fires the weapon. If color probes miss,
+    exit after clear_streak or when spawn HUD / invuln panel is detected.
     """
     deadline = time.monotonic() + max(5.0, timeout_sec)
     last_click = 0.0
@@ -88,6 +102,12 @@ def wait_team_select_done(
         if should_stop and should_stop():
             raise UiNavTimeoutError("team select: stopped")
         img = driver.capture()
+
+        if past_team_select_screen(img, coords):
+            if on_progress:
+                on_progress("dm nav: team select cleared (spawn HUD)")
+            return clicks
+
         team_visible = detect_probe_key(img, coords, "team_select", min_match=1)
         if team_visible:
             saw_team = True
@@ -95,24 +115,25 @@ def wait_team_select_done(
         else:
             clear_streak += 1
 
-        now = time.monotonic()
-        if now - last_click >= click_retry_sec:
-            _click_team_random(
-                driver,
-                coords,
-                on_progress=on_progress,
-                log_step=log_step,
-                attempt=clicks + 1,
-                team_visible=team_visible,
-            )
-            last_click = now
-            clicks += 1
-            time.sleep(0.35)
-
-        if saw_team and clear_streak >= 2:
+        if clear_streak >= 2 and clicks >= 1:
             if on_progress:
                 on_progress("dm nav: team select cleared")
             return clicks
+
+        now = time.monotonic()
+        if now - last_click >= click_retry_sec:
+            if team_visible or clicks < _MAX_BLIND_CLICKS:
+                _click_team_random(
+                    driver,
+                    coords,
+                    on_progress=on_progress,
+                    log_step=log_step,
+                    attempt=clicks + 1,
+                    team_visible=team_visible,
+                )
+                last_click = now
+                clicks += 1
+                time.sleep(0.35)
 
         time.sleep(0.25)
 

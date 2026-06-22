@@ -329,7 +329,17 @@ class DmNavigator:
         """Blocking team-pick phase before map load / spawn."""
         if isinstance(self.driver, SimDriver):
             return
-        from modules.dm_runner.team_join import wait_team_select_done
+        if self._team_done_mono is not None:
+            return
+        from modules.dm_runner.team_join import past_team_select_screen, wait_team_select_done
+
+        img = self.driver.capture()
+        if past_team_select_screen(img, self.coords):
+            self._nav_progress("dm nav: team select skipped (already in game)")
+            self._team_done_mono = time.monotonic()
+            if self.on_team_joined:
+                self.on_team_joined()
+            return
 
         wait_team_select_done(
             self.driver,
