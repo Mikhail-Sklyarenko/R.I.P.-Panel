@@ -285,6 +285,20 @@ class DmNavigator:
         except Exception as exc:
             self._nav_progress(f"dm nav: farm_panel.cfg warn ({exc})")
 
+    def _console_buy_once(self, *, label: str = "team") -> None:
+        if isinstance(self.driver, SimDriver) or not self.hwnd:
+            return
+        from modules.dm_runner.autobuy import run_console_autobuy
+
+        run_console_autobuy(
+            self.hwnd,
+            attempt=1,
+            total=1,
+            on_progress=self._nav_progress,
+            log_step=self.artifacts.log_step,
+        )
+        self.artifacts.log_step("dm_autobuy_console_after_team", label=label)
+
     def _ensure_team_joined(self) -> None:
         """Blocking team-pick phase before map load / spawn."""
         if isinstance(self.driver, SimDriver):
@@ -303,9 +317,11 @@ class DmNavigator:
             self.driver,
             self.coords,
             timeout_sec=float(self.config.dm_team_select_timeout_sec),
+            click_retry_sec=1.0,
             on_progress=self._nav_progress,
             log_step=self.artifacts.log_step,
             should_stop=self.should_stop,
+            on_team_random_clicked=lambda: self._console_buy_once(label="team_random"),
         )
         self._team_done_mono = time.monotonic()
 
@@ -333,35 +349,29 @@ class DmNavigator:
             self._nav_progress(f"dm nav: exec farm_panel.cfg warn ({exc})")
 
     def _wait_spawn_buy_ready(self) -> str:
-        """
-        Wait for spawn buy window; buy immediately on invuln panel.
-
-        Returns anchor reason: invuln | strict_hud | fallback.
-        """
+        """Retry console buy while spawn invuln panel is visible."""
         if isinstance(self.driver, SimDriver) or not self.hwnd:
             return "fallback"
 
-        from modules.dm_runner.autobuy import wait_invuln_and_autobuy
+        from modules.dm_runner.autobuy import wait_spawn_console_autobuy
         from modules.ui_nav.detectors import wait_for_strict_in_dm
 
-        self._nav_progress("dm nav: waiting for invuln buy panel…")
-        if wait_invuln_and_autobuy(
+        self._nav_progress("dm nav: waiting for spawn invuln (console buy retry)…")
+        if wait_spawn_console_autobuy(
             self.hwnd,
             self.driver,
             self.coords,
             timeout_sec=float(self.config.dm_spawn_invuln_timeout_sec),
             presses=int(self.config.dm_autobuy_presses),
             interval_sec=float(self.config.dm_autobuy_interval_sec),
-            console_fallback=bool(self.config.dm_autobuy_console_fallback),
             on_progress=self._nav_progress,
             log_step=self.artifacts.log_step,
             should_stop=self.should_stop,
         ):
-            self.artifacts.log_step("spawn_invuln_ok")
             self._startup_buy_done = True
             return "invuln"
 
-        self._nav_progress("dm nav: invuln panel miss; waiting strict spawn HUD")
+        self._nav_progress("dm nav: invuln miss; one console buy on strict HUD")
         if wait_for_strict_in_dm(
             self.driver,
             self.coords,
@@ -369,26 +379,23 @@ class DmNavigator:
             on_progress=self._nav_progress,
             should_stop=self.should_stop,
         ):
-            self.artifacts.log_step("spawn_hud_strict_ok")
+            self._console_buy_once(label="strict_hud")
+            self._startup_buy_done = True
             return "strict_hud"
 
-        self._nav_progress("dm nav: spawn buy anchor fallback (no invuln/HUD)")
+        self._nav_progress("dm nav: spawn buy fallback console")
         return "fallback"
 
     def _run_simple_startup_autobuy(self, *, anchor: str = "fallback") -> None:
-        """Fallback buy burst when invuln wait did not fire keys."""
+        """Last-chance console buy if spawn wait did not complete buys."""
         if isinstance(self.driver, SimDriver) or not self.hwnd or self._startup_buy_done:
             return
-        from modules.dm_runner.autobuy import run_simple_startup_autobuy
+        from modules.dm_runner.autobuy import run_console_autobuy_burst
 
-        delay = 0.5 if anchor == "strict_hud" else min(1.0, float(self.config.dm_autobuy_delay_sec))
-
-        run_simple_startup_autobuy(
+        run_console_autobuy_burst(
             self.hwnd,
-            delay_sec=delay,
-            presses=int(self.config.dm_autobuy_presses),
+            presses=min(3, int(self.config.dm_autobuy_presses)),
             interval_sec=float(self.config.dm_autobuy_interval_sec),
-            console_fallback=bool(self.config.dm_autobuy_console_fallback),
             on_progress=self._nav_progress,
             log_step=self.artifacts.log_step,
             should_stop=self.should_stop,

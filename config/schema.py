@@ -126,20 +126,20 @@ class AppConfig(BaseModel):
         description="Seconds after in_dm HUD before pressing p (spawn buy window)",
     )
     dm_autobuy_presses: int = Field(
-        default=3,
+        default=5,
         ge=1,
         le=10,
-        description="How many times to press p at startup spawn buy",
+        description="Console buy retries (after team click + on spawn invuln)",
     )
     dm_autobuy_interval_sec: float = Field(
         default=0.35,
-        ge=0.05,
+        ge=0.15,
         le=2.0,
-        description="Pause between startup p presses",
+        description="Pause between console buy commands",
     )
     dm_autobuy_console_fallback: bool = Field(
         default=True,
-        description="After bind keys, run buy ak47/… via CS2 console (RU keyboard safe)",
+        description="Deprecated alias — autobuy is console-only",
     )
     dm_autobuy_offsets_sec: str = Field(
         default="0,0.15,0.35,0.6,1,1.5,2.5,4,6",
