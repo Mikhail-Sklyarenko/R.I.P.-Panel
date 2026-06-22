@@ -135,6 +135,12 @@ class AppConfig(BaseModel):
         le=120,
         description="Max wait for team-pick overlay (Случайный выбор)",
     )
+    dm_spawn_invuln_timeout_sec: int = Field(
+        default=25,
+        ge=5,
+        le=60,
+        description="Wait for НЕУЯЗВИМОСТЬ spawn buy panel before autobuy",
+    )
     cs_resolution: str = Field(
         default="360x270", description="Разрешение CS2 для ui_nav coords"
     )
