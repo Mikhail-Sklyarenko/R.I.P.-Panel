@@ -40,3 +40,14 @@ def run_cs2_console_commands(hwnd: int, *commands: str) -> None:
             time.sleep(0.12)
     finally:
         _toggle_console(hwnd)
+
+
+# Same as buy_rifle_dm alias in resources/cs2/fsm.cfg
+_CONSOLE_DM_RIFLE_BUY = (
+    "buy ak47; buy m4a1_silencer; buy m4a1; buy m4a4; buy vesthelm"
+)
+
+
+def run_console_dm_rifle_buy(hwnd: int) -> None:
+    """Buy rifle+armor via developer console (no bind keys — works on any keyboard layout)."""
+    run_cs2_console_commands(hwnd, _CONSOLE_DM_RIFLE_BUY)

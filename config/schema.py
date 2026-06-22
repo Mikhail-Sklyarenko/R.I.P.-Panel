@@ -137,6 +137,10 @@ class AppConfig(BaseModel):
         le=2.0,
         description="Pause between startup p presses",
     )
+    dm_autobuy_console_fallback: bool = Field(
+        default=True,
+        description="After bind keys, run buy ak47/… via CS2 console (RU keyboard safe)",
+    )
     dm_autobuy_offsets_sec: str = Field(
         default="0,0.15,0.35,0.6,1,1.5,2.5,4,6",
         description="Deprecated — use dm_autobuy_delay_sec + dm_autobuy_presses",
