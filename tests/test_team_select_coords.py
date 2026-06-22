@@ -31,7 +31,7 @@ def test_team_select_ru_fixture_detects_and_clicks_button_text() -> None:
     img = Image.open(_FIXTURES / "team_select_ru_2026-06.png").convert("RGB")
     coords = _coords_for_image(img)
 
-    assert detect_probe_key(img, coords, "team_select", min_match=1) is True
+    assert detect_probe_key(img, coords, "team_select", min_match=2) is True
 
     pt = coords.click("team_random")
     r, g, b = img.getpixel((pt.x, pt.y))
@@ -42,7 +42,7 @@ def test_team_select_legacy_fixture_still_matches() -> None:
     img = Image.open(_FIXTURES / "team_select.png").convert("RGB")
     coords = _coords_for_image(img)
 
-    assert detect_probe_key(img, coords, "team_select", min_match=1) is True
+    assert detect_probe_key(img, coords, "team_select", min_match=2) is True
 
     pt = coords.click("team_random")
     probe = next(p for p in coords.probes("team_select") if p.x == pt.x and p.y == pt.y)

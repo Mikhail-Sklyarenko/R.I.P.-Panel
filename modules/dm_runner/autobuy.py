@@ -1,4 +1,4 @@
-"""DM startup rifle buy — press p a few times after team select + fixed delay."""
+"""DM startup rifle buy — press p after in_dm (spawn), not during map load."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ from modules.ui_nav.errors import UiNavError
 from modules.ui_nav.game_keys import press_game_bind
 
 _BUY_KEY = "p"
-_DEFAULT_SPAWN_BUY_DELAY_SEC = 10.0
+_DEFAULT_SPAWN_BUY_DELAY_SEC = 2.0
 _DEFAULT_SPAWN_BUY_PRESSES = 3
 _DEFAULT_SPAWN_BUY_INTERVAL_SEC = 0.35
 
@@ -22,7 +22,6 @@ def press_spawn_buy(hwnd: int, *, focus: bool = True) -> None:
 
 def run_simple_startup_autobuy(
     hwnd: int | None,
-    team_done_mono: float,
     *,
     delay_sec: float = _DEFAULT_SPAWN_BUY_DELAY_SEC,
     presses: int = _DEFAULT_SPAWN_BUY_PRESSES,
@@ -33,16 +32,16 @@ def run_simple_startup_autobuy(
     should_stop: Callable[[], bool] | None = None,
 ) -> bool:
     """
-    After team select: wait fixed delay for spawn, then press p N times.
+    After in_dm HUD detected: brief pause, exec cfg, press p N times.
 
-    No image probes — timing only.
+    Must run when the player is alive on the map — not after team select.
     """
     if hwnd is None or sys.platform != "win32":
         return False
 
-    wait = max(0.0, delay_sec - (time.monotonic() - team_done_mono))
+    wait = max(0.0, delay_sec)
     if on_progress:
-        on_progress(f"dm nav: autobuy wait {wait:.1f}s after team select")
+        on_progress(f"dm nav: autobuy wait {wait:.1f}s after spawn HUD")
 
     deadline = time.monotonic() + wait
     while time.monotonic() < deadline:

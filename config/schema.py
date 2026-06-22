@@ -120,10 +120,10 @@ class AppConfig(BaseModel):
         description="Deprecated — use dm_autobuy_delay_sec",
     )
     dm_autobuy_delay_sec: float = Field(
-        default=10.0,
+        default=2.0,
         ge=0.0,
-        le=60.0,
-        description="Seconds after team select cleared, then press p",
+        le=15.0,
+        description="Seconds after in_dm HUD before pressing p (spawn buy window)",
     )
     dm_autobuy_presses: int = Field(
         default=3,

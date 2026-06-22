@@ -60,6 +60,7 @@ class DmNavigator:
         self._menu_nav_done = False
         self._team_done_mono: float | None = None
         self._startup_buy_done = False
+        self._combat_preload_started = False
         self.coords = load_nav_coords_for_hwnd(
             hwnd,
             config.cs_resolution,
@@ -284,28 +285,6 @@ class DmNavigator:
         except Exception as exc:
             self._nav_progress(f"dm nav: farm_panel.cfg warn ({exc})")
 
-    def _click_team_random_if_visible(self, img=None) -> bool:
-        if isinstance(self.driver, SimDriver):
-            return False
-        frame = img if img is not None else self.driver.capture()
-        if not detect_probe_key(frame, self.coords, "team_select", min_match=1):
-            return False
-        try:
-            pt = self.coords.click("team_random")
-        except KeyError:
-            return False
-        self._nav_progress(f"dm nav: team select (poll) → random @({pt.x},{pt.y})")
-        self.driver.click(pt)
-        self.artifacts.log_step("team_random_poll_click", x=pt.x, y=pt.y)
-        return True
-
-    def _on_in_dm_poll(self, img=None) -> None:
-        """Retry team click during map load if overlay reappears."""
-        if isinstance(self.driver, SimDriver):
-            return
-        frame = img if img is not None else self.driver.capture()
-        self._click_team_random_if_visible(frame)
-
     def _ensure_team_joined(self) -> None:
         """Blocking team-pick phase before map load / spawn."""
         if isinstance(self.driver, SimDriver):
@@ -318,8 +297,6 @@ class DmNavigator:
         if past_team_select_screen(img, self.coords):
             self._nav_progress("dm nav: team select skipped (already in game)")
             self._team_done_mono = time.monotonic()
-            if self.on_team_joined:
-                self.on_team_joined()
             return
 
         wait_team_select_done(
@@ -331,11 +308,9 @@ class DmNavigator:
             should_stop=self.should_stop,
         )
         self._team_done_mono = time.monotonic()
-        if self.on_team_joined:
-            self.on_team_joined()
 
     def _spawn_hud_visible(self, img) -> bool:
-        if detect_probe_key(img, self.coords, "team_select", min_match=1):
+        if detect_probe_key(img, self.coords, "team_select", min_match=2):
             return False
         return detect_state(
             img,
@@ -358,15 +333,13 @@ class DmNavigator:
             self._nav_progress(f"dm nav: exec farm_panel.cfg warn ({exc})")
 
     def _run_simple_startup_autobuy(self) -> None:
-        """After team select: fixed delay, then press p a few times (no image probes)."""
+        """After in_dm: exec cfg, press p a few times — player must be on the map."""
         if isinstance(self.driver, SimDriver) or not self.hwnd or self._startup_buy_done:
             return
         from modules.dm_runner.autobuy import run_simple_startup_autobuy
 
-        anchor = self._team_done_mono or time.monotonic()
         run_simple_startup_autobuy(
             self.hwnd,
-            anchor,
             delay_sec=float(self.config.dm_autobuy_delay_sec),
             presses=int(self.config.dm_autobuy_presses),
             interval_sec=float(self.config.dm_autobuy_interval_sec),
@@ -377,6 +350,19 @@ class DmNavigator:
         )
         self._startup_buy_done = True
 
+    def _start_combat_preload(self) -> None:
+        """Start csgobot subprocess only after spawn autobuy (avoid early shooting)."""
+        if self._combat_preload_started or not self.on_team_joined:
+            return
+        self.on_team_joined()
+        self._combat_preload_started = True
+
+    def _finish_spawn_phase(self, *, soft_peek: bool) -> None:
+        """Autobuy → preload AI → in_dm (strict order)."""
+        self._run_simple_startup_autobuy()
+        self._start_combat_preload()
+        self._e(EventType.IN_DM, self._in_dm_detail(soft_peek=soft_peek))
+
     def _emit_in_dm_if_already_on_frame(self) -> bool:
         """Retry fast-path: skip map_load_delay when soft/strict in_dm visible."""
         try:
@@ -384,7 +370,7 @@ class DmNavigator:
         except UiNavTimeoutError:
             pass
         img = self.driver.capture()
-        if detect_probe_key(img, self.coords, "team_select", min_match=1):
+        if detect_probe_key(img, self.coords, "team_select", min_match=2):
             return False
         if not self._spawn_hud_visible(img):
             return False
@@ -393,8 +379,7 @@ class DmNavigator:
             self._nav_progress("dm nav: in_dm on frame; skip wait")
         else:
             self._nav_progress("dm nav: soft in_dm on frame; skip wait")
-        self._run_simple_startup_autobuy()
-        self._e(EventType.IN_DM, self._in_dm_detail(soft_peek=not strict))
+        self._finish_spawn_phase(soft_peek=not strict)
         return True
 
     def _wait_search_and_in_dm(self) -> None:
@@ -403,7 +388,6 @@ class DmNavigator:
         self._set_sim_phase(ScreenState.IN_DM)
         self._ensure_team_joined()
         self._bootstrap_cs2_farm_cfg()
-        self._run_simple_startup_autobuy()
         result = wait_for_in_dm(
             self.driver,
             self.coords,
@@ -411,9 +395,8 @@ class DmNavigator:
             timeout_sec=float(self.config.map_load_delay_sec),
             soft_min_match=self.config.in_dm_min_match,
             on_progress=self._nav_progress,
-            on_poll=self._on_in_dm_poll,
         )
-        self._e(EventType.IN_DM, self._in_dm_detail(soft_peek=result.soft_peek))
+        self._finish_spawn_phase(soft_peek=result.soft_peek)
 
     def _click_target(self, name: str) -> None:
         before = self.driver.capture()
