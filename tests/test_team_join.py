@@ -21,6 +21,9 @@ def _mock_clock(start: float = 0.0, step: float = 0.4, limit: float = 9.0):
         return current
 
     return tick
+
+
+def test_wait_team_select_clicks_then_clears() -> None:
     coords = load_nav_coords("1280x720")
     driver = MagicMock()
     driver.capture.return_value = object()
