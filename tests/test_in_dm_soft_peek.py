@@ -189,7 +189,7 @@ def test_dm_retry_skips_map_wait_when_soft_in_dm_on_frame(data_dir, monkeypatch)
 
     with patch.object(nav.driver, "capture", return_value=soft_img):
         with patch.object(nav, "_ensure_team_joined"):
-            with patch.object(nav, "_hold_buy_window_before_combat"):
+            with patch.object(nav, "_run_simple_startup_autobuy"):
                 with patch(
                     "modules.dm_runner.navigate.wait_for_in_dm",
                     side_effect=wait_side_effect,

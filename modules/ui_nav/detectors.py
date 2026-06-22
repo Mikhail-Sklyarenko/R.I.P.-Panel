@@ -120,31 +120,6 @@ def detect_probe_key(
     return matched >= min(max(1, required), len(probes))
 
 
-def wait_for_probe_key(
-    driver: NavDriver,
-    coords: NavCoords,
-    key: str,
-    *,
-    timeout_sec: float = 25.0,
-    poll_sec: float = 0.2,
-    min_match: int | None = None,
-    on_progress: Callable[[str], None] | None = None,
-    should_stop: Callable[[], bool] | None = None,
-) -> bool:
-    """Poll until detectors.<key> probes match (e.g. spawn_invuln buy panel)."""
-    deadline = time.monotonic() + max(1.0, timeout_sec)
-    while time.monotonic() < deadline:
-        if should_stop and should_stop():
-            return False
-        img = driver.capture()
-        if detect_probe_key(img, coords, key, min_match=min_match):
-            return True
-        time.sleep(poll_sec)
-    if on_progress:
-        on_progress(f"dm nav: timeout waiting for {key} ({timeout_sec:.0f}s)")
-    return False
-
-
 def detect_state(
     img: Image.Image,
     state: ScreenState,

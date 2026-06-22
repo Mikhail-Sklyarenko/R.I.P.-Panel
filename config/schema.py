@@ -117,29 +117,41 @@ class AppConfig(BaseModel):
         default=0,
         ge=0,
         le=30,
-        description="Deprecated extra delay before buy; use dm_autobuy_offsets_sec",
+        description="Deprecated — use dm_autobuy_delay_sec",
+    )
+    dm_autobuy_delay_sec: float = Field(
+        default=10.0,
+        ge=0.0,
+        le=60.0,
+        description="Seconds after team select cleared, then press p",
+    )
+    dm_autobuy_presses: int = Field(
+        default=3,
+        ge=1,
+        le=10,
+        description="How many times to press p at startup spawn buy",
+    )
+    dm_autobuy_interval_sec: float = Field(
+        default=0.35,
+        ge=0.05,
+        le=2.0,
+        description="Pause between startup p presses",
     )
     dm_autobuy_offsets_sec: str = Field(
         default="0,0.15,0.35,0.6,1,1.5,2.5,4,6",
-        description="Buy key times (sec) after spawn HUD — inside DM invuln window",
+        description="Deprecated — use dm_autobuy_delay_sec + dm_autobuy_presses",
     )
     dm_autobuy_window_sec: int = Field(
         default=10,
         ge=5,
         le=30,
-        description="Stand-still buy window (sec) after spawn HUD before combat AI",
+        description="Deprecated — use dm_autobuy_presses",
     )
     dm_team_select_timeout_sec: int = Field(
         default=45,
         ge=10,
         le=120,
         description="Max wait for team-pick overlay (Случайный выбор)",
-    )
-    dm_spawn_invuln_timeout_sec: int = Field(
-        default=25,
-        ge=5,
-        le=60,
-        description="Wait for НЕУЯЗВИМОСТЬ spawn buy panel before autobuy",
     )
     cs_resolution: str = Field(
         default="360x270", description="Разрешение CS2 для ui_nav coords"

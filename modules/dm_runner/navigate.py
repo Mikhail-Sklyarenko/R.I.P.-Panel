@@ -58,9 +58,8 @@ class DmNavigator:
         self.should_stop = should_stop
         self.on_team_joined = on_team_joined
         self._menu_nav_done = False
-        self._spawn_autobuy = None
         self._team_done_mono: float | None = None
-        self._last_early_buy_mono = 0.0
+        self._startup_buy_done = False
         self.coords = load_nav_coords_for_hwnd(
             hwnd,
             config.cs_resolution,
@@ -300,30 +299,12 @@ class DmNavigator:
         self.artifacts.log_step("team_random_poll_click", x=pt.x, y=pt.y)
         return True
 
-    def _try_early_spawn_buy(self) -> None:
-        """Opportunistic p during map load — does not arm the buy scheduler."""
-        if isinstance(self.driver, SimDriver) or not self.hwnd or self._team_done_mono is None:
+    def _on_in_dm_poll(self, img=None) -> None:
+        """Retry team click during map load if overlay reappears."""
+        if isinstance(self.driver, SimDriver):
             return
-        from modules.dm_runner.autobuy import (
-            _EARLY_BUY_AFTER_TEAM_SEC,
-            _EARLY_BUY_INTERVAL_SEC,
-            _EARLY_BUY_MAX_SEC,
-            press_spawn_buy,
-        )
-
-        elapsed = time.monotonic() - self._team_done_mono
-        if elapsed < _EARLY_BUY_AFTER_TEAM_SEC or elapsed > _EARLY_BUY_MAX_SEC:
-            return
-        now = time.monotonic()
-        if now - self._last_early_buy_mono < _EARLY_BUY_INTERVAL_SEC:
-            return
-        self._last_early_buy_mono = now
-        try:
-            press_spawn_buy(self.hwnd, focus=True)
-            self._nav_progress(f"dm nav: early buy p (+{elapsed:.1f}s after team)")
-            self.artifacts.log_step("dm_autobuy_early_p", elapsed_after_team=round(elapsed, 2))
-        except UiNavError as exc:
-            self._nav_progress(f"dm nav: early buy p failed ({exc})")
+        frame = img if img is not None else self.driver.capture()
+        self._click_team_random_if_visible(frame)
 
     def _ensure_team_joined(self) -> None:
         """Blocking team-pick phase before map load / spawn."""
@@ -363,21 +344,6 @@ class DmNavigator:
             min_match=self.config.in_dm_min_match,
         )
 
-    def _arm_spawn_autobuy(self, *, reason: str = "spawn") -> None:
-        from modules.dm_runner.autobuy import make_fresh_spawn_autobuy, parse_buy_offsets
-
-        offsets = parse_buy_offsets(self.config.dm_autobuy_offsets_sec)
-        self._spawn_autobuy = make_fresh_spawn_autobuy(offsets)
-        self._nav_progress(f"dm nav: autobuy armed ({reason})")
-
-    def _on_in_dm_poll(self, img=None) -> None:
-        """Team join + opportunistic early p while waiting for in_dm."""
-        if isinstance(self.driver, SimDriver):
-            return
-        frame = img if img is not None else self.driver.capture()
-        self._click_team_random_if_visible(frame)
-        self._try_early_spawn_buy()
-
     def _reload_farm_cfg_in_game(self) -> None:
         """Reload binds after redeploy (CT rifle names may differ from launch +exec)."""
         if isinstance(self.driver, SimDriver) or not self.hwnd:
@@ -391,66 +357,25 @@ class DmNavigator:
         except UiNavError as exc:
             self._nav_progress(f"dm nav: exec farm_panel.cfg warn ({exc})")
 
-    def _wait_strict_spawn_hud(self, *, timeout_sec: float = 20.0) -> bool:
-        """Alive on map: strict in_dm (timer + health HUD), not load-screen timer only."""
-        if isinstance(self.driver, SimDriver) or not self.hwnd:
-            return True
-        deadline = time.monotonic() + max(3.0, timeout_sec)
-        while time.monotonic() < deadline:
-            if self.should_stop and self.should_stop():
-                return False
-            img = self.driver.capture()
-            if detect_probe_key(img, self.coords, "team_select", min_match=1):
-                time.sleep(0.2)
-                continue
-            if detect_state(img, ScreenState.IN_DM, self.coords):
-                self._nav_progress("dm nav: spawn HUD strict ok")
-                return True
-            time.sleep(0.25)
-        self._nav_progress("dm nav: spawn HUD strict timeout (trying buy anyway)")
-        return False
-
-    def _wait_spawn_invuln_panel(self) -> bool:
-        """Wait for RU spawn invulnerability / buy hint panel (НЕУЯЗВИМОСТЬ)."""
-        if isinstance(self.driver, SimDriver) or not self.hwnd:
-            return True
-        from modules.ui_nav.detectors import wait_for_probe_key
-
-        self._nav_progress("dm nav: waiting for invuln buy panel…")
-        ok = wait_for_probe_key(
-            self.driver,
-            self.coords,
-            "spawn_invuln",
-            timeout_sec=float(self.config.dm_spawn_invuln_timeout_sec),
-            min_match=2,
-            on_progress=self._nav_progress,
-            should_stop=self.should_stop,
-        )
-        if ok:
-            self._nav_progress("dm nav: invuln buy panel visible")
-            self.artifacts.log_step("spawn_invuln_ok")
-        return ok
-
-    def _hold_buy_window_before_combat(self) -> None:
-        if isinstance(self.driver, SimDriver) or not self.hwnd:
+    def _run_simple_startup_autobuy(self) -> None:
+        """After team select: fixed delay, then press p a few times (no image probes)."""
+        if isinstance(self.driver, SimDriver) or not self.hwnd or self._startup_buy_done:
             return
-        from modules.dm_runner.autobuy import hold_buy_window
+        from modules.dm_runner.autobuy import run_simple_startup_autobuy
 
-        if not self._wait_spawn_invuln_panel():
-            self._nav_progress("dm nav: invuln panel miss; fallback spawn HUD")
-            self._wait_strict_spawn_hud()
-        self._reload_farm_cfg_in_game()
-        # Anchor buy window to invuln panel (or spawn HUD fallback).
-        self._arm_spawn_autobuy(reason="invuln buy window")
-        sched, _ = hold_buy_window(
+        anchor = self._team_done_mono or time.monotonic()
+        run_simple_startup_autobuy(
             self.hwnd,
-            self._spawn_autobuy,
-            window_sec=float(self.config.dm_autobuy_window_sec),
+            anchor,
+            delay_sec=float(self.config.dm_autobuy_delay_sec),
+            presses=int(self.config.dm_autobuy_presses),
+            interval_sec=float(self.config.dm_autobuy_interval_sec),
+            before_press=self._reload_farm_cfg_in_game,
             on_progress=self._nav_progress,
             log_step=self.artifacts.log_step,
             should_stop=self.should_stop,
         )
-        self._spawn_autobuy = sched
+        self._startup_buy_done = True
 
     def _emit_in_dm_if_already_on_frame(self) -> bool:
         """Retry fast-path: skip map_load_delay when soft/strict in_dm visible."""
@@ -468,7 +393,7 @@ class DmNavigator:
             self._nav_progress("dm nav: in_dm on frame; skip wait")
         else:
             self._nav_progress("dm nav: soft in_dm on frame; skip wait")
-        self._hold_buy_window_before_combat()
+        self._run_simple_startup_autobuy()
         self._e(EventType.IN_DM, self._in_dm_detail(soft_peek=not strict))
         return True
 
@@ -478,6 +403,7 @@ class DmNavigator:
         self._set_sim_phase(ScreenState.IN_DM)
         self._ensure_team_joined()
         self._bootstrap_cs2_farm_cfg()
+        self._run_simple_startup_autobuy()
         result = wait_for_in_dm(
             self.driver,
             self.coords,
@@ -487,7 +413,6 @@ class DmNavigator:
             on_progress=self._nav_progress,
             on_poll=self._on_in_dm_poll,
         )
-        self._hold_buy_window_before_combat()
         self._e(EventType.IN_DM, self._in_dm_detail(soft_peek=result.soft_peek))
 
     def _click_target(self, name: str) -> None:

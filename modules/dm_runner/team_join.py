@@ -20,14 +20,10 @@ class _TeamDriver(Protocol):
 
 
 def past_team_select_screen(img, coords: NavCoords) -> bool:
-    """True when team overlay is gone and spawn / in_dm HUD is visible."""
+    """True when team overlay is gone and in_dm HUD is visible."""
     if detect_probe_key(img, coords, "team_select", min_match=1):
         return False
-    if detect_probe_key(img, coords, "spawn_invuln", min_match=2):
-        return True
-    if detect_state(img, ScreenState.IN_DM, coords):
-        return True
-    return False
+    return detect_state(img, ScreenState.IN_DM, coords)
 
 
 def _click_team_random(
@@ -105,7 +101,7 @@ def wait_team_select_done(
 
         if past_team_select_screen(img, coords):
             if on_progress:
-                on_progress("dm nav: team select cleared (spawn HUD)")
+                on_progress("dm nav: team select cleared (in_dm HUD)")
             return clicks
 
         team_visible = detect_probe_key(img, coords, "team_select", min_match=1)
