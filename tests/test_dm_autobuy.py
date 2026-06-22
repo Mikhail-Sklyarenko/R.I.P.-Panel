@@ -7,6 +7,7 @@ from unittest.mock import patch
 
 from modules.dm_runner.autobuy import (
     SpawnAutobuyScheduler,
+    make_fresh_spawn_autobuy,
     parse_buy_offsets,
     run_startup_autobuy,
 )
@@ -45,17 +46,37 @@ def test_scheduler_fires_when_elapsed() -> None:
     sched = SpawnAutobuyScheduler(spawn_mono=t0, offsets_sec=(0.0, 1.0))
 
     with patch("modules.dm_runner.autobuy.sys.platform", "win32"):
-        with patch("modules.ui_nav.actions.focus_window"):
-            with patch(
-                "modules.dm_runner.autobuy.press_game_bind",
-                side_effect=lambda _hwnd, key, **kw: pressed.append(key),
-            ):
-                sched.tick(1, on_progress=None)
-                assert pressed == ["p", "f5", "o"]
+        with patch(
+            "modules.dm_runner.autobuy.press_game_bind",
+            side_effect=lambda _hwnd, key, **kw: pressed.append(key),
+        ):
+            sched.tick(1, on_progress=None)
+            assert pressed == ["p", "f5", "o"]
 
-                with patch("modules.dm_runner.autobuy.time.monotonic", return_value=t0 + 1.1):
-                    sched.tick(1, on_progress=None)
-                assert pressed == ["p", "f5", "o", "p", "f5", "o"]
+            with patch("modules.dm_runner.autobuy.time.monotonic", return_value=t0 + 1.1):
+                sched.tick(1, on_progress=None)
+            assert pressed == ["p", "f5", "o", "p", "f5", "o"]
+
+
+def test_stale_scheduler_not_reused_after_load() -> None:
+    """Buy window must re-anchor at in_dm — not reuse load-time exhausted scheduler."""
+    pressed: list[str] = []
+    stale = SpawnAutobuyScheduler(
+        spawn_mono=time.monotonic() - 60.0,
+        offsets_sec=(0.0,),
+    )
+    stale._next_index = 1
+    stale.sent = True
+
+    with patch("modules.dm_runner.autobuy.sys.platform", "win32"):
+        with patch(
+            "modules.dm_runner.autobuy.press_game_bind",
+            side_effect=lambda _hwnd, key, **kw: pressed.append(key),
+        ):
+            fresh = make_fresh_spawn_autobuy((0.0,))
+            fresh.finish(1)
+
+    assert pressed == ["p", "f5", "o"]
 
 
 def test_startup_autobuy_legacy_helper() -> None:

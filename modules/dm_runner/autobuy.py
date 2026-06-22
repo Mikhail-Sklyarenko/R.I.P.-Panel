@@ -1,4 +1,4 @@
-"""DM startup rifle buy — schedule from team join (invuln window), not after in_dm wait."""
+"""DM startup rifle buy — schedule from in_dm confirm (spawn), not map load."""
 
 from __future__ import annotations
 
@@ -37,7 +37,7 @@ def press_spawn_buy(hwnd: int, *, focus: bool = True) -> None:
 
 @dataclass
 class SpawnAutobuyScheduler:
-    """Fire buy binds at offsets from team-random click (DM invuln window)."""
+    """Fire buy binds at offsets from spawn anchor (in_dm confirmed)."""
 
     spawn_mono: float
     offsets_sec: tuple[float, ...] = _DEFAULT_BUY_OFFSETS_SEC
@@ -100,15 +100,9 @@ class SpawnAutobuyScheduler:
     ) -> None:
         if on_progress:
             on_progress(f"dm nav: autobuy @+{offset:.1f}s from spawn")
-        try:
-            from modules.ui_nav.actions import focus_window
-
-            focus_window(hwnd)
-        except UiNavError:
-            pass
         for key in self.buy_keys:
             try:
-                press_game_bind(hwnd, key, focus=False)
+                press_game_bind(hwnd, key, focus=True)
                 self.sent = True
             except UiNavError as exc:
                 if on_progress:
@@ -118,6 +112,16 @@ class SpawnAutobuyScheduler:
                 return
         if log_step:
             log_step("dm_autobuy_burst", offset_sec=offset, keys=list(self.buy_keys))
+
+
+def make_fresh_spawn_autobuy(
+    offsets_sec: tuple[float, ...] | None = None,
+) -> SpawnAutobuyScheduler:
+    """New buy schedule anchored at now (after in_dm confirmed, not map load)."""
+    return SpawnAutobuyScheduler(
+        spawn_mono=time.monotonic(),
+        offsets_sec=offsets_sec or _DEFAULT_BUY_OFFSETS_SEC,
+    )
 
 
 def hold_buy_window(
@@ -134,7 +138,7 @@ def hold_buy_window(
 
     Returns (scheduler, sent_any).
     """
-    sched = scheduler or SpawnAutobuyScheduler(spawn_mono=time.monotonic())
+    sched = scheduler or make_fresh_spawn_autobuy()
     if hwnd is None or sys.platform != "win32":
         return sched, False
 
