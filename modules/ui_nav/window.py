@@ -91,7 +91,12 @@ def wait_for_cs2_main_menu(
     """Poll until main_menu probes match. Timeout returns timed_out (no exception)."""
     _require_windows()
     from modules.ui_nav.capture import capture_client_with_black_retry
+    from modules.ui_nav.cs2_modal_dismiss import dismiss_cs2_modals
     from modules.ui_nav.detectors import ScreenState, detect_state, probe_match_results
+
+    dismiss_cs2_modals(hwnd, on_progress=on_progress)
+    last_dismiss_mono = time.monotonic()
+    dismiss_interval_sec = 8.0
 
     probe_count = len(coords.probes("main_menu"))
     strict_required = probe_count if probe_count else 1
@@ -194,6 +199,9 @@ def wait_for_cs2_main_menu(
             remaining = max(0, int(deadline - now))
             on_progress(f"waiting for CS2 main menu ({remaining}s left)")
             last_log = now
+        if not strict and now - last_dismiss_mono >= dismiss_interval_sec:
+            dismiss_cs2_modals(hwnd, on_progress=on_progress)
+            last_dismiss_mono = now
         time.sleep(poll_sec)
     if artifacts is not None and last_img is not None:
         artifacts.save_image("wait_main_menu_launch_timeout", last_img)

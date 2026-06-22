@@ -177,6 +177,10 @@ class DmNavigator:
             else:
                 wait_timeout = menu_timeout
             min_match = 1
+        from modules.ui_nav.cs2_modal_dismiss import dismiss_cs2_modals
+
+        if self.hwnd and not isinstance(self.driver, SimDriver):
+            dismiss_cs2_modals(self.hwnd, on_progress=self._nav_progress)
         try:
             self.wait_main_menu(timeout=wait_timeout, min_match=min_match)
             return False

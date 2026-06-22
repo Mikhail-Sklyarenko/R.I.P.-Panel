@@ -38,6 +38,7 @@ def focus_window(hwnd: int) -> None:
     import win32process
 
     def _do() -> None:
+        global _attach_thread_input_warned
         if not is_valid_hwnd(hwnd):
             raise UiNavError(f"window closed or invalid (hwnd={hwnd})")
         foreground = win32gui.GetForegroundWindow()
@@ -52,14 +53,24 @@ def focus_window(hwnd: int) -> None:
             and foreground_thread
             and foreground_thread != target_thread
         ):
-            attach_fn(foreground_thread, target_thread, True)
-            attached = True
+            try:
+                attach_fn(foreground_thread, target_thread, True)
+                attached = True
+            except Exception as exc:
+                # ERROR_ACCESS_DENIED (5) when foreground is elevated/other desktop.
+                if getattr(exc, "winerror", None) != 5:
+                    raise
+                if not _attach_thread_input_warned:
+                    _log.warning(
+                        "focus_window: AttachThreadInput denied (winerror 5), "
+                        "using fallback"
+                    )
+                    _attach_thread_input_warned = True
         elif (
             attach_fn is None
             and foreground_thread
             and foreground_thread != target_thread
         ):
-            global _attach_thread_input_warned
             if not _attach_thread_input_warned:
                 _log.warning(
                     "focus_window: AttachThreadInput unavailable, using fallback"

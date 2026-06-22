@@ -13,6 +13,12 @@ from modules.ui_nav.coords import load_nav_coords
 from modules.ui_nav.window import MainMenuWaitResult, wait_for_cs2_main_menu
 
 
+@pytest.fixture(autouse=True)
+def _patch_cs2_modal_dismiss():
+    with patch("modules.ui_nav.cs2_modal_dismiss.dismiss_cs2_modals", return_value=0):
+        yield
+
+
 def test_wait_for_cs2_main_menu_strict_early_soft_peek(monkeypatch, tmp_path) -> None:
     """require_strict: 1/2 probes × 3 polls → early exit without full timeout."""
     monkeypatch.setattr("sys.platform", "win32")

@@ -49,19 +49,20 @@ def capture_client(
             focus_window(hwnd)
         except UiNavError as exc:
             if on_progress:
-                on_progress(f"capture: focus_window failed ({exc})")
-            raise
+                on_progress(f"capture: focus_window failed ({exc}); grab without focus")
         except Exception as exc:
             msg = f"capture: focus_window failed: {exc}"
             if on_progress:
-                on_progress(msg)
-            raise UiNavError(msg) from exc
-        time.sleep(0.1)
-        try:
-            if win32gui.GetForegroundWindow() != hwnd and on_progress:
-                on_progress(f"capture: focus not acquired (hwnd={hwnd})")
-        except Exception:
-            pass
+                on_progress(f"{msg}; grab without focus")
+        else:
+            time.sleep(0.1)
+            try:
+                if win32gui.GetForegroundWindow() != hwnd and on_progress:
+                    on_progress(f"capture: focus not acquired (hwnd={hwnd})")
+            except Exception:
+                pass
+    elif on_progress:
+        on_progress("capture: skip_focus=True")
 
     left, top, right, bottom = win32gui.GetClientRect(hwnd)
     w, h = right - left, bottom - top
@@ -77,7 +78,10 @@ def capture_client_with_black_retry(
     attempt: int | None = None,
 ) -> Image.Image:
     """Capture once; if suspect-black, refocus and grab again (same poll attempt)."""
-    img = capture_client(hwnd, on_progress=on_progress)
+    try:
+        img = capture_client(hwnd, on_progress=on_progress)
+    except UiNavError:
+        img = capture_client(hwnd, on_progress=on_progress, skip_focus=True)
     if not is_suspect_black_capture(img):
         return img
     if artifacts is not None:
@@ -89,7 +93,10 @@ def capture_client_with_black_retry(
     if on_progress:
         on_progress("capture: suspect black frame; refocusing")
     time.sleep(0.2)
-    img2 = capture_client(hwnd, on_progress=on_progress)
+    try:
+        img2 = capture_client(hwnd, on_progress=on_progress)
+    except UiNavError:
+        img2 = capture_client(hwnd, on_progress=on_progress, skip_focus=True)
     if is_suspect_black_capture(img2) and on_progress:
         on_progress("capture: still black after refocus retry")
     return img2

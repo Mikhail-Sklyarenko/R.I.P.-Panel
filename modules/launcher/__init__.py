@@ -132,6 +132,9 @@ def run(ctx: dict[str, Any] | None = None) -> bool:
             config.cs_resolution,
             on_warn=on_cs2_progress,
         )
+        from modules.ui_nav.cs2_modal_dismiss import dismiss_cs2_modals
+
+        dismiss_cs2_modals(cs2_hwnd, on_progress=on_cs2_progress)
         menu_timeout = max(15, int(config.cs2_main_menu_wait_timeout_sec))
         menu_result = wait_for_cs2_main_menu(
             cs2_hwnd,
