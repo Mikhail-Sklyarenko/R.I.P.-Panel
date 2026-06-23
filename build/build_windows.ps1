@@ -5,7 +5,7 @@ $ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent $PSScriptRoot
 Set-Location $Root
 
-Write-Host "Farm Panel build — root: $Root"
+Write-Host "Farm Panel build - root: $Root"
 
 if (-not (Test-Path ".venv\Scripts\python.exe")) {
     Write-Host "Creating venv..."
@@ -53,4 +53,4 @@ Copy-Item (Join-Path $Root "FarmPanel.bat") $Dist -Force -ErrorAction SilentlyCo
 Copy-Item (Join-Path $Root "vault_cli.bat") $Dist -Force -ErrorAction SilentlyContinue
 
 Write-Host "Done: $Dist\FarmPanel.exe"
-Write-Host "Next: cd vendor\looter && npm install (in dist or source tree)"
+Write-Host 'Next: cd vendor\looter; npm install (in dist or source tree)'
