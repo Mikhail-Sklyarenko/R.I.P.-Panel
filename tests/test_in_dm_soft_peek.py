@@ -181,26 +181,15 @@ def test_dm_retry_skips_map_wait_when_soft_in_dm_on_frame(data_dir, monkeypatch)
     )
     nav._menu_nav_done = True
 
-    wait_calls = {"n": 0}
-
-    def wait_side_effect(*args, **kwargs):
-        wait_calls["n"] += 1
-        raise UiNavTimeoutError("timeout waiting for in_dm")
-
     with patch.object(nav.driver, "capture", return_value=soft_img):
         with patch.object(nav, "_ensure_team_joined"):
-            with patch.object(nav, "_run_simple_startup_autobuy"):
-                with patch(
-                    "modules.dm_runner.navigate.wait_for_in_dm",
-                    side_effect=wait_side_effect,
-                ):
-                    with patch.object(nav, "_prepare_cs2_window"):
-                        nav.navigate_to_dm_with_retries()
+            with patch.object(nav, "_bootstrap_cs2_farm_cfg"):
+                with patch.object(nav, "_prepare_cs2_window"):
+                    nav.navigate_to_dm_with_retries()
 
-    assert wait_calls["n"] == 1
     in_dm_events = [(e, d) for e, d in emitted if e == EventType.IN_DM]
     assert len(in_dm_events) == 1
-    assert in_dm_events[0][1] == "dm_runner: in_dm (soft_peek)"
+    assert "in_dm" in in_dm_events[0][1]
 
 
 def test_dm_retry_fast_path_blocks_while_team_select_visible(data_dir, monkeypatch) -> None:

@@ -14,7 +14,6 @@ from modules.ui_nav.detectors import (
     ScreenState,
     detect_probe_key,
     detect_state,
-    wait_for_in_dm,
     wait_for_state,
 )
 from modules.ui_nav.driver import NavDriver, SimDriver, create_driver
@@ -286,17 +285,19 @@ class DmNavigator:
             self._nav_progress(f"dm nav: farm_panel.cfg warn ({exc})")
 
     def _console_buy_once(self, *, label: str = "team") -> None:
-        if isinstance(self.driver, SimDriver) or not self.hwnd:
+        if isinstance(self.driver, SimDriver) or not self.hwnd or self._startup_buy_done:
             return
         from modules.dm_runner.autobuy import run_console_autobuy
 
-        run_console_autobuy(
+        if run_console_autobuy(
             self.hwnd,
             attempt=1,
             total=1,
             on_progress=self._nav_progress,
             log_step=self.artifacts.log_step,
-        )
+        ):
+            self._startup_buy_done = True
+            self._nav_progress("dm nav: autobuy startup done")
         self.artifacts.log_step("dm_autobuy_console_after_team", label=label)
 
     def _ensure_team_joined(self) -> None:
@@ -348,71 +349,17 @@ class DmNavigator:
         except UiNavError as exc:
             self._nav_progress(f"dm nav: exec farm_panel.cfg warn ({exc})")
 
-    def _wait_spawn_buy_ready(self) -> str:
-        """Retry console buy while spawn invuln panel is visible."""
-        if isinstance(self.driver, SimDriver) or not self.hwnd:
-            return "fallback"
-
-        from modules.dm_runner.autobuy import wait_spawn_console_autobuy
-        from modules.ui_nav.detectors import wait_for_strict_in_dm
-
-        self._nav_progress("dm nav: waiting for spawn invuln (console buy retry)…")
-        if wait_spawn_console_autobuy(
-            self.hwnd,
-            self.driver,
-            self.coords,
-            timeout_sec=float(self.config.dm_spawn_invuln_timeout_sec),
-            presses=int(self.config.dm_autobuy_presses),
-            interval_sec=float(self.config.dm_autobuy_interval_sec),
-            on_progress=self._nav_progress,
-            log_step=self.artifacts.log_step,
-            should_stop=self.should_stop,
-        ):
-            self._startup_buy_done = True
-            return "invuln"
-
-        self._nav_progress("dm nav: invuln miss; one console buy on strict HUD")
-        if wait_for_strict_in_dm(
-            self.driver,
-            self.coords,
-            timeout_sec=20.0,
-            on_progress=self._nav_progress,
-            should_stop=self.should_stop,
-        ):
-            self._console_buy_once(label="strict_hud")
-            self._startup_buy_done = True
-            return "strict_hud"
-
-        self._nav_progress("dm nav: spawn buy fallback console")
-        return "fallback"
-
-    def _run_simple_startup_autobuy(self, *, anchor: str = "fallback") -> None:
-        """Last-chance console buy if spawn wait did not complete buys."""
-        if isinstance(self.driver, SimDriver) or not self.hwnd or self._startup_buy_done:
-            return
-        from modules.dm_runner.autobuy import run_console_autobuy_burst
-
-        run_console_autobuy_burst(
-            self.hwnd,
-            presses=min(3, int(self.config.dm_autobuy_presses)),
-            interval_sec=float(self.config.dm_autobuy_interval_sec),
-            on_progress=self._nav_progress,
-            log_step=self.artifacts.log_step,
-            should_stop=self.should_stop,
-        )
-        self._startup_buy_done = True
-
     def _start_combat_preload(self) -> None:
-        """Start csgobot subprocess only after spawn autobuy (avoid early shooting)."""
+        """Start csgobot subprocess after team console buy."""
         if self._combat_preload_started or not self.on_team_joined:
             return
         self.on_team_joined()
         self._combat_preload_started = True
 
     def _finish_spawn_phase(self, *, soft_peek: bool) -> None:
-        """Wait spawn buy window → autobuy → preload AI → in_dm."""
-        anchor = self._wait_spawn_buy_ready()
-        self._run_simple_startup_autobuy(anchor=anchor)
+        """Autobuy already at team click — start combat AI immediately."""
+        if not self._startup_buy_done:
+            self._console_buy_once(label="fallback")
         self._start_combat_preload()
         self._e(EventType.IN_DM, self._in_dm_detail(soft_peek=soft_peek))
 
@@ -441,15 +388,8 @@ class DmNavigator:
         self._set_sim_phase(ScreenState.IN_DM)
         self._ensure_team_joined()
         self._bootstrap_cs2_farm_cfg()
-        result = wait_for_in_dm(
-            self.driver,
-            self.coords,
-            self.artifacts,
-            timeout_sec=float(self.config.map_load_delay_sec),
-            soft_min_match=self.config.in_dm_min_match,
-            on_progress=self._nav_progress,
-        )
-        self._finish_spawn_phase(soft_peek=result.soft_peek)
+        self._nav_progress("dm nav: team buy done — starting combat")
+        self._finish_spawn_phase(soft_peek=True)
 
     def _click_target(self, name: str) -> None:
         before = self.driver.capture()

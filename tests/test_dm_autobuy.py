@@ -1,29 +1,16 @@
-"""DM panel startup autobuy — console buy commands."""
+"""DM panel startup autobuy — single console buy."""
 
 from __future__ import annotations
 
 from unittest.mock import patch
 
-from modules.dm_runner.autobuy import run_console_autobuy_burst
+from modules.dm_runner.autobuy import run_console_autobuy
 
 
-def test_console_autobuy_burst() -> None:
-    calls: list[int] = []
-    progress: list[str] = []
-
+def test_console_autobuy_once() -> None:
     with patch("modules.dm_runner.autobuy.sys.platform", "win32"):
-        with patch("modules.dm_runner.autobuy.time.sleep"):
-            with patch(
-                "modules.dm_runner.autobuy.run_console_autobuy",
-                side_effect=lambda *_a, **_k: calls.append(1) or True,
-            ):
-                ok = run_console_autobuy_burst(
-                    4242,
-                    presses=3,
-                    interval_sec=0.2,
-                    on_progress=progress.append,
-                )
+        with patch("modules.ui_nav.cs2_console.run_console_dm_rifle_buy") as buy:
+            ok = run_console_autobuy(4242)
 
     assert ok is True
-    assert len(calls) == 3
-    assert any("autobuy startup done" in line for line in progress)
+    buy.assert_called_once_with(4242)
