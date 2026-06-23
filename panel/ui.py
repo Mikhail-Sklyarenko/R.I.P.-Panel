@@ -8,6 +8,7 @@ import customtkinter as ctk
 
 from config.schema import BotMode
 from panel.controller import PanelController
+from panel.icon import apply_window_icon
 from panel.path_picker import path_picker_available, truncate_path
 
 
@@ -32,7 +33,8 @@ class PanelView:
             self.root.geometry(geo)
         else:
             self.root.geometry(f"{geo}+80+80")
-        self.root.title("Farm Panel Prototype")
+        self.root.title("Farm Panel")
+        apply_window_icon(self.root)
         self.root.minsize(960, 560)
 
         self.root.grid_columnconfigure(0, weight=2, minsize=200)

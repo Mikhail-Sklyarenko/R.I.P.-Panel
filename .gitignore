@@ -22,7 +22,13 @@ __pycache__/
 venv/
 *.egg-info/
 dist/
-build/
+build/*
+!build/build_windows.ps1
+!build/farm_panel.spec
+!build/requirements-build.txt
+!build/README_RUN.txt
+!build/smoke_frozen.ps1
+!build/make_app_icon.py
 *.spec.bak
 
 # Secrets and Steam guard
