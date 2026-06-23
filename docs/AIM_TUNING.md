@@ -210,8 +210,16 @@ SHOOT_COOLDOWN_SEC = 0.1
 
 ---
 
+## Patrol look (PR-L1)
+
+Плавный поворот **80–90°** каждые **12–15 s** в патруле; направление чередуется; без return-sweep. В бою look **выключен** (`look_active` guard — не конфликтует с aim/fire).
+
+Env: `CSGOBOT_LOOK=0`, `CSGOBOT_LOOK_DEBUG=1`, `CSGOBOT_LOOK_YAW_MIN/MAX`, `CSGOBOT_LOOK_SWEEP_MIN/MAX`, `CSGOBOT_LOOK_IDLE_MIN/MAX`.
+
+---
+
 ## Связанные документы
 
-- `docs/COMBAT_ROADMAP.md` — порядок PR (E1 → Look L1–L4; M1 done)
+- `docs/COMBAT_ROADMAP.md` — порядок PR (E1 → Look L2–L4; L1, M1 done)
 - `docs/CSGOBOT_SETUP.md` — OBS, CUDA, auto_shoot, patrol  
 - `docs/AI_PC_PROFILE.md` — профиль ArmoryFarm  

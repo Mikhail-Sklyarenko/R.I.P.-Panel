@@ -19,6 +19,7 @@
 | PR-H1 | Hybrid head aim (`head_aim_min_conf=0.8`) |
 | **PR-T1** | Auto team CT/T — HUD color probes, hysteresis, Ctrl+T override 5 s |
 | **PR-M1** | Auto map patrol — match-ready probes + scoreboard templates → `dust2` / `mirage` / `generic_dm` |
+| **PR-L1** | Look A — `LookController` (80–90° sweeps, alternate direction, 12–15 s idle) |
 
 ---
 
@@ -27,13 +28,12 @@
 | # | PR | Задача | Приоритет |
 |---|-----|--------|-----------|
 | 1 | **PR-E1** | E2E runbook `Start Farm → loot_ok` на ArmoryFarm | следующий |
-| 2 | **PR-L1** | **Look A** — `LookController` (ease-in-out sweeps при патруле) | после E1 |
-| 3 | **PR-L2** | **Look B** — микро-дрейф мыши при беге (доп. к L1) | после L1 |
-| 4 | **PR-L3** | **Look C** — шаги `look` в patrol YAML + jitter | после L1 |
-| 5 | **PR-L4** | **Look D** — YOLO-guided look (слабый bbox на краю кадра) | позже |
+| 2 | **PR-L2** | **Look B** — микро-дрейф мыши при беге (доп. к L1) | после E1 |
+| 3 | **PR-L3** | **Look C** — шаги `look` в patrol YAML + jitter | после L2 |
+| 4 | **PR-L4** | **Look D** — YOLO-guided look (слабый bbox на краю кадра) | позже |
 | 7 | Phase 9 | Minimap / позиция на карте | опционально, если stuck-метрики плохие |
 
-> **Look-блок (L1–L4)** идёт после **PR-M1** (done): маршрут по карте уже выбирается автоматически; L3 зависит от map-specific YAML.
+> **Look-блок (L2–L4)** идёт после **PR-L1** (done): L3 зависит от map-specific YAML (M1 done).
 
 ---
 
@@ -50,20 +50,23 @@
 
 \* с рандомом по углу/времени (±20%) — высокая
 
-### PR-L1 — Look A (`LookController`)
+### PR-L1 — Look A (`LookController`) — **done**
 
 **Проблема:** бот бежит и смотрит только вперёд → мало контактов, неестественно.
 
 **Решение:** отдельный модуль `vendor/csgobot/look/look_controller.py`:
 
-- Работает только в `PATROL`, не в бою / unstuck.
-- Случайный интервал 5–11 s между осмотрами.
-- Sweep yaw 12–38° с **ease-in-out** (smoothstep), 0.9–2.0 s туда, асимметричный возврат.
-- Градусы → mouse counts через `FOVMouseMovement.angle_to_mouse`.
-- При появлении врага — **abort**; combat aim имеет приоритет над look.
+- Работает только в `PATROL`, не в бою / unstuck / autobuy freeze.
+- Интервал **12–15 s** между осмотрами.
+- Один sweep yaw **80–90°** (smootherstep, ~0.45–0.65 s), **удержание** — без return.
+- Направление **чередуется** (+/−) каждый sweep.
+- Градусы → mouse counts через `FOVMouseMovement.angle_to_mouse` + fractional carry.
+- `look_active` guard в `main.py` — один `move_relative` за кадр; combat aim имеет приоритет.
+- При появлении врага — **abort**; не трогает `fire_controller` / `aim_pipeline`.
 - Env: `CSGOBOT_LOOK=0`, `CSGOBOT_LOOK_DEBUG=1`.
+- Тесты: `tests/test_csgobot_look_controller.py`
 
-**Не делать:** ровный маятник влево–вправо, WindMouse (absolute), резкие ±90° за кадр.
+**Не делать:** return-sweep / маятник, WindMouse, резкие ±90° за кадр, look при `enemy_target`.
 
 **DoD:** unit-тесты на easing/state machine; на farm PC — плавные повороты в DM без карусели прицела в бою.
 

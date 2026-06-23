@@ -253,6 +253,18 @@ class AutoBuyConfig:
 
 
 @dataclass
+class LookConfig:
+    """Patrol camera sweeps (PR-L1): one smooth glance, hold, alternate direction."""
+    enabled: bool = True
+    yaw_deg_min: float = 80.0
+    yaw_deg_max: float = 90.0
+    sweep_sec_min: float = 0.45
+    sweep_sec_max: float = 0.65
+    idle_sec_min: float = 12.0
+    idle_sec_max: float = 15.0
+
+
+@dataclass
 class HotkeyConfig:
     """Hotkey configuration."""
     activation: int = 58  # CAPS LOCK
@@ -282,6 +294,7 @@ class AppConfig:
     team_detect: TeamDetectConfig = field(default_factory=TeamDetectConfig)
     map_detect: MapDetectConfig = field(default_factory=MapDetectConfig)
     autobuy: AutoBuyConfig = field(default_factory=AutoBuyConfig)
+    look: LookConfig = field(default_factory=LookConfig)
     preview: PreviewConfig = field(default_factory=PreviewConfig)
     hotkeys: HotkeyConfig = field(default_factory=HotkeyConfig)
 

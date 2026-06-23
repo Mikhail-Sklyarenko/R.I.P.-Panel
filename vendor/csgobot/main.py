@@ -55,6 +55,7 @@ from map.hud_map_detect import (
 from map.paths import resolve_map_regions_path, resolve_map_templates_dir
 from map.regions import load_map_regions
 from map.template_match import load_map_templates
+from look import LookController
 from patrol import (
     PatrolMode,
     PatrolRunner,
@@ -326,6 +327,21 @@ def detection_process(
         fov=config.fov,
     )
 
+    if config.look.enabled:
+        look_controller = LookController(
+            config=config.look,
+            fov_mouse=fov_mouse,
+        )
+        logger.info(
+            "look: enabled yaw=%.0f-%.0f° idle=%.0f-%.0fs sweep=%.2f-%.2fs",
+            config.look.yaw_deg_min,
+            config.look.yaw_deg_max,
+            config.look.idle_sec_min,
+            config.look.idle_sec_max,
+            config.look.sweep_sec_min,
+            config.look.sweep_sec_max,
+        )
+
     target_selector = TargetSelector(
         aim_config=config.aim,
         screen=config.capture_region,
@@ -346,6 +362,7 @@ def detection_process(
     patrol_runner: Optional[PatrolRunner] = None
     unstuck_seq: Optional[UnstuckSequence] = None
     stuck_detector: Optional[StuckDetector] = None
+    look_controller: Optional[LookController] = None
     patrol_mode = PatrolMode.PATROL
     last_enemy_seen = 0.0
     stuck_since: Optional[float] = None
@@ -618,6 +635,9 @@ def detection_process(
                 autobuy_press is not None
                 and autobuy_state.patrol_freeze_until > now
             )
+            unstuck_running = (
+                unstuck_seq is not None and unstuck_seq.is_running
+            )
 
             if not activated.is_set():
                 if fire_controller.is_holding:
@@ -626,6 +646,8 @@ def detection_process(
                     patrol_runner.pause()
                 if unstuck_seq is not None:
                     unstuck_seq.abort()
+                if look_controller is not None:
+                    look_controller.abort(now=now)
                 stuck_since = None
                 patrol_mode = PatrolMode.PATROL
             elif config.patrol.enabled and patrol_runner is not None:
@@ -639,6 +661,8 @@ def detection_process(
                 )
                 if in_combat:
                     stuck_since = None
+                    if look_controller is not None:
+                        look_controller.abort(now=now)
                     if unstuck_seq is not None and unstuck_seq.is_running:
                         unstuck_seq.abort()
                         patrol_runner.pause()
@@ -658,7 +682,6 @@ def detection_process(
                     else:
                         patrol_runner.resume()
 
-                unstuck_running = False
                 if unstuck_seq is not None and unstuck_seq.is_running:
                     unstuck_running = unstuck_seq.tick(now)
                     if not unstuck_running:
@@ -723,7 +746,10 @@ def detection_process(
                             unstuck_cooldown_sec=config.patrol.unstuck_cooldown_sec,
                         ):
                             patrol_runner.pause()
+                            if look_controller is not None:
+                                look_controller.abort(now=now)
                             unstuck_seq.start(now)
+                            unstuck_running = True
                             stuck_since = None
                             logger.info("patrol: stuck detected, unstuck started")
                         else:
@@ -743,6 +769,45 @@ def detection_process(
                     last_move_time = now
                 except Exception as e:
                     logger.debug(f"auto_move failed: {e}")
+
+            if look_controller is not None:
+                look_patrol_tick = should_patrol_tick(
+                    patrol_enabled=config.patrol.enabled,
+                    activated=activated.is_set(),
+                    mode=patrol_mode,
+                )
+                look_should_abort = (
+                    not activated.is_set()
+                    or enemy_target is not None
+                    or in_combat
+                    or patrol_buy_freeze
+                    or unstuck_running
+                    or not config.patrol.enabled
+                    or patrol_runner is None
+                    or patrol_runner.is_paused
+                    or patrol_mode != PatrolMode.PATROL
+                )
+                if look_should_abort:
+                    look_controller.abort(now=now)
+
+                look_active = (
+                    config.look.enabled
+                    and activated.is_set()
+                    and enemy_target is None
+                    and not in_combat
+                    and patrol_mode == PatrolMode.PATROL
+                    and look_patrol_tick
+                    and not patrol_buy_freeze
+                    and not unstuck_running
+                    and patrol_runner is not None
+                    and not patrol_runner.is_paused
+                )
+                look_dx, look_dy = look_controller.tick(
+                    now=now,
+                    active=look_active,
+                )
+                if look_active and (look_dx or look_dy):
+                    mouse.move_relative(look_dx, look_dy)
 
             if activated.is_set() and enemy_target is not None:
                 target = enemy_target

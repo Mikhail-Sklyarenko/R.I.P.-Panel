@@ -18,6 +18,7 @@ from config import (
     AutoBuyConfig,
     TeamDetectConfig,
     MapDetectConfig,
+    LookConfig,
     Team,
     PreviewConfig,
     HotkeyConfig,
@@ -118,6 +119,13 @@ TEAM_MANUAL_OVERRIDE_SEC = 5.0
 AUTO_MAP_DETECT = True
 MAP_DETECT_CONFIRM_FRAMES = 3
 MAP_DETECT_LOCK = True
+LOOK_ENABLED = True
+LOOK_YAW_MIN = 80.0
+LOOK_YAW_MAX = 90.0
+LOOK_SWEEP_MIN = 0.45
+LOOK_SWEEP_MAX = 0.65
+LOOK_IDLE_MIN = 12.0
+LOOK_IDLE_MAX = 15.0
 AUTO_MOVE = False  # legacy random tap; use PATROL when enabled
 MOVE_INTERVAL_SEC = 8.0
 DEAD_ZONE = 12.0  # legacy; maps to AIM_DEAD_ZONE_HIGH if unset
@@ -188,6 +196,7 @@ def create_config() -> AppConfig:
         resolve_smoothing,
         resolve_x360,
     )
+    from look.config_resolve import resolve_look_config
 
     x360 = resolve_x360(X360)
     smoothing = resolve_smoothing(SMOOTHING)
@@ -270,6 +279,18 @@ def create_config() -> AppConfig:
         move_interval_sec=MOVE_INTERVAL_SEC,
         dead_zone=aim_high,
         one_shot=ONE_SHOT,
+    )
+
+    look_config = resolve_look_config(
+        LookConfig(
+            enabled=LOOK_ENABLED,
+            yaw_deg_min=LOOK_YAW_MIN,
+            yaw_deg_max=LOOK_YAW_MAX,
+            sweep_sec_min=LOOK_SWEEP_MIN,
+            sweep_sec_max=LOOK_SWEEP_MAX,
+            idle_sec_min=LOOK_IDLE_MIN,
+            idle_sec_max=LOOK_IDLE_MAX,
+        ),
     )
 
     preview_config = PreviewConfig(
@@ -392,6 +413,7 @@ def create_config() -> AppConfig:
         team_detect=team_detect_config,
         map_detect=map_detect_config,
         autobuy=autobuy_config,
+        look=look_config,
         preview=preview_config,
         hotkeys=hotkey_config,
     )
@@ -529,6 +551,16 @@ def main() -> int:
             config.map_detect.enabled = False
     else:
         logger.info("Map detect: disabled (CSGOBOT_AUTO_MAP=0 or CSGOBOT_PATROL_SCRIPT)")
+    logger.info(
+        "Look: enabled=%s yaw=%.0f-%.0f° idle=%.0f-%.0fs sweep=%.2f-%.2fs",
+        config.look.enabled,
+        config.look.yaw_deg_min,
+        config.look.yaw_deg_max,
+        config.look.idle_sec_min,
+        config.look.idle_sec_max,
+        config.look.sweep_sec_min,
+        config.look.sweep_sec_max,
+    )
     logger.info(
         f"Autobuy: enabled={config.autobuy.enabled} "
         f"key={config.autobuy.buy_key} burst={config.autobuy.burst_count} "

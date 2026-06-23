@@ -112,7 +112,9 @@ Env без правки `run.py`: `CS2_SENSITIVITY`, `CSGOBOT_X360`, `CSGOBOT_SM
 
 **Auto map patrol (PR-M1):** template match + optional Tesseract на попапе «матч готов» и заголовке scoreboard (Tab). `dust2` / `mirage` → `resources/patrol/{map}.yaml`, иначе `generic_dm`. По умолчанию **включено** (`AUTO_MAP_DETECT = True`), hysteresis 3 кадра, lock после подтверждения. Env: `CSGOBOT_AUTO_MAP=0` (выкл), `CSGOBOT_MAP_DEBUG=1` (лог), `CSGOBOT_PATROL_SCRIPT=dust2` (фикс. скрипт, без автодетекта). Ресурсы: `resources/csgobot/map_regions_1280x720.yaml`, `resources/csgobot/map_templates/`. Пересборка шаблонов: `python scripts/build_map_templates.py`. Фикстуры: `tests/fixtures/csgobot_map/`.
 
-**Roadmap:** `docs/COMBAT_ROADMAP.md` — следующие PR: **E1** (E2E) → **L1–L4** (Look).
+**Patrol look (PR-L1):** один плавный поворот **80–90°** (~0.45–0.65 s), **без return**; направление чередуется; следующий поворот через **12–15 s**. Не работает в бою / unstuck / autobuy freeze. Env: `CSGOBOT_LOOK=0`, `CSGOBOT_LOOK_DEBUG=1`, `CSGOBOT_LOOK_YAW_MIN/MAX`, `CSGOBOT_LOOK_SWEEP_MIN/MAX`, `CSGOBOT_LOOK_IDLE_MIN/MAX`.
+
+**Roadmap:** `docs/COMBAT_ROADMAP.md` — следующие PR: **E1** (E2E) → **L2–L4** (Look).
 
 **Fire (PR-6d):** default `CSGOBOT_SHOOT_MODE=hold` (зажим LMB). Альтернативы: `burst`, `tap`. См. `docs/AIM_TUNING.md`.
 
@@ -141,6 +143,7 @@ Env без правки `run.py`: `CS2_SENSITIVITY`, `CSGOBOT_X360`, `CSGOBOT_SM
 | `PATROL_ENABLED` | `True` | сценарий вместо random WASD |
 | `PATROL_SCRIPT` | `generic_dm` | файл `resources/patrol/{name}.yaml` |
 | `PATROL_COMBAT_CLEAR_SEC` | `0.75` | пауза после врага перед бегом |
+| `LOOK_ENABLED` | `True` | плавный осмотр камерой в патруле (PR-L1) |
 | `AUTO_MOVE` | `False` | legacy random tap |
 
 Сценарии: `generic_dm.yaml`, `dust2.yaml`, `mirage.yaml`. В логе: `patrol: loaded ...`.
