@@ -34,6 +34,7 @@ from detectors import YOLOv8Detector
 from detectors.combat_detect import run_combat_detection
 from detectors.detect_debug import log_detect_status
 from aiming import FOVMouseMovement, TargetSelector
+from aiming.aim_mouse_controller import AimMouseController
 from aiming.aim_pipeline import AimPipelineState, process_aim_frame
 from aiming.fire_actions import apply_fire_action
 from aiming.fire_controller import FireAction, FireController
@@ -363,6 +364,14 @@ def detection_process(
         stop_event.set()
         return
 
+    aim_mouse: Optional[AimMouseController] = None
+    if float(config.aim.mouse_hz) > 0:
+        aim_mouse = AimMouseController(
+            config=config.aim,
+            fov_mouse=fov_mouse,
+        )
+        aim_mouse.start(mouse.move_relative)
+
     fps = FPSCounter()
     last_move_time = 0.0
     fire_controller = FireController.from_aim_config(config.aim)
@@ -620,12 +629,17 @@ def detection_process(
                 head_miss_since = None
                 last_target_key = None
                 aim_pipeline.reset_trackers()
+                if aim_mouse is not None:
+                    aim_mouse.clear()
                 if fire_controller.is_holding:
                     fire_action = fire_controller.force_release(now)
 
             in_combat = enemy_target is not None
             if in_combat:
                 last_enemy_seen = now
+
+            if not activated.is_set() and aim_mouse is not None:
+                aim_mouse.clear()
 
             if autobuy_press is not None:
                 autobuy_state = update_autobuy(
@@ -849,6 +863,8 @@ def detection_process(
                 )
                 if switched_body:
                     aim_pipeline.reset_trackers()
+                    if aim_mouse is not None:
+                        aim_mouse.reset_track()
 
                 target_key = (
                     target.class_name,
@@ -857,6 +873,8 @@ def detection_process(
                 )
                 if target_key != last_target_key:
                     aim_pipeline.reset_trackers()
+                    if aim_mouse is not None:
+                        aim_mouse.reset_track()
                     last_target_key = target_key
 
                 frame = process_aim_frame(
@@ -870,11 +888,23 @@ def detection_process(
                     fps_value=fps(),
                 )
 
-                if frame.should_move and (frame.mouse_dx or frame.mouse_dy):
-                    mouse.move_relative(frame.mouse_dx, frame.mouse_dy)
-
-                    if config.aim.one_shot:
+                if aim_mouse is not None:
+                    aim_mouse.set_target(
+                        frame.aim_x,
+                        frame.aim_y,
+                        smoothing=frame.smoothing,
+                        now=now,
+                    )
+                    dbg_dx, dbg_dy = aim_mouse.last_delta
+                    if config.aim.one_shot and aim_mouse.consume_applied():
                         activated.clear()
+                else:
+                    dbg_dx, dbg_dy = frame.mouse_dx, frame.mouse_dy
+                    if frame.should_move and (frame.mouse_dx or frame.mouse_dy):
+                        mouse.move_relative(frame.mouse_dx, frame.mouse_dy)
+
+                        if config.aim.one_shot:
+                            activated.clear()
 
                 fire_action = fire_controller.tick(
                     pixel_distance=frame.pixel_distance,
@@ -888,21 +918,22 @@ def detection_process(
                         "aim: fps=%.0f dist=%.1f smooth=%.2f "
                         "mouse=(%d,%d) target=(%.0f,%.0f) "
                         "lead_stable=%s speed=%.0f move=%s "
-                        "fire=%s hold=%s roi=%s body_fb=%s",
+                        "fire=%s hold=%s roi=%s body_fb=%s hz=%.0f",
                         fps(),
                         frame.pixel_distance,
                         frame.smoothing,
-                        frame.mouse_dx,
-                        frame.mouse_dy,
+                        dbg_dx,
+                        dbg_dy,
                         frame.aim_x,
                         frame.aim_y,
                         frame.lead.stable,
                         frame.lead.speed_px_s,
-                        frame.should_move,
+                        frame.should_move if aim_mouse is None else bool(dbg_dx or dbg_dy),
                         fire_action.mode,
                         fire_action.holding,
                         roi_used_last,
                         switched_body,
+                        float(config.aim.mouse_hz),
                     )
                     last_aim_debug_log = now
 
@@ -946,6 +977,8 @@ def detection_process(
 
                 preview_queue.put_nowait(img)
     finally:
+        if aim_mouse is not None:
+            aim_mouse.stop()
         apply_fire_action(mouse, fire_controller.force_release(time.monotonic()))
         if unstuck_seq is not None:
             unstuck_seq.abort()

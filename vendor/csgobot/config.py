@@ -145,6 +145,13 @@ class AimConfig:
     mouse_max_delta: int = 35
     mouse_min_delta: int = 2
 
+    # PR-A1 (Aim L1.3-style): high-rate mouse thread + target tracking
+    # mouse_hz=0 → legacy one mouse apply per YOLO frame
+    mouse_hz: float = 120.0
+    mouse_step_max_delta: int = 20  # per high-rate tick; 0 = use mouse_max_delta
+    mouse_coast: bool = True  # extrapolate aim point between detections
+    mouse_coast_max_sec: float = 0.10
+
     # PR-6c: lead variance gate
     lead_variance_gate: bool = True
     lead_min_speed_px_s: float = 40.0

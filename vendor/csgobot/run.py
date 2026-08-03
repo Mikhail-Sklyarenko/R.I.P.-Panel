@@ -143,6 +143,11 @@ AIM_DEAD_ZONE_LOW = 8.0
 SHOOT_DEAD_ZONE = 18.0
 MOUSE_MAX_DELTA = 35
 MOUSE_MIN_DELTA = 2
+# Aim L1.3-style: dedicated mouse thread (0 = legacy YOLO-tick mouse)
+AIM_MOUSE_HZ = 120.0
+AIM_MOUSE_STEP_MAX = 20
+AIM_MOUSE_COAST = True
+AIM_MOUSE_COAST_MAX_SEC = 0.10
 AIM_SMOOTH_ENABLED = True
 AIM_SMOOTH_ALPHA = 0.45
 AIM_SMOOTH_JUMP_RESET_PX = 80.0
@@ -172,6 +177,10 @@ def create_config() -> AppConfig:
         resolve_adaptive_smoothing,
         resolve_aim_dead_zone_high,
         resolve_aim_dead_zone_low,
+        resolve_aim_mouse_coast,
+        resolve_aim_mouse_coast_max_sec,
+        resolve_aim_mouse_hz,
+        resolve_aim_mouse_step_max_delta,
         resolve_aim_smooth_alpha,
         resolve_aim_smooth_enabled,
         resolve_body_fallback_sec,
@@ -269,6 +278,10 @@ def create_config() -> AppConfig:
         aim_smooth_jump_reset_px=AIM_SMOOTH_JUMP_RESET_PX,
         mouse_max_delta=resolve_mouse_max_delta(MOUSE_MAX_DELTA),
         mouse_min_delta=resolve_mouse_min_delta(MOUSE_MIN_DELTA),
+        mouse_hz=resolve_aim_mouse_hz(AIM_MOUSE_HZ),
+        mouse_step_max_delta=resolve_aim_mouse_step_max_delta(AIM_MOUSE_STEP_MAX),
+        mouse_coast=resolve_aim_mouse_coast(AIM_MOUSE_COAST),
+        mouse_coast_max_sec=resolve_aim_mouse_coast_max_sec(AIM_MOUSE_COAST_MAX_SEC),
         head_confidence=HEAD_SHOOT_CONFIDENCE,
         body_confidence=BODY_SHOOT_CONFIDENCE,
         auto_shoot=AUTO_SHOOT,
@@ -517,7 +530,8 @@ def main() -> int:
         f"Aim advanced: lead={config.aim.lead_aim_enabled} "
         f"lead_ms={config.aim.lead_ms} lead_gate={config.aim.lead_variance_gate} "
         f"smooth={config.aim.aim_smooth_alpha} body_fallback={config.aim.body_fallback_sec}s "
-        f"mouse_cap={config.aim.mouse_max_delta}"
+        f"mouse_cap={config.aim.mouse_max_delta} "
+        f"aim_hz={config.aim.mouse_hz} step_max={config.aim.mouse_step_max_delta}"
     )
     logger.info(
         f"Shoot: mode={config.aim.shoot_mode} burst={config.aim.burst_size} "

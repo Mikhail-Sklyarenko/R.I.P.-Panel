@@ -96,6 +96,32 @@ def resolve_mouse_min_delta(default: int) -> int:
     return default
 
 
+def resolve_aim_mouse_hz(default: float) -> float:
+    raw = os.environ.get("CSGOBOT_AIM_MOUSE_HZ", "").strip()
+    if raw:
+        return max(0.0, float(raw))
+    return default
+
+
+def resolve_aim_mouse_step_max_delta(default: int) -> int:
+    raw = os.environ.get("CSGOBOT_AIM_MOUSE_STEP_MAX", "").strip()
+    if raw:
+        return max(0, int(float(raw)))
+    return default
+
+
+def resolve_aim_mouse_coast(default: bool) -> bool:
+    val = _env_bool("CSGOBOT_AIM_MOUSE_COAST")
+    return default if val is None else val
+
+
+def resolve_aim_mouse_coast_max_sec(default: float) -> float:
+    raw = os.environ.get("CSGOBOT_AIM_MOUSE_COAST_MAX_SEC", "").strip()
+    if raw:
+        return max(0.0, float(raw))
+    return default
+
+
 def resolve_lead_variance_gate(default: bool) -> bool:
     val = _env_bool("CSGOBOT_LEAD_VARIANCE_GATE")
     return default if val is None else val

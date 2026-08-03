@@ -120,6 +120,21 @@ Legacy `CSGOBOT_DEAD_ZONE` → `aim_dead_zone_high`.
 
 Симптом «дёргается на бегу» → `git pull` 6c; debug: `lead_stable=False` в `aim:` log.
 
+## High-rate aim mouse (PR-A1 / L1.3-style)
+
+Тот же принцип, что у look L1.3: **detection задаёт цель**, **мышь крутится на своём hz**.
+
+| Параметр | Default | Env |
+|----------|---------|-----|
+| Aim mouse Hz | **120** | `CSGOBOT_AIM_MOUSE_HZ` (`0` = legacy, 1 apply / YOLO frame) |
+| Step max / tick | **20** | `CSGOBOT_AIM_MOUSE_STEP_MAX` |
+| Coast between detections | `on` | `CSGOBOT_AIM_MOUSE_COAST=0` |
+| Coast max age | **0.10 s** | `CSGOBOT_AIM_MOUSE_COAST_MAX_SEC` |
+
+Pipeline при hz&gt;0: **EMA → lead → set_target → 120 Hz FOV+cap+hysteresis → shoot zone** (fire по-прежнему на YOLO tick).
+
+Симптом «цель есть, но дёргает как слайдшоу» → убедиться `aim_hz=120` в стартовом логе `Aim advanced: … aim_hz=120`; `CSGOBOT_AIM_DEBUG=1`.
+
 ## Hybrid head aim (PR-H1)
 
 Близко + уверенная голова → **head**; далеко / tiny bbox / low conf → **body** (6f long-range сохранён).
@@ -147,7 +162,7 @@ Shoot confidence отдельно: head `0.65`, body `0.55` (fire_controller).
 
 **ROI fallback:** если на полном кадре 0 врагов — второй YOLO pass по центральному crop 75%. Лог при `CSGOBOT_DETECT_DEBUG=1`: `detect: enemies=N roi=True best=t conf=... bbox_h=...`.
 
-Smoothing делит шаг мыши на N каждый кадр YOLO (не плавная кривая).
+Smoothing делит шаг мыши на N каждый тик мыши (при PR-A1 — на 120 Hz; при `AIM_MOUSE_HZ=0` — каждый кадр YOLO).
 
 ### Симптом → действие
 

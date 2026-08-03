@@ -114,7 +114,9 @@ Env без правки `run.py`: `CS2_SENSITIVITY`, `CSGOBOT_X360`, `CSGOBOT_SM
 
 **Patrol look (PR-L1…L1.3):** поворот **80–90°**, idle **5–8 s**. **L1.1** combat не сбрасывает idle. **L1.2/L1.3:** sweep **1.0–1.4 s** (≤1.8 s hard max, ~80°/s), мышь на отдельном потоке **`mouse_hz=120`**, шаг ≤**20**, на время look отпускается WASD. Лог: `look: sweep start … hz=120`. Env: `CSGOBOT_LOOK_MOUSE_HZ`, `CSGOBOT_LOOK_MAX_DELTA`, `CSGOBOT_LOOK_SWEEP_*`, `CSGOBOT_LOOK_MAX_YAW_DEG_PER_SEC`, `CSGOBOT_LOOK_SWEEP_HARD_MAX`, `CSGOBOT_LOOK_PAUSE_MOVEMENT=0`.
 
-**Roadmap:** `docs/COMBAT_ROADMAP.md` — следующие PR: **E1** (E2E) → **L2–L4** (Look).
+**Aim mouse (PR-A1 / L1.3-style):** наводка больше не привязана к FPS YOLO. Detection обновляет aim-point (EMA+lead); отдельный поток **`AIM_MOUSE_HZ=120`** тянет мышь к цели capped-шагами (`AIM_MOUSE_STEP_MAX=20`) + coast между кадрами. Стрейфы **не** входят в A1. Env: `CSGOBOT_AIM_MOUSE_HZ=0` (legacy), `CSGOBOT_AIM_MOUSE_STEP_MAX`, `CSGOBOT_AIM_MOUSE_COAST`, `CSGOBOT_AIM_MOUSE_COAST_MAX_SEC`. Лог: `aim: mouse thread hz=120 …`.
+
+**Roadmap:** `docs/COMBAT_ROADMAP.md` — следующие: **E1** (E2E) → **A2** (strafes) → **L2–L4** (Look).
 
 **Fire (PR-6d):** default `CSGOBOT_SHOOT_MODE=hold` (зажим LMB). Альтернативы: `burst`, `tap`. См. `docs/AIM_TUNING.md`.
 
