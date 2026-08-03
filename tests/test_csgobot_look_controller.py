@@ -30,6 +30,9 @@ def _ctrl(
     idle_max: float = 15.0,
     sweep_min: float = 0.45,
     sweep_max: float = 0.65,
+    max_yaw_deg_per_sec: float = 1000.0,
+    max_delta: int = 28,
+    substeps_per_tick: int = 12,
 ) -> LookController:
     return LookController(
         config=LookConfig(
@@ -40,6 +43,10 @@ def _ctrl(
             sweep_sec_max=sweep_max,
             idle_sec_min=idle_min,
             idle_sec_max=idle_max,
+            max_yaw_deg_per_sec=max_yaw_deg_per_sec,
+            max_delta=max_delta,
+            substeps_per_tick=substeps_per_tick,
+            substep_sleep_sec=0.0,
         ),
         fov_mouse=_fov_mouse(),
         rng=random.Random(seed),
@@ -222,6 +229,7 @@ def test_yaw_and_idle_within_config_bounds() -> None:
             sweep_sec_max=0.65,
             idle_sec_min=12.0,
             idle_sec_max=15.0,
+            max_yaw_deg_per_sec=1000.0,
         ),
         fov_mouse=_fov_mouse(),
         rng=rng,
@@ -233,6 +241,49 @@ def test_yaw_and_idle_within_config_bounds() -> None:
     ctrl._begin_sweep(now=delay)
     assert 80.0 <= ctrl._current_yaw_deg <= 90.0
     assert 0.45 <= ctrl._sweep_duration <= 0.65
+
+
+def test_yaw_rate_floor_extends_short_sweep() -> None:
+    ctrl = _ctrl(
+        seed=1,
+        sweep_min=0.3,
+        sweep_max=0.3,
+        max_yaw_deg_per_sec=60.0,
+    )
+    ctrl._begin_sweep(now=0.0)
+    # 80° / 60°/s ≈ 1.33s minimum
+    assert ctrl._sweep_duration >= ctrl._current_yaw_deg / 60.0 - 1e-6
+
+
+def test_apply_mouse_caps_each_substep() -> None:
+    ctrl = _ctrl(
+        seed=5,
+        idle_min=0.0,
+        idle_max=0.0,
+        sweep_min=0.4,
+        sweep_max=0.4,
+        max_delta=10,
+        substeps_per_tick=5,
+    )
+    pieces: list[int] = []
+    ctrl.tick(now=0.0, active=True)  # begin sweep (elapsed=0 → no mouse yet)
+    ctrl.tick(
+        now=0.2,
+        active=True,
+        apply_mouse=lambda dx, dy: pieces.append(dx),
+    )
+    assert pieces
+    assert all(abs(p) <= 10 for p in pieces)
+    assert abs(sum(pieces)) <= 10 * 5
+
+
+def test_is_sweeping_property() -> None:
+    ctrl = _ctrl(idle_min=0.0, idle_max=0.0, sweep_min=1.0, sweep_max=1.0)
+    assert not ctrl.is_sweeping
+    ctrl.tick(now=0.0, active=True)
+    assert ctrl.is_sweeping
+    ctrl.abort(now=0.1)
+    assert not ctrl.is_sweeping
 
 
 def test_main_py_does_not_null_look_controller_after_create() -> None:

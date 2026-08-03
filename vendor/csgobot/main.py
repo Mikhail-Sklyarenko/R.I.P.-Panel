@@ -337,7 +337,7 @@ def detection_process(
         )
         logger.info(
             "look: enabled yaw=%.0f-%.0f° idle=%.0f-%.0fs sweep=%.2f-%.2fs "
-            "abort_cd=%.1fs (combat preserves cadence)",
+            "abort_cd=%.1fs max_yaw=%.0f°/s max_delta=%d (L1.2 smooth)",
             config.look.yaw_deg_min,
             config.look.yaw_deg_max,
             config.look.idle_sec_min,
@@ -345,6 +345,8 @@ def detection_process(
             config.look.sweep_sec_min,
             config.look.sweep_sec_max,
             config.look.abort_cooldown_sec,
+            config.look.max_yaw_deg_per_sec,
+            config.look.max_delta,
         )
 
     target_selector = TargetSelector(
@@ -714,9 +716,18 @@ def detection_process(
                 ):
                     patrol_runner.resume()
 
+                look_hold_movement = (
+                    look_controller is not None
+                    and config.look.pause_movement
+                    and look_controller.is_sweeping
+                )
+                if look_hold_movement:
+                    patrol_runner.release_all_keys()
+
                 if (
                     not patrol_buy_freeze
                     and not unstuck_running
+                    and not look_hold_movement
                     and should_patrol_tick(
                         patrol_enabled=config.patrol.enabled,
                         activated=activated.is_set(),
@@ -806,12 +817,20 @@ def detection_process(
                     and patrol_runner is not None
                     and not patrol_runner.is_paused
                 )
-                look_dx, look_dy = look_controller.tick(
+                look_controller.tick(
                     now=now,
                     active=look_active,
+                    apply_mouse=(
+                        mouse.move_relative if look_active else None
+                    ),
                 )
-                if look_active and (look_dx or look_dy):
-                    mouse.move_relative(look_dx, look_dy)
+                if (
+                    look_active
+                    and config.look.pause_movement
+                    and look_controller.is_sweeping
+                    and patrol_runner is not None
+                ):
+                    patrol_runner.release_all_keys()
 
             if activated.is_set() and enemy_target is not None:
                 target = enemy_target

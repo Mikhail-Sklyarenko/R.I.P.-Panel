@@ -254,16 +254,22 @@ class AutoBuyConfig:
 
 @dataclass
 class LookConfig:
-    """Patrol camera sweeps (PR-L1/L1.1): glance + combat-resilient wall-clock cadence."""
+    """Patrol camera sweeps (PR-L1…L1.2): cadence + smooth capped mouse substeps."""
     enabled: bool = True
     yaw_deg_min: float = 80.0
     yaw_deg_max: float = 90.0
-    sweep_sec_min: float = 0.7
-    sweep_sec_max: float = 1.1
+    sweep_sec_min: float = 1.6
+    sweep_sec_max: float = 2.4
     idle_sec_min: float = 5.0
     idle_sec_max: float = 8.0
     # After mid-sweep abort (combat), retry no sooner than this — do not full-reset idle.
     abort_cooldown_sec: float = 1.5
+    # L1.2 smoothness
+    max_yaw_deg_per_sec: float = 55.0  # floor on sweep duration = yaw / rate
+    max_delta: int = 28  # mouse counts per substep (aim uses ~35)
+    substeps_per_tick: int = 12
+    substep_sleep_sec: float = 0.001
+    pause_movement: bool = True  # release WASD while sweeping
 
 
 @dataclass
