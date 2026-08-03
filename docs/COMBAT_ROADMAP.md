@@ -25,6 +25,7 @@
 | **PR-L1.3** | Look speed+smooth: retuned 1.0–1.4 s + dedicated 120 Hz mouse thread |
 | **PR-A1** | Aim L1.3-style: 120 Hz mouse thread + target tracking/coast (no strafes) |
 | **PR-A1.1** | Aim soft-settle: hold on target (no bbox hunt); coast only for real speed |
+| **PR-A1.2** | Dual-phase aim: fast acquire + early fire (shoot@28) + settle@10 |
 
 ---
 
@@ -33,7 +34,7 @@
 | # | PR | Задача | Приоритет |
 |---|-----|--------|-----------|
 | 1 | **PR-E1** | E2E runbook `Start Farm → loot_ok` на ArmoryFarm | следующий |
-| 2 | **PR-A2** | Combat strafes (human WASD while aiming) — после A1.1 | после A1.1 farm soak |
+| 2 | **PR-A2** | Combat strafes (human WASD while aiming) — после A1.2 | после A1.2 farm soak |
 | 3 | **PR-L2** | **Look B** — микро-дрейф мыши при беге (доп. к L1) | после E1 |
 | 4 | **PR-L3** | **Look C** — шаги `look` в patrol YAML + jitter | после L2 |
 | 5 | **PR-L4** | **Look D** — YOLO-guided look (слабый bbox на краю кадра) | позже |

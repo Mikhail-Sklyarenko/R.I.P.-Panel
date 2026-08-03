@@ -94,7 +94,7 @@ Caps Lock → проверка поворота на 360°.
 | Hold re-press gap | `50 ms` | `CSGOBOT_HOLD_GAP_MS` |
 | Hold release grace | `80 ms` | `CSGOBOT_HOLD_RELEASE_GRACE_MS` |
 | Shoot cooldown (tap) | `70 ms` | `CSGOBOT_SHOOT_COOLDOWN_MS` |
-| Head/body conf | `0.65` / `0.55` | — |
+| Head/body conf | `0.60` / `0.50` | — |
 
 **hold** — `mouseDown` пока цель в `shoot_dead_zone`, отпускает после `HOLD_MAX_MS` или потери цели (с grace). Ближе к «зажиму» в DM.
 
@@ -120,28 +120,29 @@ Legacy `CSGOBOT_DEAD_ZONE` → `aim_dead_zone_high`.
 
 Симптом «дёргается на бегу» → `git pull` 6c; debug: `lead_stable=False` в `aim:` log.
 
-## High-rate aim mouse (PR-A1 / A1.1 settle)
+## High-rate aim mouse (PR-A1 / A1.1 settle / A1.2 dual-phase)
 
 Тот же принцип, что у look L1.3: **detection задаёт цель**, **мышь крутится на своём hz**.
 
 | Параметр | Default | Env |
 |----------|---------|-----|
-| Aim mouse Hz | **120** | `CSGOBOT_AIM_MOUSE_HZ` (`0` = legacy, 1 apply / YOLO frame) |
-| Step max / tick | **20** | `CSGOBOT_AIM_MOUSE_STEP_MAX` |
-| Coast between detections | `on` | `CSGOBOT_AIM_MOUSE_COAST=0` |
-| Coast max age | **0.10 s** | `CSGOBOT_AIM_MOUSE_COAST_MAX_SEC` |
+| Aim mouse Hz | **120** | `CSGOBOT_AIM_MOUSE_HZ` (`0` = legacy) |
+| Step max / tick | **28** | `CSGOBOT_AIM_MOUSE_STEP_MAX` |
+| Base smoothing | **1.8** | `CSGOBOT_SMOOTHING` |
+| Shoot dead zone | **28** | `CSGOBOT_SHOOT_DEAD_ZONE` (огонь **до** settle) |
 | Soft-settle | `on` | `CSGOBOT_AIM_SETTLE=0` |
-| Settle / unlock px | **10** / **18** | `CSGOBOT_AIM_SETTLE_PX`, `CSGOBOT_AIM_UNLOCK_PX` |
+| Settle / unlock px | **10** / **20** | `CSGOBOT_AIM_SETTLE_PX`, `CSGOBOT_AIM_UNLOCK_PX` |
+| Near zone / step | **36** / **14** | `CSGOBOT_AIM_NEAR_PX`, `CSGOBOT_AIM_NEAR_STEP_MAX` |
+| Snap px / acquire scale | **100** / **0.5** | `CSGOBOT_AIM_SNAP_PX`, `CSGOBOT_AIM_ACQUIRE_SMOOTH_SCALE` |
 | Coast min speed | **150** px/s | `CSGOBOT_AIM_COAST_MIN_SPEED` |
-| Near zone / step | **56** / **8** | `CSGOBOT_AIM_NEAR_PX`, `CSGOBOT_AIM_NEAR_STEP_MAX` |
 
-**A1.1:** на цели — soft-lock aim-point (игнор bbox jitter до unlock); coast только если скорость выше порога; near-zone меньший step против overshoot-hunt. «Живость» стрельбы — позже через **A2 strafes**, не через wobble прицела.
+**A1.2 dual-phase:** далеко — низкий effective smoothing + крупный step (быстрый snap); ближе `near_px` — precision; огонь с **28 px**; settle на **10 px** (без hunt). Shoot conf head/body **0.60 / 0.50**.
 
-Pipeline при hz&gt;0: **EMA → lead → set_target (settle gate) → 120 Hz FOV+cap+hysteresis → shoot zone**.
+Pipeline: **EMA → lead → set_target → 120 Hz (acquire smooth + step) → shoot@28 → settle@10**.
 
-Симптом «водит прицелом по торсу на цели» → `git pull` A1.1; в debug `settle=True`; при необходимости ↑ `CSGOBOT_AIM_SETTLE_PX` / `CSGOBOT_AIM_UNLOCK_PX`.
+Симптом «медленно наводится / поздно стреляет» → `git pull` A1.2; лог `(A1.2)`; при необходимости ↓ `CSGOBOT_SMOOTHING=1.4`, ↑ `CSGOBOT_SHOOT_DEAD_ZONE=32`.
 
-Симптом «цель есть, но дёргает как слайдшоу» → убедиться `aim_hz=120` в стартовом логе; `CSGOBOT_AIM_DEBUG=1`.
+Симптом «водит прицелом по торсу» → settle on; ↑ `CSGOBOT_AIM_SETTLE_PX`.
 
 ## Hybrid head aim (PR-H1)
 
@@ -154,7 +155,7 @@ Pipeline при hz&gt;0: **EMA → lead → set_target (settle gate) → 120 Hz 
 | Min bbox height (head) | `28` | `CSGOBOT_MIN_BBOX_HEIGHT` |
 | Long-range body bias | `on` | `CSGOBOT_LONG_RANGE_BODY=0` |
 
-Shoot confidence отдельно: head `0.65`, body `0.55` (fire_controller) — не путать с **aim** conf 0.8.
+Shoot confidence отдельно: head `0.60`, body `0.50` (fire_controller) — не путать с **aim** conf 0.8.
 
 Лог: `head_aim_min_conf=0.8 heads=True`.
 
@@ -166,7 +167,7 @@ Shoot confidence отдельно: head `0.65`, body `0.55` (fire_controller) �
 | Max assist dist | `320` | `CSGOBOT_MAX_DIST` |
 | ROI center zoom | `on` (0.75) | `CSGOBOT_ROI_ZOOM=0`, `CSGOBOT_ROI_FRACTION` |
 
-Shoot confidence отдельно: head `0.65`, body `0.55` (fire_controller).
+Shoot confidence отдельно: head `0.60`, body `0.50` (fire_controller).
 
 **ROI fallback:** если на полном кадре 0 врагов — второй YOLO pass по центральному crop 75%. Лог при `CSGOBOT_DETECT_DEBUG=1`: `detect: enemies=N roi=True best=t conf=... bbox_h=...`.
 

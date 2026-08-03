@@ -117,8 +117,8 @@ class AimConfig:
     min_shoot_distance: int = 50    # Min distance for auto-shoot
 
     # Confidence thresholds for auto-shoot
-    head_confidence: float = 0.65
-    body_confidence: float = 0.55
+    head_confidence: float = 0.60
+    body_confidence: float = 0.50
 
     # Smoothing (1.0 = instant, higher = slower)
     smoothing_factor: float = 1.0
@@ -136,7 +136,7 @@ class AimConfig:
     # PR-6c: aim movement hysteresis (pixels from crosshair)
     aim_dead_zone_high: float = 14.0
     aim_dead_zone_low: float = 8.0
-    shoot_dead_zone: float = 18.0
+    shoot_dead_zone: float = 28.0
 
     # PR-6c: aim point EMA + mouse delta filter
     aim_smooth_enabled: bool = True
@@ -148,16 +148,19 @@ class AimConfig:
     # PR-A1 (Aim L1.3-style): high-rate mouse thread + target tracking
     # mouse_hz=0 → legacy one mouse apply per YOLO frame
     mouse_hz: float = 120.0
-    mouse_step_max_delta: int = 20  # per high-rate tick; 0 = use mouse_max_delta
+    mouse_step_max_delta: int = 28  # per high-rate tick; 0 = use mouse_max_delta
     mouse_coast: bool = True  # extrapolate aim point between detections
     mouse_coast_max_sec: float = 0.10
     # PR-A1.1: soft-settle (stop hunting bbox noise on target)
     aim_settle_enabled: bool = True
     aim_settle_px: float = 10.0  # enter soft-lock when crosshair dist ≤ this
-    aim_unlock_px: float = 18.0  # leave soft-lock when aim point jumps this much
+    aim_unlock_px: float = 20.0  # leave soft-lock when aim point jumps this much
     mouse_coast_min_speed_px_s: float = 150.0  # below → no coast (noise gate)
-    aim_near_px: float = 56.0  # within → use near step cap
-    aim_near_step_max_delta: int = 8
+    # PR-A1.2: dual-phase — fast acquire, precise near, fire before settle
+    aim_near_px: float = 36.0  # within → near step + full smoothing
+    aim_near_step_max_delta: int = 14
+    aim_snap_px: float = 100.0  # beyond → max acquire snap (far_scale)
+    aim_acquire_smooth_scale: float = 0.5  # far smoothing multiplier
 
     # PR-6c: lead variance gate
     lead_variance_gate: bool = True

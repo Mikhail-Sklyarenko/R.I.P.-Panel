@@ -354,14 +354,16 @@ def adaptive_smoothing(
 
     Far targets → lower smoothing (faster snap). Close → higher (precision).
     Low FPS → higher smoothing (less overshoot per frame).
+
+    A1.2: more aggressive far snap (was 0.65…1.25 → 0.50…1.15).
     """
     base = max(1.0, base)
     if max_distance <= 0:
         max_distance = 300.0
 
     dist_norm = min(1.0, max(0.0, pixel_distance / max_distance))
-    # far: *0.65, close: *1.25
-    dist_factor = 1.25 - 0.6 * dist_norm
+    # far: *0.50, close: *1.15
+    dist_factor = 1.15 - 0.65 * dist_norm
 
     fps_factor = 1.0
     if fps > 0:
@@ -373,3 +375,48 @@ def adaptive_smoothing(
             fps_factor = 0.88
 
     return max(1.0, base * dist_factor * fps_factor)
+
+
+def acquisition_smoothing(
+    base: float,
+    pixel_distance: float,
+    *,
+    near_px: float = 36.0,
+    snap_px: float = 100.0,
+    far_scale: float = 0.5,
+) -> float:
+    """
+    Dual-phase mouse smoothing (PR-A1.2).
+
+    Far from crosshair → multiply base by ``far_scale`` (snappier).
+    Inside ``near_px`` → keep full base (precision / settle).
+    Between → linear blend.
+    """
+    base = max(1.0, float(base))
+    dist = max(0.0, float(pixel_distance))
+    near = max(0.0, float(near_px))
+    snap = max(near + 1e-6, float(snap_px))
+    far_scale = max(0.15, min(1.0, float(far_scale)))
+
+    if dist <= near:
+        return base
+    if dist >= snap:
+        return max(1.0, base * far_scale)
+
+    t = (dist - near) / (snap - near)
+    scale = 1.0 + (far_scale - 1.0) * t
+    return max(1.0, base * scale)
+
+
+def resolve_aim_snap_px(default: float) -> float:
+    raw = os.environ.get("CSGOBOT_AIM_SNAP_PX", "").strip()
+    if raw:
+        return max(1.0, float(raw))
+    return default
+
+
+def resolve_aim_acquire_smooth_scale(default: float) -> float:
+    raw = os.environ.get("CSGOBOT_AIM_ACQUIRE_SMOOTH_SCALE", "").strip()
+    if raw:
+        return max(0.15, min(1.0, float(raw)))
+    return default

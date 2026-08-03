@@ -114,9 +114,9 @@ Env без правки `run.py`: `CS2_SENSITIVITY`, `CSGOBOT_X360`, `CSGOBOT_SM
 
 **Patrol look (PR-L1…L1.3):** поворот **80–90°**, idle **5–8 s**. **L1.1** combat не сбрасывает idle. **L1.2/L1.3:** sweep **1.0–1.4 s** (≤1.8 s hard max, ~80°/s), мышь на отдельном потоке **`mouse_hz=120`**, шаг ≤**20**, на время look отпускается WASD. Лог: `look: sweep start … hz=120`. Env: `CSGOBOT_LOOK_MOUSE_HZ`, `CSGOBOT_LOOK_MAX_DELTA`, `CSGOBOT_LOOK_SWEEP_*`, `CSGOBOT_LOOK_MAX_YAW_DEG_PER_SEC`, `CSGOBOT_LOOK_SWEEP_HARD_MAX`, `CSGOBOT_LOOK_PAUSE_MOVEMENT=0`.
 
-**Aim mouse (PR-A1 / A1.1):** наводка на отдельном потоке **`AIM_MOUSE_HZ=120`**, capped steps. **A1.1 soft-settle:** на цели прицел **держится** (не охотится за шумом bbox); coast только при реальной скорости; near-zone меньший step. Стрейфы = **A2**. Env: `CSGOBOT_AIM_SETTLE`, `CSGOBOT_AIM_SETTLE_PX`, `CSGOBOT_AIM_UNLOCK_PX`, `CSGOBOT_AIM_COAST_MIN_SPEED`, `CSGOBOT_AIM_NEAR_PX`, `CSGOBOT_AIM_NEAR_STEP_MAX`, `CSGOBOT_AIM_MOUSE_HZ=0` (legacy). Лог: `aim: mouse thread … settle=10 unlock=18 (A1.1)`.
+**Aim mouse (PR-A1…A1.2):** поток **120 Hz**. **A1.1** soft-settle на цели. **A1.2 dual-phase:** быстрый snap вдали (`step_max=28`, acquire smooth×0.5), near step 14 @ 36 px, огонь с **28 px**, settle @ **10 px**. Env: `CSGOBOT_SMOOTHING`, `CSGOBOT_SHOOT_DEAD_ZONE`, `CSGOBOT_AIM_SNAP_PX`, `CSGOBOT_AIM_ACQUIRE_SMOOTH_SCALE`, `CSGOBOT_AIM_NEAR_*`, `CSGOBOT_AIM_SETTLE*`. Лог: `(A1.2)`.
 
-**Roadmap:** `docs/COMBAT_ROADMAP.md` — следующие: **E1** (E2E) → **A2** (strafes) → **L2–L4** (Look).
+**Roadmap:** `docs/COMBAT_ROADMAP.md` — следующие: **E1** → **A2** (strafes) → **L2–L4**.
 
 **Fire (PR-6d):** default `CSGOBOT_SHOOT_MODE=hold` (зажим LMB). Альтернативы: `burst`, `tap`. См. `docs/AIM_TUNING.md`.
 

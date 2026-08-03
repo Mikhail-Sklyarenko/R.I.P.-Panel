@@ -1,8 +1,8 @@
-"""High-rate aim mouse (PR-A1 / A1.1 settle).
+"""High-rate aim mouse (PR-A1 / A1.1 settle / A1.2 dual-phase).
 
 Detection updates the tracked aim point; a dedicated mouse thread applies FOV
-deltas at ``mouse_hz``. A1.1 adds soft-settle so on-target hold does not hunt
-YOLO bbox noise (human presence comes from strafes/recoil later, not wobble).
+deltas at ``mouse_hz``. Soft-settle stops on-target bbox hunt; dual-phase
+gain snaps fast when far and tightens only near the crosshair.
 """
 
 from __future__ import annotations
@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING, Callable
 
 from aiming.dead_zone import AimHysteresis, AimHysteresisConfig
 from aiming.mouse_filter import filter_mouse_delta
+from aim_tuning import acquisition_smoothing
 
 if TYPE_CHECKING:
     from aiming.fov_mouse import FOVMouseMovement
@@ -33,8 +34,8 @@ class AimMouseController:
     Track screen-space aim point + apply mouse at high rate.
 
     A1 — detection owns *what* to track; mouse thread owns *how* it moves.
-    A1.1 — soft-settle: freeze aim point when on target; coast only for real speed;
-    near-zone uses a smaller step cap to avoid overshoot oscillation.
+    A1.1 — soft-settle: freeze aim point when on target; coast only for real speed.
+    A1.2 — dual-phase: low smoothing + large step when far; precision near settle.
     """
 
     def __init__(
@@ -122,12 +123,15 @@ class AimMouseController:
         t.start()
         logger.info(
             "aim: mouse thread hz=%.0f step_max=%d near_step=%d "
-            "settle=%.0f unlock=%.0f coast=%s coast_min_v=%.0f (A1.1)",
+            "settle=%.0f unlock=%.0f snap=%.0f acquire_scale=%.2f "
+            "coast=%s coast_min_v=%.0f (A1.2)",
             float(self._config.mouse_hz),
             self._step_max_delta(),
             max(1, int(self._config.aim_near_step_max_delta)),
             float(self._config.aim_settle_px),
             float(self._config.aim_unlock_px),
+            float(self._config.aim_snap_px),
+            float(self._config.aim_acquire_smooth_scale),
             bool(self._config.mouse_coast),
             float(self._config.mouse_coast_min_speed_px_s),
         )
@@ -252,6 +256,8 @@ class AimMouseController:
         far_step = self._step_max_delta()
         near_step = max(1, int(self._config.aim_near_step_max_delta))
         near_px = max(0.0, float(self._config.aim_near_px))
+        snap_px = max(near_px + 1.0, float(self._config.aim_snap_px))
+        acquire_scale = float(self._config.aim_acquire_smooth_scale)
         settle_px = max(0.0, float(self._config.aim_settle_px))
         settle_on = bool(self._config.aim_settle_enabled)
         min_coast_speed = max(0.0, float(self._config.mouse_coast_min_speed_px_s))
@@ -288,7 +294,7 @@ class AimMouseController:
 
             # Settle against the locked/raw aim point (not coasted ghost).
             settle_dist = self._fov_mouse.get_move(
-                base_x, base_y, smoothing=smoothing
+                base_x, base_y, smoothing=1.0
             ).pixel_distance
 
             with self._lock:
@@ -301,7 +307,16 @@ class AimMouseController:
                     self._last_dy = 0
                     continue
 
-            aim_result = self._fov_mouse.get_move(tx, ty, smoothing=smoothing)
+            # Dual-phase: measure raw error, then snap hard when far.
+            raw_dist = self._fov_mouse.get_move(tx, ty, smoothing=1.0).pixel_distance
+            eff_smooth = acquisition_smoothing(
+                smoothing,
+                raw_dist,
+                near_px=near_px,
+                snap_px=snap_px,
+                far_scale=acquire_scale,
+            )
+            aim_result = self._fov_mouse.get_move(tx, ty, smoothing=eff_smooth)
             dist = aim_result.pixel_distance
 
             if near_px > 0 and dist <= near_px:

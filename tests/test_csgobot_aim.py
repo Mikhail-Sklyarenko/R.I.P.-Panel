@@ -11,6 +11,7 @@ if str(_CSGOBOT) not in sys.path:
 
 from aim_tuning import (  # noqa: E402
     aim_debug_enabled,
+    acquisition_smoothing,
     resolve_dead_zone,
     resolve_smoothing,
     resolve_x360,
@@ -107,7 +108,8 @@ def test_create_config_6d_shoot_defaults(monkeypatch) -> None:
     cfg = create_config()
     assert cfg.aim.shoot_mode == "hold"
     assert cfg.aim.burst_size == 7
-    assert cfg.aim.head_confidence == 0.65
+    assert cfg.aim.head_confidence == 0.60
+    assert cfg.aim.body_confidence == 0.50
 
 
 def test_create_config_6c_stabilizer_defaults(monkeypatch) -> None:
@@ -118,6 +120,30 @@ def test_create_config_6c_stabilizer_defaults(monkeypatch) -> None:
     cfg = create_config()
     assert cfg.aim.aim_dead_zone_high == 14.0
     assert cfg.aim.aim_dead_zone_low == 8.0
-    assert cfg.aim.shoot_dead_zone == 18.0
+    assert cfg.aim.shoot_dead_zone == 28.0
     assert cfg.aim.aim_smooth_enabled is True
     assert cfg.aim.lead_variance_gate is True
+
+
+def test_create_config_a12_dual_phase_defaults(monkeypatch) -> None:
+    monkeypatch.delenv("CSGOBOT_AIM_MOUSE_STEP_MAX", raising=False)
+    monkeypatch.delenv("CSGOBOT_AIM_NEAR_STEP_MAX", raising=False)
+    monkeypatch.delenv("CSGOBOT_SMOOTHING", raising=False)
+    from run import create_config  # noqa: E402
+
+    cfg = create_config()
+    assert cfg.aim.mouse_step_max_delta == 28
+    assert cfg.aim.aim_near_step_max_delta == 14
+    assert cfg.aim.aim_near_px == 36.0
+    assert cfg.aim.aim_snap_px == 100.0
+    assert cfg.aim.aim_acquire_smooth_scale == 0.5
+    assert cfg.aim.smoothing_factor == 1.8
+
+
+def test_acquisition_smoothing_far_snappier_than_near() -> None:
+    near = acquisition_smoothing(2.0, 20.0, near_px=36.0, snap_px=100.0, far_scale=0.5)
+    far = acquisition_smoothing(2.0, 120.0, near_px=36.0, snap_px=100.0, far_scale=0.5)
+    mid = acquisition_smoothing(2.0, 68.0, near_px=36.0, snap_px=100.0, far_scale=0.5)
+    assert near == 2.0
+    assert far == 1.0
+    assert far < mid < near
