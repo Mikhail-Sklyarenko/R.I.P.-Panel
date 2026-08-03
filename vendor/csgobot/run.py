@@ -122,10 +122,11 @@ MAP_DETECT_LOCK = True
 LOOK_ENABLED = True
 LOOK_YAW_MIN = 80.0
 LOOK_YAW_MAX = 90.0
-LOOK_SWEEP_MIN = 0.45
-LOOK_SWEEP_MAX = 0.65
-LOOK_IDLE_MIN = 12.0
-LOOK_IDLE_MAX = 15.0
+# Slightly longer sweep + shorter idle so quiet-patrol look is visible on farm PCs
+LOOK_SWEEP_MIN = 0.7
+LOOK_SWEEP_MAX = 1.1
+LOOK_IDLE_MIN = 8.0
+LOOK_IDLE_MAX = 12.0
 AUTO_MOVE = False  # legacy random tap; use PATROL when enabled
 MOVE_INTERVAL_SEC = 8.0
 DEAD_ZONE = 12.0  # legacy; maps to AIM_DEAD_ZONE_HIGH if unset

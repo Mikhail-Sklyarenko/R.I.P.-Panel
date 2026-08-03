@@ -176,3 +176,74 @@ def test_yaw_and_idle_within_config_bounds() -> None:
     ctrl._begin_sweep(now=delay)
     assert 80.0 <= ctrl._current_yaw_deg <= 90.0
     assert 0.45 <= ctrl._sweep_duration <= 0.65
+
+
+def test_main_py_does_not_null_look_controller_after_create() -> None:
+    """Regression: LookController was created then look_controller=None wiped it."""
+    import ast
+
+    main_path = _CSGOBOT / "main.py"
+    tree = ast.parse(main_path.read_text(encoding="utf-8"))
+
+    def _is_look_none_assign(node: ast.AST) -> bool:
+        if isinstance(node, ast.AnnAssign):
+            target = node.target
+            if not isinstance(target, ast.Name) or target.id != "look_controller":
+                return False
+            return isinstance(node.value, ast.Constant) and node.value.value is None
+        if isinstance(node, ast.Assign):
+            if not any(
+                isinstance(t, ast.Name) and t.id == "look_controller" for t in node.targets
+            ):
+                return False
+            return isinstance(node.value, ast.Constant) and node.value.value is None
+        return False
+
+    def _creates_look_controller(node: ast.AST) -> bool:
+        if not isinstance(node, ast.Assign):
+            return False
+        if not any(isinstance(t, ast.Name) and t.id == "look_controller" for t in node.targets):
+            return False
+        val = node.value
+        return isinstance(val, ast.Call) and (
+            (isinstance(val.func, ast.Name) and val.func.id == "LookController")
+            or (
+                isinstance(val.func, ast.Attribute)
+                and val.func.attr == "LookController"
+            )
+        )
+
+    def _iter_stmts_in_order(stmts: list[ast.stmt]):
+        for stmt in stmts:
+            yield stmt
+            if isinstance(stmt, ast.If):
+                yield from _iter_stmts_in_order(stmt.body)
+                yield from _iter_stmts_in_order(stmt.orelse)
+            elif isinstance(stmt, (ast.For, ast.While, ast.With, ast.AsyncWith)):
+                yield from _iter_stmts_in_order(stmt.body)
+                if hasattr(stmt, "orelse"):
+                    yield from _iter_stmts_in_order(stmt.orelse)
+            elif isinstance(stmt, ast.Try):
+                yield from _iter_stmts_in_order(stmt.body)
+                for handler in stmt.handlers:
+                    yield from _iter_stmts_in_order(handler.body)
+                yield from _iter_stmts_in_order(stmt.orelse)
+                yield from _iter_stmts_in_order(stmt.finalbody)
+
+    for node in tree.body:
+        if not isinstance(node, ast.FunctionDef) or node.name != "detection_process":
+            continue
+        created = False
+        for stmt in _iter_stmts_in_order(node.body):
+            if _creates_look_controller(stmt):
+                created = True
+                continue
+            if created and _is_look_none_assign(stmt):
+                raise AssertionError(
+                    "detection_process assigns look_controller=None after "
+                    "LookController(...) — patrol look is silently disabled"
+                )
+        assert created, "detection_process should construct LookController when look enabled"
+        return
+
+    raise AssertionError("detection_process not found in vendor/csgobot/main.py")

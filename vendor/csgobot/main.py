@@ -327,6 +327,9 @@ def detection_process(
         fov=config.fov,
     )
 
+    # Look must be initialized once here. Do NOT reassign look_controller=None
+    # later in this function — that silently disabled all patrol yaw sweeps (PR-L1).
+    look_controller: Optional[LookController] = None
     if config.look.enabled:
         look_controller = LookController(
             config=config.look,
@@ -362,7 +365,6 @@ def detection_process(
     patrol_runner: Optional[PatrolRunner] = None
     unstuck_seq: Optional[UnstuckSequence] = None
     stuck_detector: Optional[StuckDetector] = None
-    look_controller: Optional[LookController] = None
     patrol_mode = PatrolMode.PATROL
     last_enemy_seen = 0.0
     stuck_since: Optional[float] = None
