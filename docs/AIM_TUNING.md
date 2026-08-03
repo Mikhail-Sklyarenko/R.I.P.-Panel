@@ -120,7 +120,7 @@ Legacy `CSGOBOT_DEAD_ZONE` → `aim_dead_zone_high`.
 
 Симптом «дёргается на бегу» → `git pull` 6c; debug: `lead_stable=False` в `aim:` log.
 
-## High-rate aim mouse (PR-A1 / L1.3-style)
+## High-rate aim mouse (PR-A1 / A1.1 settle)
 
 Тот же принцип, что у look L1.3: **detection задаёт цель**, **мышь крутится на своём hz**.
 
@@ -130,10 +130,18 @@ Legacy `CSGOBOT_DEAD_ZONE` → `aim_dead_zone_high`.
 | Step max / tick | **20** | `CSGOBOT_AIM_MOUSE_STEP_MAX` |
 | Coast between detections | `on` | `CSGOBOT_AIM_MOUSE_COAST=0` |
 | Coast max age | **0.10 s** | `CSGOBOT_AIM_MOUSE_COAST_MAX_SEC` |
+| Soft-settle | `on` | `CSGOBOT_AIM_SETTLE=0` |
+| Settle / unlock px | **10** / **18** | `CSGOBOT_AIM_SETTLE_PX`, `CSGOBOT_AIM_UNLOCK_PX` |
+| Coast min speed | **150** px/s | `CSGOBOT_AIM_COAST_MIN_SPEED` |
+| Near zone / step | **56** / **8** | `CSGOBOT_AIM_NEAR_PX`, `CSGOBOT_AIM_NEAR_STEP_MAX` |
 
-Pipeline при hz&gt;0: **EMA → lead → set_target → 120 Hz FOV+cap+hysteresis → shoot zone** (fire по-прежнему на YOLO tick).
+**A1.1:** на цели — soft-lock aim-point (игнор bbox jitter до unlock); coast только если скорость выше порога; near-zone меньший step против overshoot-hunt. «Живость» стрельбы — позже через **A2 strafes**, не через wobble прицела.
 
-Симптом «цель есть, но дёргает как слайдшоу» → убедиться `aim_hz=120` в стартовом логе `Aim advanced: … aim_hz=120`; `CSGOBOT_AIM_DEBUG=1`.
+Pipeline при hz&gt;0: **EMA → lead → set_target (settle gate) → 120 Hz FOV+cap+hysteresis → shoot zone**.
+
+Симптом «водит прицелом по торсу на цели» → `git pull` A1.1; в debug `settle=True`; при необходимости ↑ `CSGOBOT_AIM_SETTLE_PX` / `CSGOBOT_AIM_UNLOCK_PX`.
+
+Симптом «цель есть, но дёргает как слайдшоу» → убедиться `aim_hz=120` в стартовом логе; `CSGOBOT_AIM_DEBUG=1`.
 
 ## Hybrid head aim (PR-H1)
 

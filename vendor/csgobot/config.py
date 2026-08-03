@@ -151,6 +151,13 @@ class AimConfig:
     mouse_step_max_delta: int = 20  # per high-rate tick; 0 = use mouse_max_delta
     mouse_coast: bool = True  # extrapolate aim point between detections
     mouse_coast_max_sec: float = 0.10
+    # PR-A1.1: soft-settle (stop hunting bbox noise on target)
+    aim_settle_enabled: bool = True
+    aim_settle_px: float = 10.0  # enter soft-lock when crosshair dist ≤ this
+    aim_unlock_px: float = 18.0  # leave soft-lock when aim point jumps this much
+    mouse_coast_min_speed_px_s: float = 150.0  # below → no coast (noise gate)
+    aim_near_px: float = 56.0  # within → use near step cap
+    aim_near_step_max_delta: int = 8
 
     # PR-6c: lead variance gate
     lead_variance_gate: bool = True

@@ -148,6 +148,13 @@ AIM_MOUSE_HZ = 120.0
 AIM_MOUSE_STEP_MAX = 20
 AIM_MOUSE_COAST = True
 AIM_MOUSE_COAST_MAX_SEC = 0.10
+# A1.1 soft-settle: hold on target, track only real motion
+AIM_SETTLE = True
+AIM_SETTLE_PX = 10.0
+AIM_UNLOCK_PX = 18.0
+AIM_COAST_MIN_SPEED = 150.0
+AIM_NEAR_PX = 56.0
+AIM_NEAR_STEP_MAX = 8
 AIM_SMOOTH_ENABLED = True
 AIM_SMOOTH_ALPHA = 0.45
 AIM_SMOOTH_JUMP_RESET_PX = 80.0
@@ -179,8 +186,14 @@ def create_config() -> AppConfig:
         resolve_aim_dead_zone_low,
         resolve_aim_mouse_coast,
         resolve_aim_mouse_coast_max_sec,
+        resolve_aim_mouse_coast_min_speed,
         resolve_aim_mouse_hz,
         resolve_aim_mouse_step_max_delta,
+        resolve_aim_near_px,
+        resolve_aim_near_step_max_delta,
+        resolve_aim_settle_enabled,
+        resolve_aim_settle_px,
+        resolve_aim_unlock_px,
         resolve_aim_smooth_alpha,
         resolve_aim_smooth_enabled,
         resolve_body_fallback_sec,
@@ -282,6 +295,12 @@ def create_config() -> AppConfig:
         mouse_step_max_delta=resolve_aim_mouse_step_max_delta(AIM_MOUSE_STEP_MAX),
         mouse_coast=resolve_aim_mouse_coast(AIM_MOUSE_COAST),
         mouse_coast_max_sec=resolve_aim_mouse_coast_max_sec(AIM_MOUSE_COAST_MAX_SEC),
+        aim_settle_enabled=resolve_aim_settle_enabled(AIM_SETTLE),
+        aim_settle_px=resolve_aim_settle_px(AIM_SETTLE_PX),
+        aim_unlock_px=resolve_aim_unlock_px(AIM_UNLOCK_PX),
+        mouse_coast_min_speed_px_s=resolve_aim_mouse_coast_min_speed(AIM_COAST_MIN_SPEED),
+        aim_near_px=resolve_aim_near_px(AIM_NEAR_PX),
+        aim_near_step_max_delta=resolve_aim_near_step_max_delta(AIM_NEAR_STEP_MAX),
         head_confidence=HEAD_SHOOT_CONFIDENCE,
         body_confidence=BODY_SHOOT_CONFIDENCE,
         auto_shoot=AUTO_SHOOT,
@@ -531,7 +550,9 @@ def main() -> int:
         f"lead_ms={config.aim.lead_ms} lead_gate={config.aim.lead_variance_gate} "
         f"smooth={config.aim.aim_smooth_alpha} body_fallback={config.aim.body_fallback_sec}s "
         f"mouse_cap={config.aim.mouse_max_delta} "
-        f"aim_hz={config.aim.mouse_hz} step_max={config.aim.mouse_step_max_delta}"
+        f"aim_hz={config.aim.mouse_hz} step_max={config.aim.mouse_step_max_delta} "
+        f"settle={config.aim.aim_settle_px}/{config.aim.aim_unlock_px} "
+        f"near_step={config.aim.aim_near_step_max_delta}"
     )
     logger.info(
         f"Shoot: mode={config.aim.shoot_mode} burst={config.aim.burst_size} "

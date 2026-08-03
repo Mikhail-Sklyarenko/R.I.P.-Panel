@@ -1,4 +1,4 @@
-"""Unit tests for AimMouseController (PR-A1 / Aim L1.3-style)."""
+"""Unit tests for AimMouseController (PR-A1 / A1.1 settle)."""
 
 from __future__ import annotations
 
@@ -27,15 +27,22 @@ def _ctrl(
     mouse_step_max_delta: int = 12,
     mouse_coast: bool = True,
     mouse_coast_max_sec: float = 0.10,
+    mouse_coast_min_speed_px_s: float = 150.0,
     aim_dead_zone_high: float = 14.0,
     aim_dead_zone_low: float = 8.0,
     mouse_min_delta: int = 0,
+    aim_settle_enabled: bool = True,
+    aim_settle_px: float = 10.0,
+    aim_unlock_px: float = 18.0,
+    aim_near_px: float = 56.0,
+    aim_near_step_max_delta: int = 8,
 ) -> AimMouseController:
     aim = AimConfig(
         mouse_hz=mouse_hz,
         mouse_step_max_delta=mouse_step_max_delta,
         mouse_coast=mouse_coast,
         mouse_coast_max_sec=mouse_coast_max_sec,
+        mouse_coast_min_speed_px_s=mouse_coast_min_speed_px_s,
         aim_dead_zone_high=aim_dead_zone_high,
         aim_dead_zone_low=aim_dead_zone_low,
         mouse_min_delta=mouse_min_delta,
@@ -44,6 +51,11 @@ def _ctrl(
         adaptive_smoothing=False,
         aim_smooth_enabled=False,
         lead_aim_enabled=False,
+        aim_settle_enabled=aim_settle_enabled,
+        aim_settle_px=aim_settle_px,
+        aim_unlock_px=aim_unlock_px,
+        aim_near_px=aim_near_px,
+        aim_near_step_max_delta=aim_near_step_max_delta,
     )
     return AimMouseController(config=aim, fov_mouse=_fov())
 
@@ -55,10 +67,14 @@ def test_enabled_when_hz_positive() -> None:
 
 def test_high_rate_thread_applies_capped_mouse() -> None:
     pieces: list[tuple[int, int]] = []
-    ctrl = _ctrl(mouse_hz=90.0, mouse_step_max_delta=12, mouse_min_delta=0)
+    ctrl = _ctrl(
+        mouse_hz=90.0,
+        mouse_step_max_delta=12,
+        mouse_min_delta=0,
+        aim_settle_px=2.0,
+    )
     ctrl.start(lambda dx, dy: pieces.append((dx, dy)))
     try:
-        # Far from center → must move
         ctrl.set_target(900.0, 360.0, smoothing=1.0, now=time.monotonic())
         deadline = time.monotonic() + 0.8
         while time.monotonic() < deadline and len(pieces) < 5:
@@ -82,14 +98,13 @@ def test_clear_stops_tracking() -> None:
         time.sleep(0.15)
         after = len(pieces)
         assert not ctrl.is_tracking
-        # At most a couple of in-flight ticks after clear
         assert after - before <= 3
     finally:
         ctrl.stop()
 
 
 def test_coast_velocity_from_successive_targets() -> None:
-    ctrl = _ctrl(mouse_hz=0.0, mouse_coast=True)
+    ctrl = _ctrl(mouse_hz=0.0, mouse_coast=True, mouse_coast_min_speed_px_s=100.0)
     t0 = 10.0
     ctrl.set_target(640.0, 360.0, smoothing=1.0, now=t0)
     ctrl.set_target(740.0, 360.0, smoothing=1.0, now=t0 + 0.05)
@@ -97,6 +112,78 @@ def test_coast_velocity_from_successive_targets() -> None:
         assert ctrl._vx > 0
         assert abs(ctrl._vx - 2000.0) < 1.0
         assert abs(ctrl._vy) < 1e-6
+
+
+def test_coast_velocity_gated_for_slow_jitter() -> None:
+    ctrl = _ctrl(mouse_hz=0.0, mouse_coast_min_speed_px_s=150.0)
+    t0 = 10.0
+    ctrl.set_target(640.0, 360.0, smoothing=1.0, now=t0)
+    # 5 px / 0.05 s = 100 px/s < 150 → no coast velocity
+    ctrl.set_target(645.0, 360.0, smoothing=1.0, now=t0 + 0.05)
+    with ctrl._lock:
+        assert ctrl._vx == 0.0
+        assert ctrl._vy == 0.0
+
+
+def test_settle_ignores_bbox_jitter_until_unlock() -> None:
+    ctrl = _ctrl(
+        mouse_hz=0.0,
+        aim_settle_enabled=True,
+        aim_settle_px=10.0,
+        aim_unlock_px=18.0,
+    )
+    # Force settle state as if crosshair already on target.
+    with ctrl._lock:
+        ctrl._settled = True
+        ctrl._lock_x = 640.0
+        ctrl._lock_y = 360.0
+        ctrl._target_x = 640.0
+        ctrl._target_y = 360.0
+        ctrl._has_sample = True
+        ctrl._active = True
+
+    ctrl.set_target(646.0, 368.0, smoothing=1.0, now=1.0)  # ~10 px jitter
+    with ctrl._lock:
+        assert ctrl._settled
+        assert ctrl._target_x == 640.0
+        assert ctrl._target_y == 360.0
+        assert ctrl._vx == 0.0
+
+    ctrl.set_target(670.0, 360.0, smoothing=1.0, now=1.1)  # 30 px → unlock
+    with ctrl._lock:
+        assert not ctrl._settled
+        assert abs(ctrl._target_x - 670.0) < 1e-6
+
+
+def test_on_target_settle_stops_mouse() -> None:
+    pieces: list[tuple[int, int]] = []
+    ctrl = _ctrl(
+        mouse_hz=90.0,
+        mouse_step_max_delta=20,
+        mouse_min_delta=0,
+        aim_settle_px=12.0,
+        aim_near_px=80.0,
+        aim_near_step_max_delta=6,
+    )
+    ctrl.start(lambda dx, dy: pieces.append((dx, dy)))
+    try:
+        # Slightly off center → pull in, then settle
+        ctrl.set_target(648.0, 362.0, smoothing=1.0, now=time.monotonic())
+        time.sleep(0.35)
+        mid = len(pieces)
+        # Feed jitter while hopefully settled
+        for i in range(8):
+            ctrl.set_target(
+                640.0 + (i % 3) - 1,
+                360.0 + (i % 2),
+                smoothing=1.0,
+                now=time.monotonic(),
+            )
+            time.sleep(0.03)
+        # After settle, additional applies should be rare/none
+        assert ctrl.is_settled or (len(pieces) - mid) <= 4
+    finally:
+        ctrl.stop()
 
 
 def test_legacy_hz_zero_does_not_start_thread() -> None:

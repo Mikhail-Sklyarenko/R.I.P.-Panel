@@ -918,7 +918,7 @@ def detection_process(
                         "aim: fps=%.0f dist=%.1f smooth=%.2f "
                         "mouse=(%d,%d) target=(%.0f,%.0f) "
                         "lead_stable=%s speed=%.0f move=%s "
-                        "fire=%s hold=%s roi=%s body_fb=%s hz=%.0f",
+                        "fire=%s hold=%s roi=%s body_fb=%s hz=%.0f settle=%s",
                         fps(),
                         frame.pixel_distance,
                         frame.smoothing,
@@ -934,6 +934,7 @@ def detection_process(
                         roi_used_last,
                         switched_body,
                         float(config.aim.mouse_hz),
+                        aim_mouse.is_settled if aim_mouse is not None else False,
                     )
                     last_aim_debug_log = now
 

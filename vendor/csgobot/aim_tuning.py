@@ -122,6 +122,46 @@ def resolve_aim_mouse_coast_max_sec(default: float) -> float:
     return default
 
 
+def resolve_aim_settle_enabled(default: bool) -> bool:
+    val = _env_bool("CSGOBOT_AIM_SETTLE")
+    return default if val is None else val
+
+
+def resolve_aim_settle_px(default: float) -> float:
+    raw = os.environ.get("CSGOBOT_AIM_SETTLE_PX", "").strip()
+    if raw:
+        return max(0.0, float(raw))
+    return default
+
+
+def resolve_aim_unlock_px(default: float) -> float:
+    raw = os.environ.get("CSGOBOT_AIM_UNLOCK_PX", "").strip()
+    if raw:
+        return max(1.0, float(raw))
+    return default
+
+
+def resolve_aim_mouse_coast_min_speed(default: float) -> float:
+    raw = os.environ.get("CSGOBOT_AIM_COAST_MIN_SPEED", "").strip()
+    if raw:
+        return max(0.0, float(raw))
+    return default
+
+
+def resolve_aim_near_px(default: float) -> float:
+    raw = os.environ.get("CSGOBOT_AIM_NEAR_PX", "").strip()
+    if raw:
+        return max(0.0, float(raw))
+    return default
+
+
+def resolve_aim_near_step_max_delta(default: int) -> int:
+    raw = os.environ.get("CSGOBOT_AIM_NEAR_STEP_MAX", "").strip()
+    if raw:
+        return max(1, int(float(raw)))
+    return default
+
+
 def resolve_lead_variance_gate(default: bool) -> bool:
     val = _env_bool("CSGOBOT_LEAD_VARIANCE_GATE")
     return default if val is None else val
