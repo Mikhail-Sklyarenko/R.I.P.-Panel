@@ -154,6 +154,63 @@ def test_abort_mid_sweep_stops_motion_without_return() -> None:
     assert all(d == 0 for d in after[:5])
 
 
+def test_combat_abort_preserves_due_does_not_full_reset_idle() -> None:
+    """DM: brief combat must not push next look by a full idle interval."""
+    ctrl = _ctrl(seed=11, idle_min=10.0, idle_max=10.0, sweep_min=0.5, sweep_max=0.5)
+    ctrl._config.abort_cooldown_sec = 1.5
+
+    ctrl._schedule_idle(now=0.0)
+    assert ctrl._due_at == 10.0
+
+    # Combat spam while idle — due_at must stay
+    for t in (1.0, 2.0, 5.0, 9.0):
+        ctrl.abort(now=t)
+        assert ctrl._due_at == 10.0
+
+    # Become active after due — should start sweep immediately
+    dx, _ = ctrl.tick(now=10.0, active=True)
+    assert ctrl._state.name == "SWEEPING"
+    assert dx != 0 or ctrl._total_counts != 0
+
+
+def test_mid_sweep_abort_then_quiet_retries_after_cooldown_not_full_idle() -> None:
+    ctrl = _ctrl(seed=5, idle_min=20.0, idle_max=20.0, sweep_min=2.0, sweep_max=2.0)
+    ctrl._config.abort_cooldown_sec = 1.0
+    ctrl._idle_scheduled = True
+    ctrl._idle_until = 0.0
+    ctrl.tick(now=0.0, active=True)
+    assert ctrl._state.name == "SWEEPING"
+
+    for i in range(10):
+        ctrl.tick(now=i / 120.0, active=True)
+
+    ctrl.abort(now=0.5)
+    assert ctrl._state.name == "IDLE"
+    # Retry soon (cooldown), not +20s idle
+    assert 0.5 < ctrl._due_at <= 0.5 + 1.0 + 1e-6
+
+    # Still in "combat" (inactive) past due — no motion, due preserved
+    assert ctrl.tick(now=2.0, active=False) == (0, 0)
+    assert ctrl._due_at <= 1.5 + 1e-6
+
+    # Quiet again — sweep resumes without waiting full 20s
+    ctrl.tick(now=2.0, active=True)
+    assert ctrl._state.name == "SWEEPING"
+
+
+def test_inactive_tick_aborts_sweep_without_full_idle_reset() -> None:
+    ctrl = _ctrl(seed=5, idle_min=15.0, idle_max=15.0, sweep_min=2.0, sweep_max=2.0)
+    ctrl._config.abort_cooldown_sec = 1.5
+    ctrl._idle_scheduled = True
+    ctrl._idle_until = 0.0
+    ctrl.tick(now=0.0, active=True)
+    assert ctrl._state.name == "SWEEPING"
+
+    assert ctrl.tick(now=0.3, active=False) == (0, 0)
+    assert ctrl._state.name == "IDLE"
+    assert ctrl._due_at <= 0.3 + 1.5 + 1e-6
+
+
 def test_yaw_and_idle_within_config_bounds() -> None:
     rng = random.Random(123)
     ctrl = LookController(

@@ -19,7 +19,8 @@
 | PR-H1 | Hybrid head aim (`head_aim_min_conf=0.8`) |
 | **PR-T1** | Auto team CT/T — HUD color probes, hysteresis, Ctrl+T override 5 s |
 | **PR-M1** | Auto map patrol — match-ready probes + scoreboard templates → `dust2` / `mirage` / `generic_dm` |
-| **PR-L1** | Look A — `LookController` (80–90° sweeps, alternate direction, 12–15 s idle) |
+| **PR-L1** | Look A — `LookController` (80–90° sweeps, alternate direction) |
+| **PR-L1.1** | Look cadence: wall-clock `due_at`; combat abort no longer full-resets idle (DM-visible) |
 
 ---
 

@@ -112,7 +112,7 @@ Env без правки `run.py`: `CS2_SENSITIVITY`, `CSGOBOT_X360`, `CSGOBOT_SM
 
 **Auto map patrol (PR-M1):** template match + optional Tesseract на попапе «матч готов» и заголовке scoreboard (Tab). `dust2` / `mirage` → `resources/patrol/{map}.yaml`, иначе `generic_dm`. По умолчанию **включено** (`AUTO_MAP_DETECT = True`), hysteresis 3 кадра, lock после подтверждения. Env: `CSGOBOT_AUTO_MAP=0` (выкл), `CSGOBOT_MAP_DEBUG=1` (лог), `CSGOBOT_PATROL_SCRIPT=dust2` (фикс. скрипт, без автодетекта). Ресурсы: `resources/csgobot/map_regions_1280x720.yaml`, `resources/csgobot/map_templates/`. Пересборка шаблонов: `python scripts/build_map_templates.py`. Фикстуры: `tests/fixtures/csgobot_map/`.
 
-**Patrol look (PR-L1):** один плавный поворот **80–90°** (~0.7–1.1 s), **без return**; направление чередуется; следующий поворот через **8–12 s**. Только в спокойном патруле (нет цели YOLO / боя / unstuck / autobuy freeze) — в плотном DM look редкий. В логе при старте: `look: enabled …`; отладка: `CSGOBOT_LOOK_DEBUG=1` → `look: sweep start/done`. Env: `CSGOBOT_LOOK=0`, `CSGOBOT_LOOK_DEBUG=1`, `CSGOBOT_LOOK_YAW_MIN/MAX`, `CSGOBOT_LOOK_SWEEP_MIN/MAX`, `CSGOBOT_LOOK_IDLE_MIN/MAX`.
+**Patrol look (PR-L1 / L1.1):** один плавный поворот **80–90°** (~0.7–1.1 s), без return; idle **5–8 s** между завершёнными look. **Combat-resilient:** abort в бою **не** сбрасывает таймер на полный idle — после короткой паузы без цели YOLO look стартует, если `due_at` уже прошёл (abort cooldown default **1.5 s**). В логе: `look: enabled …`, `look: sweep start/done` (INFO). Env: `CSGOBOT_LOOK=0`, `CSGOBOT_LOOK_DEBUG=1`, `CSGOBOT_LOOK_YAW_MIN/MAX`, `CSGOBOT_LOOK_SWEEP_MIN/MAX`, `CSGOBOT_LOOK_IDLE_MIN/MAX`, `CSGOBOT_LOOK_ABORT_COOLDOWN`.
 
 **Roadmap:** `docs/COMBAT_ROADMAP.md` — следующие PR: **E1** (E2E) → **L2–L4** (Look).
 
@@ -143,7 +143,7 @@ Env без правки `run.py`: `CS2_SENSITIVITY`, `CSGOBOT_X360`, `CSGOBOT_SM
 | `PATROL_ENABLED` | `True` | сценарий вместо random WASD |
 | `PATROL_SCRIPT` | `generic_dm` | файл `resources/patrol/{name}.yaml` |
 | `PATROL_COMBAT_CLEAR_SEC` | `0.75` | пауза после врага перед бегом |
-| `LOOK_ENABLED` | `True` | плавный осмотр камерой в патруле (PR-L1); idle 8–12 s, sweep 0.7–1.1 s |
+| `LOOK_ENABLED` | `True` | осмотр в патруле (L1.1); idle 5–8 s, sweep 0.7–1.1 s; combat keeps cadence |
 | `AUTO_MOVE` | `False` | legacy random tap |
 
 Сценарии: `generic_dm.yaml`, `dust2.yaml`, `mirage.yaml`. В логе: `patrol: loaded ...`.

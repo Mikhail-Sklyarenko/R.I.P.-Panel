@@ -254,14 +254,16 @@ class AutoBuyConfig:
 
 @dataclass
 class LookConfig:
-    """Patrol camera sweeps (PR-L1): one smooth glance, hold, alternate direction."""
+    """Patrol camera sweeps (PR-L1/L1.1): glance + combat-resilient wall-clock cadence."""
     enabled: bool = True
     yaw_deg_min: float = 80.0
     yaw_deg_max: float = 90.0
-    sweep_sec_min: float = 0.45
-    sweep_sec_max: float = 0.65
-    idle_sec_min: float = 12.0
-    idle_sec_max: float = 15.0
+    sweep_sec_min: float = 0.7
+    sweep_sec_max: float = 1.1
+    idle_sec_min: float = 5.0
+    idle_sec_max: float = 8.0
+    # After mid-sweep abort (combat), retry no sooner than this — do not full-reset idle.
+    abort_cooldown_sec: float = 1.5
 
 
 @dataclass

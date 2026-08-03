@@ -41,6 +41,7 @@ def resolve_look_config(default: LookConfig) -> LookConfig:
     sweep_max = _env_float("CSGOBOT_LOOK_SWEEP_MAX")
     idle_min = _env_float("CSGOBOT_LOOK_IDLE_MIN")
     idle_max = _env_float("CSGOBOT_LOOK_IDLE_MAX")
+    abort_cd = _env_float("CSGOBOT_LOOK_ABORT_COOLDOWN")
     return LookConfig(
         enabled=resolve_look_enabled(default.enabled),
         yaw_deg_min=yaw_min if yaw_min is not None else default.yaw_deg_min,
@@ -49,4 +50,7 @@ def resolve_look_config(default: LookConfig) -> LookConfig:
         sweep_sec_max=sweep_max if sweep_max is not None else default.sweep_sec_max,
         idle_sec_min=idle_min if idle_min is not None else default.idle_sec_min,
         idle_sec_max=idle_max if idle_max is not None else default.idle_sec_max,
+        abort_cooldown_sec=(
+            abort_cd if abort_cd is not None else default.abort_cooldown_sec
+        ),
     )

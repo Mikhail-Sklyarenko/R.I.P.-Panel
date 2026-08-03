@@ -1,4 +1,4 @@
-"""Patrol camera look: single smooth yaw sweep, hold, alternate direction (PR-L1)."""
+"""Patrol camera look: smooth yaw sweeps with combat-resilient cadence (PR-L1 / L1.1)."""
 
 from __future__ import annotations
 
@@ -23,7 +23,14 @@ class _State(Enum):
 
 
 class LookController:
-    """Smooth patrol yaw sweeps; combat / unstuck must call abort() from main."""
+    """
+    Smooth patrol yaw sweeps.
+
+    Cadence is wall-clock ``due_at``: combat / unstuck call ``abort()`` which
+    cancels an in-flight sweep but does **not** push the next look by a full
+    idle interval (that made DM look never fire). When quiet again and
+    ``now >= due_at``, the next sweep starts immediately.
+    """
 
     def __init__(
         self,
@@ -37,8 +44,8 @@ class LookController:
         self._rng = rng or random.Random()
         self._debug = look_debug_enabled()
         self._state = _State.IDLE
-        self._idle_until = 0.0
-        self._idle_scheduled = False
+        self._due_at = 0.0
+        self._due_scheduled = False
         self._sweep_start = 0.0
         self._sweep_duration = 0.0
         self._total_counts = 0
@@ -47,18 +54,52 @@ class LookController:
         self._next_sign: Optional[int] = None
         self._current_yaw_deg = 0.0
 
+    # --- test / legacy aliases -------------------------------------------------
+    @property
+    def _idle_until(self) -> float:
+        return self._due_at
+
+    @_idle_until.setter
+    def _idle_until(self, value: float) -> None:
+        self._due_at = float(value)
+
+    @property
+    def _idle_scheduled(self) -> bool:
+        return self._due_scheduled
+
+    @_idle_scheduled.setter
+    def _idle_scheduled(self, value: bool) -> None:
+        self._due_scheduled = bool(value)
+
     def abort(self, *, now: float | None = None) -> None:
-        if self._state == _State.SWEEPING and self._debug:
-            logger.info("look: abort mid-sweep (yaw=%.1f°)", self._current_yaw_deg)
+        """Cancel in-flight sweep; preserve look cadence (do not full-reset idle)."""
+        was_sweeping = self._state == _State.SWEEPING
+        if was_sweeping:
+            logger.info(
+                "look: abort mid-sweep (yaw=%.1f°)",
+                self._current_yaw_deg,
+            )
+            if now is not None:
+                cooldown = max(0.0, float(self._config.abort_cooldown_sec))
+                # Keep existing due_at if already later; otherwise retry soon after combat.
+                self._due_at = max(self._due_at, now + cooldown)
+                self._due_scheduled = True
+                if self._debug:
+                    logger.info(
+                        "look: abort cooldown %.2fs → due_in=%.2fs",
+                        cooldown,
+                        max(0.0, self._due_at - now),
+                    )
+        self._clear_sweep()
         self._state = _State.IDLE
-        self._swept_float = 0.0
-        self._applied_counts = 0
-        self._idle_scheduled = False
-        if now is not None:
-            self._schedule_idle(now)
 
     def tick(self, *, now: float, active: bool) -> tuple[int, int]:
-        if not self._config.enabled or not active:
+        if not self._config.enabled:
+            return (0, 0)
+
+        if not active:
+            if self._state == _State.SWEEPING:
+                self.abort(now=now)
             return (0, 0)
 
         if self._state == _State.IDLE:
@@ -67,10 +108,10 @@ class LookController:
         return self._tick_sweep(now)
 
     def _tick_idle(self, now: float) -> tuple[int, int]:
-        if not self._idle_scheduled:
+        if not self._due_scheduled:
             self._schedule_idle(now)
 
-        if now < self._idle_until:
+        if now < self._due_at:
             return (0, 0)
 
         self._begin_sweep(now)
@@ -78,7 +119,9 @@ class LookController:
 
     def _tick_sweep(self, now: float) -> tuple[int, int]:
         elapsed = now - self._sweep_start
-        progress = min(elapsed / self._sweep_duration, 1.0) if self._sweep_duration > 0 else 1.0
+        progress = (
+            min(elapsed / self._sweep_duration, 1.0) if self._sweep_duration > 0 else 1.0
+        )
         eased = smootherstep(progress)
         if progress >= 1.0:
             dx = self._total_counts - self._applied_counts
@@ -91,17 +134,19 @@ class LookController:
             self._swept_float = float(self._applied_counts)
 
         if progress >= 1.0:
+            yaw = self._current_yaw_deg
+            counts = self._total_counts
+            next_sign = self._next_sign or 0
+            self._clear_sweep()
             self._state = _State.IDLE
-            self._swept_float = 0.0
-            self._applied_counts = 0
-            self._idle_scheduled = False
-            if self._debug:
-                logger.info(
-                    "look: sweep done yaw=%.1f° counts=%d next_sign=%+d",
-                    self._current_yaw_deg,
-                    self._total_counts,
-                    self._next_sign or 0,
-                )
+            self._schedule_idle(now)
+            logger.info(
+                "look: sweep done yaw=%.1f° counts=%d next_sign=%+d next_in=%.1fs",
+                yaw,
+                counts,
+                next_sign,
+                max(0.0, self._due_at - now),
+            )
 
         return (dx, 0)
 
@@ -110,8 +155,14 @@ class LookController:
             self._config.idle_sec_min,
             self._config.idle_sec_max,
         )
-        self._idle_until = now + delay
-        self._idle_scheduled = True
+        self._due_at = now + delay
+        self._due_scheduled = True
+
+    def _clear_sweep(self) -> None:
+        self._swept_float = 0.0
+        self._applied_counts = 0
+        self._total_counts = 0
+        self._sweep_duration = 0.0
 
     def _begin_sweep(self, now: float) -> None:
         yaw_deg = self._rng.uniform(
@@ -135,11 +186,10 @@ class LookController:
         self._applied_counts = 0
         self._state = _State.SWEEPING
 
-        if self._debug:
-            logger.info(
-                "look: sweep start yaw=%.1f° sign=%+d counts=%d dur=%.2fs",
-                yaw_deg,
-                sign,
-                self._total_counts,
-                self._sweep_duration,
-            )
+        logger.info(
+            "look: sweep start yaw=%.1f° sign=%+d counts=%d dur=%.2fs",
+            yaw_deg,
+            sign,
+            self._total_counts,
+            self._sweep_duration,
+        )

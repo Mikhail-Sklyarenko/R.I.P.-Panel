@@ -122,11 +122,12 @@ MAP_DETECT_LOCK = True
 LOOK_ENABLED = True
 LOOK_YAW_MIN = 80.0
 LOOK_YAW_MAX = 90.0
-# Slightly longer sweep + shorter idle so quiet-patrol look is visible on farm PCs
+# Visible DM look: shorter cadence; combat abort keeps due_at (L1.1), not full idle reset
 LOOK_SWEEP_MIN = 0.7
 LOOK_SWEEP_MAX = 1.1
-LOOK_IDLE_MIN = 8.0
-LOOK_IDLE_MAX = 12.0
+LOOK_IDLE_MIN = 5.0
+LOOK_IDLE_MAX = 8.0
+LOOK_ABORT_COOLDOWN = 1.5
 AUTO_MOVE = False  # legacy random tap; use PATROL when enabled
 MOVE_INTERVAL_SEC = 8.0
 DEAD_ZONE = 12.0  # legacy; maps to AIM_DEAD_ZONE_HIGH if unset
@@ -291,6 +292,7 @@ def create_config() -> AppConfig:
             sweep_sec_max=LOOK_SWEEP_MAX,
             idle_sec_min=LOOK_IDLE_MIN,
             idle_sec_max=LOOK_IDLE_MAX,
+            abort_cooldown_sec=LOOK_ABORT_COOLDOWN,
         ),
     )
 

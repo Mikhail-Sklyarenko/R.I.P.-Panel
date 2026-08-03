@@ -336,13 +336,15 @@ def detection_process(
             fov_mouse=fov_mouse,
         )
         logger.info(
-            "look: enabled yaw=%.0f-%.0f° idle=%.0f-%.0fs sweep=%.2f-%.2fs",
+            "look: enabled yaw=%.0f-%.0f° idle=%.0f-%.0fs sweep=%.2f-%.2fs "
+            "abort_cd=%.1fs (combat preserves cadence)",
             config.look.yaw_deg_min,
             config.look.yaw_deg_max,
             config.look.idle_sec_min,
             config.look.idle_sec_max,
             config.look.sweep_sec_min,
             config.look.sweep_sec_max,
+            config.look.abort_cooldown_sec,
         )
 
     target_selector = TargetSelector(
