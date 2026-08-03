@@ -33,6 +33,7 @@ def _ctrl(
     max_yaw_deg_per_sec: float = 1000.0,
     max_delta: int = 28,
     substeps_per_tick: int = 12,
+    mouse_hz: float = 0.0,
 ) -> LookController:
     return LookController(
         config=LookConfig(
@@ -44,9 +45,11 @@ def _ctrl(
             idle_sec_min=idle_min,
             idle_sec_max=idle_max,
             max_yaw_deg_per_sec=max_yaw_deg_per_sec,
+            sweep_sec_hard_max=10.0,
             max_delta=max_delta,
             substeps_per_tick=substeps_per_tick,
             substep_sleep_sec=0.0,
+            mouse_hz=mouse_hz,
         ),
         fov_mouse=_fov_mouse(),
         rng=random.Random(seed),
@@ -230,6 +233,8 @@ def test_yaw_and_idle_within_config_bounds() -> None:
             idle_sec_min=12.0,
             idle_sec_max=15.0,
             max_yaw_deg_per_sec=1000.0,
+            sweep_sec_hard_max=10.0,
+            mouse_hz=0.0,
         ),
         fov_mouse=_fov_mouse(),
         rng=rng,
@@ -241,6 +246,33 @@ def test_yaw_and_idle_within_config_bounds() -> None:
     ctrl._begin_sweep(now=delay)
     assert 80.0 <= ctrl._current_yaw_deg <= 90.0
     assert 0.45 <= ctrl._sweep_duration <= 0.65
+
+
+def test_high_rate_thread_applies_capped_mouse() -> None:
+    import time
+
+    pieces: list[int] = []
+    ctrl = _ctrl(
+        seed=3,
+        idle_min=0.0,
+        idle_max=0.0,
+        sweep_min=0.3,
+        sweep_max=0.3,
+        max_yaw_deg_per_sec=1000.0,
+        max_delta=12,
+        mouse_hz=90.0,
+    )
+    ctrl.tick(
+        now=time.monotonic(),
+        active=True,
+        apply_mouse=lambda dx, dy: pieces.append(dx),
+    )
+    deadline = time.monotonic() + 1.2
+    while time.monotonic() < deadline and ctrl.is_sweeping:
+        time.sleep(0.02)
+    ctrl.abort(now=time.monotonic())
+    assert len(pieces) >= 5
+    assert all(abs(p) <= 12 for p in pieces)
 
 
 def test_yaw_rate_floor_extends_short_sweep() -> None:

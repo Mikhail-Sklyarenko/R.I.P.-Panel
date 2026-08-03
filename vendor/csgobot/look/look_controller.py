@@ -1,9 +1,10 @@
-"""Patrol camera look: smooth yaw sweeps (PR-L1 / L1.1 / L1.2)."""
+"""Patrol camera look: smooth yaw sweeps (PR-L1 … L1.3)."""
 
 from __future__ import annotations
 
 import logging
 import random
+import threading
 import time
 from enum import Enum, auto
 from typing import TYPE_CHECKING, Callable, Optional
@@ -29,9 +30,9 @@ class LookController:
     """
     Smooth patrol yaw sweeps.
 
-    L1.1 — wall-clock ``due_at`` survives combat abort (no full idle reset).
-    L1.2 — capped mouse substeps + yaw-rate floor on duration so sweeps are
-    not one huge ``move_relative`` per YOLO frame (jerky / frame smear).
+    L1.1 — wall-clock ``due_at`` survives combat abort.
+    L1.2 — capped mouse deltas + yaw-rate floor on duration.
+    L1.3 — high-rate mouse thread (``mouse_hz``) so motion is not tied to YOLO FPS.
     """
 
     def __init__(
@@ -56,12 +57,18 @@ class LookController:
         self._next_sign: Optional[int] = None
         self._current_yaw_deg = 0.0
         self._pending_finish = False
+        self._apply_mouse: ApplyMouseFn | None = None
+        self._lock = threading.Lock()
+        self._thread: threading.Thread | None = None
+        self._thread_stop = threading.Event()
 
     @property
     def is_sweeping(self) -> bool:
         return self._state == _State.SWEEPING
 
-    # --- test / legacy aliases -------------------------------------------------
+    def _use_high_rate(self) -> bool:
+        return float(self._config.mouse_hz) > 0 and self._apply_mouse is not None
+
     @property
     def _idle_until(self) -> float:
         return self._due_at
@@ -80,24 +87,26 @@ class LookController:
 
     def abort(self, *, now: float | None = None) -> None:
         """Cancel in-flight sweep; preserve look cadence (do not full-reset idle)."""
-        was_sweeping = self._state == _State.SWEEPING
-        if was_sweeping:
-            logger.info(
-                "look: abort mid-sweep (yaw=%.1f°)",
-                self._current_yaw_deg,
-            )
-            if now is not None:
-                cooldown = max(0.0, float(self._config.abort_cooldown_sec))
-                self._due_at = max(self._due_at, now + cooldown)
-                self._due_scheduled = True
-                if self._debug:
-                    logger.info(
-                        "look: abort cooldown %.2fs → due_in=%.2fs",
-                        cooldown,
-                        max(0.0, self._due_at - now),
-                    )
-        self._clear_sweep()
-        self._state = _State.IDLE
+        self._stop_mouse_thread()
+        with self._lock:
+            was_sweeping = self._state == _State.SWEEPING
+            if was_sweeping:
+                logger.info(
+                    "look: abort mid-sweep (yaw=%.1f°)",
+                    self._current_yaw_deg,
+                )
+                if now is not None:
+                    cooldown = max(0.0, float(self._config.abort_cooldown_sec))
+                    self._due_at = max(self._due_at, now + cooldown)
+                    self._due_scheduled = True
+                    if self._debug:
+                        logger.info(
+                            "look: abort cooldown %.2fs → due_in=%.2fs",
+                            cooldown,
+                            max(0.0, self._due_at - now),
+                        )
+            self._clear_sweep_locked()
+            self._state = _State.IDLE
 
     def tick(
         self,
@@ -106,12 +115,9 @@ class LookController:
         active: bool,
         apply_mouse: ApplyMouseFn | None = None,
     ) -> tuple[int, int]:
-        """
-        Advance look state.
+        if apply_mouse is not None:
+            self._apply_mouse = apply_mouse
 
-        If ``apply_mouse`` is set, large deltas are split into capped substeps
-        (with optional micro-sleep) before returning the total dx applied.
-        """
         if not self._config.enabled:
             return (0, 0)
 
@@ -120,26 +126,37 @@ class LookController:
                 self.abort(now=now)
             return (0, 0)
 
-        if self._state == _State.IDLE:
-            raw_dx, _ = self._tick_idle(now)
-        else:
-            raw_dx, _ = self._tick_sweep(now)
+        high_rate = self._use_high_rate()
 
-        emitted = self._emit_mouse(raw_dx, apply_mouse)
-        self._finish_if_needed(now)
-        return emitted
+        with self._lock:
+            if self._state == _State.IDLE:
+                if not self._due_scheduled:
+                    self._schedule_idle_locked(now)
+                if now < self._due_at:
+                    return (0, 0)
+                self._begin_sweep_locked(now)
+                if high_rate:
+                    self._start_mouse_thread_unlocked()
+                    return (0, 0)
 
-    def _emit_mouse(
+            if high_rate:
+                return (0, 0)
+
+            raw_dx = self._compute_dx_locked(now)
+            if apply_mouse is not None:
+                emitted = self._emit_capped_locked(raw_dx, apply_mouse)
+            else:
+                emitted = (raw_dx, 0)
+            self._finish_if_needed_locked(now)
+            return emitted
+
+    def _emit_capped_locked(
         self,
         dx: int,
-        apply_mouse: ApplyMouseFn | None,
+        apply_mouse: ApplyMouseFn,
     ) -> tuple[int, int]:
         if dx == 0:
             return (0, 0)
-
-        # Unit tests call tick() without apply_mouse — keep single-step math.
-        if apply_mouse is None:
-            return (dx, 0)
 
         max_delta = max(1, int(self._config.max_delta))
         max_sub = max(1, int(self._config.substeps_per_tick))
@@ -160,7 +177,6 @@ class LookController:
             remaining -= step
             steps += 1
 
-        # Carry unfinished easing target to next tick (avoid huge single jumps).
         if remaining > 0:
             rewind = sign * remaining
             self._applied_counts -= rewind
@@ -168,17 +184,7 @@ class LookController:
 
         return (applied, 0)
 
-    def _tick_idle(self, now: float) -> tuple[int, int]:
-        if not self._due_scheduled:
-            self._schedule_idle(now)
-
-        if now < self._due_at:
-            return (0, 0)
-
-        self._begin_sweep(now)
-        return self._tick_sweep(now)
-
-    def _tick_sweep(self, now: float) -> tuple[int, int]:
+    def _compute_dx_locked(self, now: float) -> int:
         elapsed = now - self._sweep_start
         progress = (
             min(elapsed / self._sweep_duration, 1.0) if self._sweep_duration > 0 else 1.0
@@ -195,25 +201,23 @@ class LookController:
             self._applied_counts = target_applied
             self._swept_float = float(self._applied_counts)
             self._pending_finish = False
+        return dx
 
-        return (dx, 0)
-
-    def _finish_if_needed(self, now: float) -> None:
+    def _finish_if_needed_locked(self, now: float) -> None:
         if not self._pending_finish:
             return
         if self._state != _State.SWEEPING:
             self._pending_finish = False
             return
-        # Wait until capped emit has caught up to total.
         if self._applied_counts != self._total_counts:
             return
 
         yaw = self._current_yaw_deg
         counts = self._total_counts
         next_sign = self._next_sign or 0
-        self._clear_sweep()
+        self._clear_sweep_locked()
         self._state = _State.IDLE
-        self._schedule_idle(now)
+        self._schedule_idle_locked(now)
         logger.info(
             "look: sweep done yaw=%.1f° counts=%d next_sign=%+d next_in=%.1fs",
             yaw,
@@ -222,7 +226,7 @@ class LookController:
             max(0.0, self._due_at - now),
         )
 
-    def _schedule_idle(self, now: float) -> None:
+    def _schedule_idle_locked(self, now: float) -> None:
         delay = self._rng.uniform(
             self._config.idle_sec_min,
             self._config.idle_sec_max,
@@ -230,14 +234,14 @@ class LookController:
         self._due_at = now + delay
         self._due_scheduled = True
 
-    def _clear_sweep(self) -> None:
+    def _clear_sweep_locked(self) -> None:
         self._swept_float = 0.0
         self._applied_counts = 0
         self._total_counts = 0
         self._sweep_duration = 0.0
         self._pending_finish = False
 
-    def _begin_sweep(self, now: float) -> None:
+    def _begin_sweep_locked(self, now: float) -> None:
         yaw_deg = self._rng.uniform(
             self._config.yaw_deg_min,
             self._config.yaw_deg_max,
@@ -258,6 +262,10 @@ class LookController:
         max_rate = float(self._config.max_yaw_deg_per_sec)
         if max_rate > 0:
             dur = max(dur, float(yaw_deg) / max_rate)
+        hard_max = float(self._config.sweep_sec_hard_max)
+        if hard_max > 0:
+            dur = min(dur, hard_max)
+
         self._sweep_duration = dur
         self._sweep_start = now
         self._swept_float = 0.0
@@ -267,11 +275,98 @@ class LookController:
 
         logger.info(
             "look: sweep start yaw=%.1f° sign=%+d counts=%d dur=%.2fs "
-            "max_delta=%d substeps=%d",
+            "max_delta=%d hz=%.0f",
             yaw_deg,
             sign,
             self._total_counts,
             self._sweep_duration,
             int(self._config.max_delta),
-            int(self._config.substeps_per_tick),
+            float(self._config.mouse_hz),
         )
+
+    def _start_mouse_thread_unlocked(self) -> None:
+        self._thread_stop.set()
+        self._thread_stop = threading.Event()
+        t = threading.Thread(
+            target=self._mouse_loop,
+            name="csgobot-look-mouse",
+            daemon=True,
+        )
+        self._thread = t
+        t.start()
+
+    def _stop_mouse_thread(self) -> None:
+        self._thread_stop.set()
+        t = self._thread
+        self._thread = None
+        if t is not None and t.is_alive() and t is not threading.current_thread():
+            t.join(timeout=0.75)
+
+    def _mouse_loop(self) -> None:
+        hz = max(30.0, float(self._config.mouse_hz))
+        period = 1.0 / hz
+        max_delta = max(1, int(self._config.max_delta))
+        max_chunks = max(1, int(self._config.substeps_per_tick))
+
+        while not self._thread_stop.wait(period):
+            chunks: list[int] = []
+            apply_fn: ApplyMouseFn | None = None
+            with self._lock:
+                if self._state != _State.SWEEPING:
+                    break
+                now = time.monotonic()
+                elapsed = now - self._sweep_start
+                progress = (
+                    min(elapsed / self._sweep_duration, 1.0)
+                    if self._sweep_duration > 0
+                    else 1.0
+                )
+                eased = smootherstep(progress)
+                target = (
+                    self._total_counts
+                    if progress >= 1.0
+                    else int(round(self._total_counts * eased))
+                )
+                remaining = target - self._applied_counts
+                apply_fn = self._apply_mouse
+                if remaining != 0 and apply_fn is not None:
+                    sign = 1 if remaining > 0 else -1
+                    left = abs(remaining)
+                    for _ in range(max_chunks):
+                        if left <= 0:
+                            break
+                        step = min(left, max_delta)
+                        chunks.append(sign * step)
+                        left -= step
+                    applied_now = sign * (abs(remaining) - left)
+                    self._applied_counts += applied_now
+                    self._swept_float = float(self._applied_counts)
+                if progress >= 1.0:
+                    self._pending_finish = True
+                    self._finish_if_needed_locked(now)
+                    if self._state != _State.SWEEPING:
+                        break
+
+            for piece in chunks:
+                if apply_fn is None:
+                    break
+                try:
+                    apply_fn(piece, 0)
+                except Exception as exc:
+                    logger.debug("look: mouse apply failed: %s", exc)
+                    self._thread_stop.set()
+                    return
+
+
+    # --- test helpers (sync) --------------------------------------------------
+    def _schedule_idle(self, now: float) -> None:
+        with self._lock:
+            self._schedule_idle_locked(now)
+
+    def _begin_sweep(self, now: float) -> None:
+        with self._lock:
+            self._begin_sweep_locked(now)
+
+    def _clear_sweep(self) -> None:
+        with self._lock:
+            self._clear_sweep_locked()

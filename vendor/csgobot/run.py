@@ -122,17 +122,19 @@ MAP_DETECT_LOCK = True
 LOOK_ENABLED = True
 LOOK_YAW_MIN = 80.0
 LOOK_YAW_MAX = 90.0
-# L1.1 cadence + L1.2 smooth mouse (longer sweep, capped substeps, pause WASD)
-LOOK_SWEEP_MIN = 1.6
-LOOK_SWEEP_MAX = 2.4
+# L1.3: natural speed + 120 Hz mouse thread (not YOLO-tick bound)
+LOOK_SWEEP_MIN = 1.0
+LOOK_SWEEP_MAX = 1.4
 LOOK_IDLE_MIN = 5.0
 LOOK_IDLE_MAX = 8.0
 LOOK_ABORT_COOLDOWN = 1.5
-LOOK_MAX_YAW_DEG_PER_SEC = 55.0
-LOOK_MAX_DELTA = 28
-LOOK_SUBSTEPS = 12
-LOOK_SUBSTEP_SLEEP = 0.001
+LOOK_MAX_YAW_DEG_PER_SEC = 80.0
+LOOK_SWEEP_HARD_MAX = 1.8
+LOOK_MAX_DELTA = 20
+LOOK_SUBSTEPS = 8
+LOOK_SUBSTEP_SLEEP = 0.0
 LOOK_PAUSE_MOVEMENT = True
+LOOK_MOUSE_HZ = 120.0
 AUTO_MOVE = False  # legacy random tap; use PATROL when enabled
 MOVE_INTERVAL_SEC = 8.0
 DEAD_ZONE = 12.0  # legacy; maps to AIM_DEAD_ZONE_HIGH if unset
@@ -299,10 +301,12 @@ def create_config() -> AppConfig:
             idle_sec_max=LOOK_IDLE_MAX,
             abort_cooldown_sec=LOOK_ABORT_COOLDOWN,
             max_yaw_deg_per_sec=LOOK_MAX_YAW_DEG_PER_SEC,
+            sweep_sec_hard_max=LOOK_SWEEP_HARD_MAX,
             max_delta=LOOK_MAX_DELTA,
             substeps_per_tick=LOOK_SUBSTEPS,
             substep_sleep_sec=LOOK_SUBSTEP_SLEEP,
             pause_movement=LOOK_PAUSE_MOVEMENT,
+            mouse_hz=LOOK_MOUSE_HZ,
         ),
     )
 

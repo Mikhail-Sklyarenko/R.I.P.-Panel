@@ -112,7 +112,7 @@ Env без правки `run.py`: `CS2_SENSITIVITY`, `CSGOBOT_X360`, `CSGOBOT_SM
 
 **Auto map patrol (PR-M1):** template match + optional Tesseract на попапе «матч готов» и заголовке scoreboard (Tab). `dust2` / `mirage` → `resources/patrol/{map}.yaml`, иначе `generic_dm`. По умолчанию **включено** (`AUTO_MAP_DETECT = True`), hysteresis 3 кадра, lock после подтверждения. Env: `CSGOBOT_AUTO_MAP=0` (выкл), `CSGOBOT_MAP_DEBUG=1` (лог), `CSGOBOT_PATROL_SCRIPT=dust2` (фикс. скрипт, без автодетекта). Ресурсы: `resources/csgobot/map_regions_1280x720.yaml`, `resources/csgobot/map_templates/`. Пересборка шаблонов: `python scripts/build_map_templates.py`. Фикстуры: `tests/fixtures/csgobot_map/`.
 
-**Patrol look (PR-L1 / L1.1 / L1.2):** поворот **80–90°**, idle **5–8 s** между завершёнными look. **L1.1:** abort в бою не сбрасывает полный idle. **L1.2 плавность:** длительность sweep **1.6–2.4 s** (и не быстрее `max_yaw_deg_per_sec≈55`), мышь режется на substeps (`max_delta=28`, до 12 шагов/тик + 1 ms sleep), на время sweep отпускается WASD. Лог: `look: sweep start/done`. Env: `CSGOBOT_LOOK*`, `CSGOBOT_LOOK_MAX_DELTA`, `CSGOBOT_LOOK_SUBSTEPS`, `CSGOBOT_LOOK_SUBSTEP_SLEEP`, `CSGOBOT_LOOK_MAX_YAW_DEG_PER_SEC`, `CSGOBOT_LOOK_PAUSE_MOVEMENT=0`.
+**Patrol look (PR-L1…L1.3):** поворот **80–90°**, idle **5–8 s**. **L1.1** combat не сбрасывает idle. **L1.2/L1.3:** sweep **1.0–1.4 s** (≤1.8 s hard max, ~80°/s), мышь на отдельном потоке **`mouse_hz=120`**, шаг ≤**20**, на время look отпускается WASD. Лог: `look: sweep start … hz=120`. Env: `CSGOBOT_LOOK_MOUSE_HZ`, `CSGOBOT_LOOK_MAX_DELTA`, `CSGOBOT_LOOK_SWEEP_*`, `CSGOBOT_LOOK_MAX_YAW_DEG_PER_SEC`, `CSGOBOT_LOOK_SWEEP_HARD_MAX`, `CSGOBOT_LOOK_PAUSE_MOVEMENT=0`.
 
 **Roadmap:** `docs/COMBAT_ROADMAP.md` — следующие PR: **E1** (E2E) → **L2–L4** (Look).
 
@@ -143,7 +143,7 @@ Env без правки `run.py`: `CS2_SENSITIVITY`, `CSGOBOT_X360`, `CSGOBOT_SM
 | `PATROL_ENABLED` | `True` | сценарий вместо random WASD |
 | `PATROL_SCRIPT` | `generic_dm` | файл `resources/patrol/{name}.yaml` |
 | `PATROL_COMBAT_CLEAR_SEC` | `0.75` | пауза после врага перед бегом |
-| `LOOK_ENABLED` | `True` | L1.2: idle 5–8 s, sweep 1.6–2.4 s, capped mouse substeps, pause WASD |
+| `LOOK_ENABLED` | `True` | L1.3: 1.0–1.4 s sweep @ 120 Hz mouse thread, capped steps, pause WASD |
 | `AUTO_MOVE` | `False` | legacy random tap |
 
 Сценарии: `generic_dm.yaml`, `dust2.yaml`, `mirage.yaml`. В логе: `patrol: loaded ...`.

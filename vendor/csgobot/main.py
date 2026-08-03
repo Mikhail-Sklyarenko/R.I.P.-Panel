@@ -337,7 +337,7 @@ def detection_process(
         )
         logger.info(
             "look: enabled yaw=%.0f-%.0f° idle=%.0f-%.0fs sweep=%.2f-%.2fs "
-            "abort_cd=%.1fs max_yaw=%.0f°/s max_delta=%d (L1.2 smooth)",
+            "abort_cd=%.1fs max_yaw=%.0f°/s max_delta=%d hz=%.0f (L1.3)",
             config.look.yaw_deg_min,
             config.look.yaw_deg_max,
             config.look.idle_sec_min,
@@ -347,6 +347,7 @@ def detection_process(
             config.look.abort_cooldown_sec,
             config.look.max_yaw_deg_per_sec,
             config.look.max_delta,
+            config.look.mouse_hz,
         )
 
     target_selector = TargetSelector(

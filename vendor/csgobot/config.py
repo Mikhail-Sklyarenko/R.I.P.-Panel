@@ -254,22 +254,23 @@ class AutoBuyConfig:
 
 @dataclass
 class LookConfig:
-    """Patrol camera sweeps (PR-L1…L1.2): cadence + smooth capped mouse substeps."""
+    """Patrol camera sweeps (PR-L1…L1.3): cadence + smooth high-rate mouse."""
     enabled: bool = True
     yaw_deg_min: float = 80.0
     yaw_deg_max: float = 90.0
-    sweep_sec_min: float = 1.6
-    sweep_sec_max: float = 2.4
+    # Natural glance speed (not slow-mo); yaw-rate floor still applies.
+    sweep_sec_min: float = 1.0
+    sweep_sec_max: float = 1.4
     idle_sec_min: float = 5.0
     idle_sec_max: float = 8.0
-    # After mid-sweep abort (combat), retry no sooner than this — do not full-reset idle.
     abort_cooldown_sec: float = 1.5
-    # L1.2 smoothness
-    max_yaw_deg_per_sec: float = 55.0  # floor on sweep duration = yaw / rate
-    max_delta: int = 28  # mouse counts per substep (aim uses ~35)
-    substeps_per_tick: int = 12
-    substep_sleep_sec: float = 0.001
-    pause_movement: bool = True  # release WASD while sweeping
+    max_yaw_deg_per_sec: float = 80.0
+    sweep_sec_hard_max: float = 1.8  # never slower than this even if rate floor wants more
+    max_delta: int = 20
+    substeps_per_tick: int = 8
+    substep_sleep_sec: float = 0.0  # high-rate thread paces via mouse_hz
+    pause_movement: bool = True
+    mouse_hz: float = 120.0  # 0 = sync/YOLO-tick mode (tests)
 
 
 @dataclass

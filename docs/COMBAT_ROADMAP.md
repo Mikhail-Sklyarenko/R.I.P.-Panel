@@ -22,6 +22,7 @@
 | **PR-L1** | Look A — `LookController` (80–90° sweeps, alternate direction) |
 | **PR-L1.1** | Look cadence: wall-clock `due_at`; combat abort no longer full-resets idle (DM-visible) |
 | **PR-L1.2** | Look smoothness: longer sweep, yaw-rate floor, capped mouse substeps, pause WASD |
+| **PR-L1.3** | Look speed+smooth: retuned 1.0–1.4 s + dedicated 120 Hz mouse thread |
 
 ---
 
