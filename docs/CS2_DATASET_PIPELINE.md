@@ -8,7 +8,9 @@ Work under `vendor/csgobot/yolov8/datasets/`.
 
 - `hf_raw/` - downloaded Hugging Face imagefolder sources.
 - `sources/<name>/` - YOLO-formatted normalized sources.
-- `product_v1/` - merged + split output dataset.
+- `product_v1/` / `product_v1_bootstrap/` - merged + split output dataset.
+
+**Windows shortcut (same idea as upstream csgobot):** from repo root run `BootstrapDataset.bat` — downloads external dataset, builds, audits, writes manifest. No manual image copy required for bootstrap.
 
 ## 1) Download a public source (optional bootstrap)
 

@@ -118,8 +118,9 @@ Env без правки `run.py`: `CS2_SENSITIVITY`, `CSGOBOT_X360`, `CSGOBOT_SM
 
 **Roadmap:** `docs/COMBAT_ROADMAP.md` — следующие: **E1** → **A2** (strafes) → **L2–L4**.
 
-**Dataset strategy (CT detect):** `docs/CS2_DATASET_STRATEGY.md` — отбор публичных датасетов, legal/risk фильтр, и production-пайплайн для собственного CS2 CT-heavy датасета.
-**Dataset runbook:** `docs/CS2_DATASET_PIPELINE.md` — пошаговый E2E процесс: download/convert/merge/audit/release-gates.
+**Dataset strategy (CT detect):** `docs/CS2_DATASET_STRATEGY.md` — отбор публичных датасетов, legal/risk фильтр, и production-пайплайн для собственного CS2 CT-heavy датасета.  
+**Dataset runbook:** `docs/CS2_DATASET_PIPELINE.md` — пошаговый E2E процесс: download/convert/merge/audit/release-gates.  
+**Windows one-click (как у csgobot — данные вне git):** после `git pull` запусти `BootstrapDataset.bat` в корне репо.
 
 **Fire (PR-6d):** default `CSGOBOT_SHOOT_MODE=hold` (зажим LMB). Альтернативы: `burst`, `tap`. См. `docs/AIM_TUNING.md`.
 

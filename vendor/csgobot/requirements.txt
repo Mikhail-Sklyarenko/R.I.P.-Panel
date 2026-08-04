@@ -22,3 +22,7 @@ pynput>=1.7.0
 pyyaml>=6.0
 # Optional OCR fallback for map detect: pip install pytesseract (+ Tesseract binary)
 # tomli>=2.0.0  # Only needed if using TOML config files
+
+# Dataset bootstrap (BootstrapDataset.bat / run_product_pipeline.py)
+# Optional until you train/rebuild weights:
+# huggingface_hub[cli]>=0.23.0
