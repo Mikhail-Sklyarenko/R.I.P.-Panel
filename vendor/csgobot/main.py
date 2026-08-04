@@ -10,6 +10,7 @@ import random
 import signal
 import sys
 import time
+from math import hypot
 from typing import Optional
 
 import cv2
@@ -388,6 +389,7 @@ def detection_process(
     aim_pipeline = AimPipelineState.from_aim_config(config.aim)
     head_miss_since: Optional[float] = None
     last_target_key: Optional[tuple] = None
+    last_target_aim: Optional[tuple] = None
     last_detect_debug_log = 0.0
     roi_used_last = False
     autobuy_state = AutoBuyState()
@@ -628,6 +630,7 @@ def detection_process(
             if enemy_target is None:
                 head_miss_since = None
                 last_target_key = None
+                last_target_aim = None
                 aim_pipeline.reset_trackers()
                 if aim_mouse is not None:
                     aim_mouse.clear()
@@ -865,17 +868,30 @@ def detection_process(
                     aim_pipeline.reset_trackers()
                     if aim_mouse is not None:
                         aim_mouse.reset_track()
+                    last_target_aim = None
 
-                target_key = (
-                    target.class_name,
-                    int(target.aim_x // 8),
-                    int(target.aim_y // 8),
+                # A1.2.1: hard-retarget only on class change or large aim jump.
+                # The old aim_x//8 bucket reset cleared settle every few pixels
+                # and caused on-target vertical thrash.
+                hard_px = max(8.0, float(config.aim.aim_hard_retarget_px))
+                target_key = (target.class_name,)
+                jump = 0.0
+                if last_target_aim is not None:
+                    jump = hypot(
+                        target.aim_x - last_target_aim[0],
+                        target.aim_y - last_target_aim[1],
+                    )
+                hard_retarget = (
+                    last_target_key is None
+                    or target_key != last_target_key
+                    or jump >= hard_px
                 )
-                if target_key != last_target_key:
+                if hard_retarget:
                     aim_pipeline.reset_trackers()
                     if aim_mouse is not None:
                         aim_mouse.reset_track()
                     last_target_key = target_key
+                last_target_aim = (float(target.aim_x), float(target.aim_y))
 
                 frame = process_aim_frame(
                     raw_x=target.aim_x,

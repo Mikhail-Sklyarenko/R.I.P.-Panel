@@ -1,8 +1,9 @@
-"""High-rate aim mouse (PR-A1 / A1.1 settle / A1.2 dual-phase).
+"""High-rate aim mouse (PR-A1 / A1.1 settle / A1.2 dual-phase / A1.2.1 hold).
 
 Detection updates the tracked aim point; a dedicated mouse thread applies FOV
 deltas at ``mouse_hz``. Soft-settle stops on-target bbox hunt; dual-phase
-gain snaps fast when far and tightens only near the crosshair.
+gain snaps fast when far and tightens only near the crosshair. A1.2.1 adds
+near-zone Y damp and expects hard-retarget only on real target switches.
 """
 
 from __future__ import annotations
@@ -36,6 +37,7 @@ class AimMouseController:
     A1 — detection owns *what* to track; mouse thread owns *how* it moves.
     A1.1 — soft-settle: freeze aim point when on target; coast only for real speed.
     A1.2 — dual-phase: low smoothing + large step when far; precision near settle.
+    A1.2.1 — near Y damp + calmer defaults; hard-retarget owned by main loop.
     """
 
     def __init__(
@@ -124,7 +126,7 @@ class AimMouseController:
         logger.info(
             "aim: mouse thread hz=%.0f step_max=%d near_step=%d "
             "settle=%.0f unlock=%.0f snap=%.0f acquire_scale=%.2f "
-            "coast=%s coast_min_v=%.0f (A1.2)",
+            "y_scale=%.2f coast=%s coast_min_v=%.0f (A1.2.1)",
             float(self._config.mouse_hz),
             self._step_max_delta(),
             max(1, int(self._config.aim_near_step_max_delta)),
@@ -132,6 +134,7 @@ class AimMouseController:
             float(self._config.aim_unlock_px),
             float(self._config.aim_snap_px),
             float(self._config.aim_acquire_smooth_scale),
+            float(self._config.aim_near_y_scale),
             bool(self._config.mouse_coast),
             float(self._config.mouse_coast_min_speed_px_s),
         )
@@ -258,6 +261,7 @@ class AimMouseController:
         near_px = max(0.0, float(self._config.aim_near_px))
         snap_px = max(near_px + 1.0, float(self._config.aim_snap_px))
         acquire_scale = float(self._config.aim_acquire_smooth_scale)
+        near_y_scale = float(self._config.aim_near_y_scale)
         settle_px = max(0.0, float(self._config.aim_settle_px))
         settle_on = bool(self._config.aim_settle_enabled)
         min_coast_speed = max(0.0, float(self._config.mouse_coast_min_speed_px_s))
@@ -330,6 +334,15 @@ class AimMouseController:
                 max_delta=step_max,
                 min_delta=min_delta,
             )
+
+            # A1.2.1: bbox head/chest flicker is mostly vertical — damp near target.
+            if (
+                near_px > 0
+                and dist <= near_px
+                and 0.0 < near_y_scale < 1.0
+                and dy != 0
+            ):
+                dy = int(round(dy * near_y_scale))
 
             with self._lock:
                 if not self._active:

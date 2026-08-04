@@ -36,6 +36,7 @@ def _ctrl(
     aim_unlock_px: float = 18.0,
     aim_near_px: float = 56.0,
     aim_near_step_max_delta: int = 8,
+    aim_near_y_scale: float = 1.0,
 ) -> AimMouseController:
     aim = AimConfig(
         mouse_hz=mouse_hz,
@@ -56,6 +57,7 @@ def _ctrl(
         aim_unlock_px=aim_unlock_px,
         aim_near_px=aim_near_px,
         aim_near_step_max_delta=aim_near_step_max_delta,
+        aim_near_y_scale=aim_near_y_scale,
     )
     return AimMouseController(config=aim, fov_mouse=_fov())
 
@@ -184,6 +186,41 @@ def test_on_target_settle_stops_mouse() -> None:
         assert ctrl.is_settled or (len(pieces) - mid) <= 4
     finally:
         ctrl.stop()
+
+
+def test_near_y_scale_damps_vertical_moves() -> None:
+    """A1.2.1: near-zone dy should be smaller with y_scale < 1."""
+
+    def _collect(y_scale: float) -> list[tuple[int, int]]:
+        pieces: list[tuple[int, int]] = []
+        ctrl = _ctrl(
+            mouse_hz=90.0,
+            mouse_step_max_delta=20,
+            mouse_min_delta=0,
+            aim_settle_enabled=False,
+            aim_near_px=200.0,
+            aim_near_step_max_delta=20,
+            aim_near_y_scale=y_scale,
+            aim_dead_zone_high=2.0,
+            aim_dead_zone_low=1.0,
+        )
+        ctrl.start(lambda dx, dy: pieces.append((dx, dy)))
+        try:
+            # Pure vertical offset inside near zone
+            ctrl.set_target(640.0, 400.0, smoothing=1.0, now=time.monotonic())
+            deadline = time.monotonic() + 0.25
+            while time.monotonic() < deadline and len(pieces) < 8:
+                time.sleep(0.02)
+        finally:
+            ctrl.stop()
+        return pieces
+
+    full = _collect(1.0)
+    damp = _collect(0.5)
+    assert full and damp
+    full_dy = sum(abs(dy) for _, dy in full[:5])
+    damp_dy = sum(abs(dy) for _, dy in damp[:5])
+    assert damp_dy < full_dy
 
 
 def test_legacy_hz_zero_does_not_start_thread() -> None:

@@ -78,7 +78,7 @@ MIN_BBOX_HEIGHT_FOR_HEAD = 28.0
 LONG_RANGE_BODY_BIAS = True
 ROI_ZOOM_ENABLED = True
 ROI_FRACTION = 0.75
-SMOOTHING = 1.8  # A1.2: faster acquire; dual-phase lowers further when far
+SMOOTHING = 2.4  # A1.2.1: stable hold; dual-phase still snaps when far
 LEAD_AIM_ENABLED = True  # velocity lead for moving targets
 LEAD_MS = 80.0  # override: CSGOBOT_LEAD_MS
 ADAPTIVE_SMOOTHING = True  # override: CSGOBOT_ADAPTIVE_SMOOTHING=0
@@ -140,23 +140,25 @@ MOVE_INTERVAL_SEC = 8.0
 DEAD_ZONE = 12.0  # legacy; maps to AIM_DEAD_ZONE_HIGH if unset
 AIM_DEAD_ZONE_HIGH = 14.0
 AIM_DEAD_ZONE_LOW = 8.0
-SHOOT_DEAD_ZONE = 28.0  # A1.2: fire before perfect settle (was 18)
+SHOOT_DEAD_ZONE = 24.0  # A1.2.1: fire early, but after near throttle
 MOUSE_MAX_DELTA = 35
 MOUSE_MIN_DELTA = 2
 # Aim L1.3-style: dedicated mouse thread (0 = legacy YOLO-tick mouse)
 AIM_MOUSE_HZ = 120.0
-AIM_MOUSE_STEP_MAX = 28  # A1.2: faster far snap
+AIM_MOUSE_STEP_MAX = 20  # A1.2.1: calmer far snap (was 28)
 AIM_MOUSE_COAST = True
 AIM_MOUSE_COAST_MAX_SEC = 0.10
-# A1.1 soft-settle + A1.2 dual-phase acquire
+# A1.1 soft-settle + A1.2 dual-phase + A1.2.1 stable hold
 AIM_SETTLE = True
-AIM_SETTLE_PX = 10.0
-AIM_UNLOCK_PX = 20.0
-AIM_COAST_MIN_SPEED = 150.0
-AIM_NEAR_PX = 36.0  # near throttle only in last ~36 px
-AIM_NEAR_STEP_MAX = 14
+AIM_SETTLE_PX = 12.0
+AIM_UNLOCK_PX = 24.0
+AIM_COAST_MIN_SPEED = 220.0  # ignore bbox micro-jitter as coast
+AIM_NEAR_PX = 48.0  # earlier precision zone
+AIM_NEAR_STEP_MAX = 8
 AIM_SNAP_PX = 100.0
-AIM_ACQUIRE_SMOOTH_SCALE = 0.5
+AIM_ACQUIRE_SMOOTH_SCALE = 0.65  # less aggressive far snap than 0.5
+AIM_NEAR_Y_SCALE = 0.55  # damp vertical thrash near target
+AIM_HARD_RETARGET_PX = 80.0  # reset trackers only on class/big jump
 AIM_SMOOTH_ENABLED = True
 AIM_SMOOTH_ALPHA = 0.45
 AIM_SMOOTH_JUMP_RESET_PX = 80.0
@@ -192,8 +194,10 @@ def create_config() -> AppConfig:
         resolve_aim_mouse_hz,
         resolve_aim_mouse_step_max_delta,
         resolve_aim_acquire_smooth_scale,
+        resolve_aim_hard_retarget_px,
         resolve_aim_near_px,
         resolve_aim_near_step_max_delta,
+        resolve_aim_near_y_scale,
         resolve_aim_settle_enabled,
         resolve_aim_settle_px,
         resolve_aim_snap_px,
@@ -309,6 +313,8 @@ def create_config() -> AppConfig:
         aim_acquire_smooth_scale=resolve_aim_acquire_smooth_scale(
             AIM_ACQUIRE_SMOOTH_SCALE
         ),
+        aim_near_y_scale=resolve_aim_near_y_scale(AIM_NEAR_Y_SCALE),
+        aim_hard_retarget_px=resolve_aim_hard_retarget_px(AIM_HARD_RETARGET_PX),
         head_confidence=HEAD_SHOOT_CONFIDENCE,
         body_confidence=BODY_SHOOT_CONFIDENCE,
         auto_shoot=AUTO_SHOOT,
@@ -560,7 +566,9 @@ def main() -> int:
         f"mouse_cap={config.aim.mouse_max_delta} "
         f"aim_hz={config.aim.mouse_hz} step_max={config.aim.mouse_step_max_delta} "
         f"settle={config.aim.aim_settle_px}/{config.aim.aim_unlock_px} "
-        f"near_step={config.aim.aim_near_step_max_delta} "
+        f"near={config.aim.aim_near_px}/{config.aim.aim_near_step_max_delta} "
+        f"y_scale={config.aim.aim_near_y_scale} "
+        f"hard_retarget={config.aim.aim_hard_retarget_px} "
         f"snap={config.aim.aim_snap_px} acquire={config.aim.aim_acquire_smooth_scale}"
     )
     logger.info(

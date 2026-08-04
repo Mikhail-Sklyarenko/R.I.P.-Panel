@@ -162,6 +162,20 @@ def resolve_aim_near_step_max_delta(default: int) -> int:
     return default
 
 
+def resolve_aim_near_y_scale(default: float) -> float:
+    raw = os.environ.get("CSGOBOT_AIM_NEAR_Y_SCALE", "").strip()
+    if raw:
+        return max(0.15, min(1.0, float(raw)))
+    return default
+
+
+def resolve_aim_hard_retarget_px(default: float) -> float:
+    raw = os.environ.get("CSGOBOT_AIM_HARD_RETARGET_PX", "").strip()
+    if raw:
+        return max(8.0, float(raw))
+    return default
+
+
 def resolve_lead_variance_gate(default: bool) -> bool:
     val = _env_bool("CSGOBOT_LEAD_VARIANCE_GATE")
     return default if val is None else val

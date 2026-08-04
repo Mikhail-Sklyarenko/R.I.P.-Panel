@@ -120,27 +120,31 @@ Legacy `CSGOBOT_DEAD_ZONE` → `aim_dead_zone_high`.
 
 Симптом «дёргается на бегу» → `git pull` 6c; debug: `lead_stable=False` в `aim:` log.
 
-## High-rate aim mouse (PR-A1 / A1.1 settle / A1.2 dual-phase)
+## High-rate aim mouse (PR-A1 / A1.1 settle / A1.2 dual-phase / A1.2.1 hold)
 
 Тот же принцип, что у look L1.3: **detection задаёт цель**, **мышь крутится на своём hz**.
 
 | Параметр | Default | Env |
 |----------|---------|-----|
 | Aim mouse Hz | **120** | `CSGOBOT_AIM_MOUSE_HZ` (`0` = legacy) |
-| Step max / tick | **28** | `CSGOBOT_AIM_MOUSE_STEP_MAX` |
-| Base smoothing | **1.8** | `CSGOBOT_SMOOTHING` |
-| Shoot dead zone | **28** | `CSGOBOT_SHOOT_DEAD_ZONE` (огонь **до** settle) |
+| Step max / tick | **20** | `CSGOBOT_AIM_MOUSE_STEP_MAX` |
+| Base smoothing | **2.4** | `CSGOBOT_SMOOTHING` |
+| Shoot dead zone | **24** | `CSGOBOT_SHOOT_DEAD_ZONE` (огонь **до** settle) |
 | Soft-settle | `on` | `CSGOBOT_AIM_SETTLE=0` |
-| Settle / unlock px | **10** / **20** | `CSGOBOT_AIM_SETTLE_PX`, `CSGOBOT_AIM_UNLOCK_PX` |
-| Near zone / step | **36** / **14** | `CSGOBOT_AIM_NEAR_PX`, `CSGOBOT_AIM_NEAR_STEP_MAX` |
-| Snap px / acquire scale | **100** / **0.5** | `CSGOBOT_AIM_SNAP_PX`, `CSGOBOT_AIM_ACQUIRE_SMOOTH_SCALE` |
-| Coast min speed | **150** px/s | `CSGOBOT_AIM_COAST_MIN_SPEED` |
+| Settle / unlock px | **12** / **24** | `CSGOBOT_AIM_SETTLE_PX`, `CSGOBOT_AIM_UNLOCK_PX` |
+| Near zone / step | **48** / **8** | `CSGOBOT_AIM_NEAR_PX`, `CSGOBOT_AIM_NEAR_STEP_MAX` |
+| Near Y scale | **0.55** | `CSGOBOT_AIM_NEAR_Y_SCALE` (`1` = off) |
+| Hard retarget px | **80** | `CSGOBOT_AIM_HARD_RETARGET_PX` |
+| Snap px / acquire scale | **100** / **0.65** | `CSGOBOT_AIM_SNAP_PX`, `CSGOBOT_AIM_ACQUIRE_SMOOTH_SCALE` |
+| Coast min speed | **220** px/s | `CSGOBOT_AIM_COAST_MIN_SPEED` |
 
-**A1.2 dual-phase:** далеко — низкий effective smoothing + крупный step (быстрый snap); ближе `near_px` — precision; огонь с **28 px**; settle на **10 px** (без hunt). Shoot conf head/body **0.60 / 0.50**.
+**A1.2.1 stable hold:** убран reset трека на каждом `aim//8` бакете (это сбрасывало settle и давало вертикальный thrash). Hard-retarget только при смене class или прыжке ≥80 px. Near-зона раньше и тише; **Y damp** гасит bbox flicker вверх/вниз. Лог: `(A1.2.1)`.
 
-Pipeline: **EMA → lead → set_target → 120 Hz (acquire smooth + step) → shoot@28 → settle@10**.
+Pipeline: **EMA → lead → set_target → 120 Hz (acquire + near Y damp) → shoot@24 → settle@12**.
 
-Симптом «медленно наводится / поздно стреляет» → `git pull` A1.2; лог `(A1.2)`; при необходимости ↓ `CSGOBOT_SMOOTHING=1.4`, ↑ `CSGOBOT_SHOOT_DEAD_ZONE=32`.
+Симптом «водит прицелом вверх/вниз на цели» → `git pull` A1.2.1; лог `(A1.2.1)`; при необходимости ↑ `CSGOBOT_SMOOTHING=2.8`, ↓ `CSGOBOT_AIM_NEAR_Y_SCALE=0.4`, ↑ `CSGOBOT_AIM_SETTLE_PX=14`.
+
+Симптом «медленно наводится» → ↓ `CSGOBOT_SMOOTHING=2.0`, ↑ `CSGOBOT_AIM_MOUSE_STEP_MAX=24`, ↓ `CSGOBOT_AIM_ACQUIRE_SMOOTH_SCALE=0.5`.
 
 Симптом «водит прицелом по торсу» → settle on; ↑ `CSGOBOT_AIM_SETTLE_PX`.
 

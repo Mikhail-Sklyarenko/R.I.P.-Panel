@@ -120,7 +120,7 @@ def test_create_config_6c_stabilizer_defaults(monkeypatch) -> None:
     cfg = create_config()
     assert cfg.aim.aim_dead_zone_high == 14.0
     assert cfg.aim.aim_dead_zone_low == 8.0
-    assert cfg.aim.shoot_dead_zone == 28.0
+    assert cfg.aim.shoot_dead_zone == 24.0
     assert cfg.aim.aim_smooth_enabled is True
     assert cfg.aim.lead_variance_gate is True
 
@@ -129,15 +129,22 @@ def test_create_config_a12_dual_phase_defaults(monkeypatch) -> None:
     monkeypatch.delenv("CSGOBOT_AIM_MOUSE_STEP_MAX", raising=False)
     monkeypatch.delenv("CSGOBOT_AIM_NEAR_STEP_MAX", raising=False)
     monkeypatch.delenv("CSGOBOT_SMOOTHING", raising=False)
+    monkeypatch.delenv("CSGOBOT_AIM_NEAR_Y_SCALE", raising=False)
+    monkeypatch.delenv("CSGOBOT_AIM_HARD_RETARGET_PX", raising=False)
     from run import create_config  # noqa: E402
 
     cfg = create_config()
-    assert cfg.aim.mouse_step_max_delta == 28
-    assert cfg.aim.aim_near_step_max_delta == 14
-    assert cfg.aim.aim_near_px == 36.0
+    assert cfg.aim.mouse_step_max_delta == 20
+    assert cfg.aim.aim_near_step_max_delta == 8
+    assert cfg.aim.aim_near_px == 48.0
     assert cfg.aim.aim_snap_px == 100.0
-    assert cfg.aim.aim_acquire_smooth_scale == 0.5
-    assert cfg.aim.smoothing_factor == 1.8
+    assert cfg.aim.aim_acquire_smooth_scale == 0.65
+    assert cfg.aim.aim_near_y_scale == 0.55
+    assert cfg.aim.aim_hard_retarget_px == 80.0
+    assert cfg.aim.aim_settle_px == 12.0
+    assert cfg.aim.aim_unlock_px == 24.0
+    assert cfg.aim.mouse_coast_min_speed_px_s == 220.0
+    assert cfg.aim.smoothing_factor == 2.4
 
 
 def test_acquisition_smoothing_far_snappier_than_near() -> None:

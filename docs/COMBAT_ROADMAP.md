@@ -26,6 +26,7 @@
 | **PR-A1** | Aim L1.3-style: 120 Hz mouse thread + target tracking/coast (no strafes) |
 | **PR-A1.1** | Aim soft-settle: hold on target (no bbox hunt); coast only for real speed |
 | **PR-A1.2** | Dual-phase aim: fast acquire + early fire (shoot@28) + settle@10 |
+| **PR-A1.2.1** | Stable on-target hold: no 8px-bucket reset, near Y damp, calmer defaults |
 
 ---
 
