@@ -1,7 +1,7 @@
 """Run end-to-end product dataset pipeline.
 
 Stages:
-1) (optional) download HF dataset via huggingface-cli
+1) (optional) download HF dataset via huggingface_hub Python API
 2) convert HF imagefolder -> YOLO
 3) merge sources into product dataset
 4) audit dataset
@@ -11,7 +11,6 @@ Stages:
 from __future__ import annotations
 
 import argparse
-import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -20,6 +19,24 @@ from pathlib import Path
 def run(cmd: list[str]) -> None:
     print("+", " ".join(cmd))
     subprocess.run(cmd, check=True)
+
+
+def download_hf_dataset(repo_id: str, local_dir: Path) -> None:
+    """Download dataset without relying on huggingface-cli / PATH."""
+    try:
+        from huggingface_hub import snapshot_download
+    except ImportError as exc:  # pragma: no cover
+        raise RuntimeError(
+            "huggingface_hub is required. Install: pip install huggingface_hub"
+        ) from exc
+
+    local_dir.mkdir(parents=True, exist_ok=True)
+    print(f"+ snapshot_download repo={repo_id} local_dir={local_dir}")
+    snapshot_download(
+        repo_id=repo_id,
+        repo_type="dataset",
+        local_dir=str(local_dir),
+    )
 
 
 def main() -> int:
@@ -50,30 +67,16 @@ def main() -> int:
 
     workdir = args.workdir.resolve()
     py = sys.executable
+    hf_local = (workdir / args.hf_local_dir).resolve()
 
-    # Optional HF download
+    # Optional HF download (Python API — works on Windows without CLI on PATH)
     if args.hf_repo:
-        hf_cli = shutil.which("huggingface-cli")
-        if hf_cli is None:
-            raise RuntimeError(
-                "huggingface-cli not found. Install: pip install 'huggingface_hub[cli]'"
-            )
-        run(
-            [
-                hf_cli,
-                "download",
-                args.hf_repo,
-                "--repo-type",
-                "dataset",
-                "--local-dir",
-                str((workdir / args.hf_local_dir).resolve()),
-            ]
-        )
+        download_hf_dataset(args.hf_repo, hf_local)
 
     dynamic_sources = list(args.source)
 
     # Optional conversion if HF root exists
-    hf_data_root = (workdir / args.hf_local_dir / args.hf_data_subdir).resolve()
+    hf_data_root = (hf_local / args.hf_data_subdir).resolve()
     converted_root = (workdir / "sources" / "hf_converted").resolve()
     if hf_data_root.exists():
         convert_cmd = [
@@ -92,7 +95,9 @@ def main() -> int:
         dynamic_sources.append(f"hf={converted_root}")
 
     if not dynamic_sources:
-        raise RuntimeError("no sources provided; pass --source or --hf-repo with convertible data")
+        raise RuntimeError(
+            "no sources provided; pass --source or --hf-repo with convertible data"
+        )
 
     # Build
     build_cmd = [

@@ -13,13 +13,13 @@ BootstrapDataset.bat
 
 This will:
 1. ensure `huggingface_hub` in csgobot venv;
-2. download `fvossel/csgo-player-detection`;
+2. download `fvossel/csgo-player-detection` via Python API (`snapshot_download`);
 3. convert HF → YOLO;
 4. build `product_v1_bootstrap`;
 5. audit quality;
 6. write `manifests/product_v1_bootstrap_manifest.json`.
 
-Requires: `vendor\csgobot\venv` already created (`pip install -r requirements.txt`).
+No `huggingface-cli` / PATH required (Windows-safe).
 
 ## Manual / Mac / Linux
 

@@ -1,7 +1,7 @@
 @echo off
 REM One-click CS2 dataset bootstrap (csgobot-style: data not in git).
-REM Downloads approved HF source, converts to YOLO, builds product_v1_bootstrap,
-REM audits quality, writes immutable manifest.
+REM Downloads approved HF source via Python API, converts to YOLO,
+REM builds product_v1_bootstrap, audits quality, writes immutable manifest.
 setlocal EnableExtensions
 cd /d "%~dp0"
 
@@ -16,7 +16,7 @@ if not exist "%PY%" (
   echo   cd vendor\csgobot
   echo   python -m venv venv
   echo   venv\Scripts\pip.exe install -r requirements.txt
-  echo   venv\Scripts\pip.exe install "huggingface_hub[cli]"
+  echo   venv\Scripts\pip.exe install huggingface_hub
   exit /b 1
 )
 
@@ -26,10 +26,10 @@ echo Workdir: %DS%
 echo Source:  fvossel/csgo-player-detection  ^(CS2, external, not in git^)
 echo.
 
-"%PIP%" show huggingface_hub >nul 2>&1
+"%PY%" -c "import huggingface_hub" >nul 2>&1
 if errorlevel 1 (
   echo Installing huggingface_hub...
-  "%PIP%" install "huggingface_hub[cli]"
+  "%PIP%" install huggingface_hub
   if errorlevel 1 (
     echo ERROR: failed to install huggingface_hub
     exit /b 1

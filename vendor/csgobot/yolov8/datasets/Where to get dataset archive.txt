@@ -6,6 +6,8 @@ Why: archives are too large even for Git LFS.
 One-click on Windows (repo root):
   BootstrapDataset.bat
 
+Uses Python API (huggingface_hub.snapshot_download) — no huggingface-cli required.
+
 Or manually from vendor\csgobot:
   venv\Scripts\python.exe yolov8\datasets\run_product_pipeline.py --workdir yolov8\datasets --hf-repo fvossel/csgo-player-detection --hf-local-dir hf_raw\fvossel_cs2 --hf-data-subdir data --out-root product_v1_bootstrap --classes c,ch,t,th --train-pct 80 --val-pct 10 --dedup-stem --manifest-out manifests\product_v1_bootstrap_manifest.json
 

@@ -25,4 +25,4 @@ pyyaml>=6.0
 
 # Dataset bootstrap (BootstrapDataset.bat / run_product_pipeline.py)
 # Optional until you train/rebuild weights:
-# huggingface_hub[cli]>=0.23.0
+# huggingface_hub>=0.23.0
