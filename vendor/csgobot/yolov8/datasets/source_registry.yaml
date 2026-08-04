@@ -1,0 +1,33 @@
+version: 1
+generated_by: "manual review"
+notes:
+  - "Use this registry to keep dataset provenance explicit."
+  - "status=approved means allowed for engineering experiments after legal check."
+
+sources:
+  - id: "fvossel_cs2_hf"
+    provider: "huggingface"
+    repo: "fvossel/csgo-player-detection"
+    format: "imagefolder+metadata_jsonl"
+    classes: ["ct_body", "ct_head", "t_body", "t_head"]
+    license_note: "Research-focused; images derivative of Valve assets."
+    status: "approved_with_legal_review"
+    reason: "Best documented public CS2 source and class stats."
+
+  - id: "kaggle_cs2_body_head"
+    provider: "kaggle"
+    repo: "merfarukgnaydn/counter-strike-2-body-and-head-classification"
+    format: "varies"
+    classes: ["ct_body", "ct_head", "t_body", "t_head"]
+    license_note: "License clarity can be limited depending on snapshot."
+    status: "conditional"
+    reason: "Useful baseline source but requires explicit legal acceptance."
+
+  - id: "roboflow_universe_cs2"
+    provider: "roboflow"
+    repo: "community datasets (various)"
+    format: "roboflow export variants"
+    classes: ["varies"]
+    license_note: "Dataset-specific license by creator."
+    status: "experimental_only"
+    reason: "Quality/consistency varies too much for primary production source."

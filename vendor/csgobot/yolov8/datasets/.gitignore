@@ -1,3 +1,27 @@
 lstudio
 prepared
 prepared-csgo-dataset-24.05.24.zip
+hf_raw
+sources
+product_*
+manifests
+
+# Keep only our_cs2 scaffold in git (actual data files stay ignored)
+!sources/
+sources/*
+!sources/our_cs2/
+!sources/our_cs2/train/
+!sources/our_cs2/train/images/
+!sources/our_cs2/train/images/.gitkeep
+!sources/our_cs2/train/labels/
+!sources/our_cs2/train/labels/.gitkeep
+!sources/our_cs2/val/
+!sources/our_cs2/val/images/
+!sources/our_cs2/val/images/.gitkeep
+!sources/our_cs2/val/labels/
+!sources/our_cs2/val/labels/.gitkeep
+!sources/our_cs2/test/
+!sources/our_cs2/test/images/
+!sources/our_cs2/test/images/.gitkeep
+!sources/our_cs2/test/labels/
+!sources/our_cs2/test/labels/.gitkeep
