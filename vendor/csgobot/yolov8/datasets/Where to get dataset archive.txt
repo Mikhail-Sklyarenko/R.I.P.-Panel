@@ -1,8 +1,10 @@
 Datasets are NOT stored in git (same approach as upstream csgobot / Priler).
 
 Why: archives are too large even for Git LFS.
+Farm PCs never need them — use EnsureWeights.bat for the ~50 MB .pt only.
+See docs\PRODUCT_MODEL_LIFECYCLE.md
 
-=== Production bootstrap (recommended) ===
+=== TRAIN machine bootstrap ===
 One-click on Windows (repo root):
   BootstrapDataset.bat
 
@@ -20,3 +22,6 @@ Legacy CSGO-oriented source (reference only, not primary for CS2 CT fix):
 Own captures (later, for CT quality):
   Drop YOLO pairs into sources\our_cs2\{train,val,test}\{images,labels}
   See docs\CS2_DATASET_PIPELINE.md and docs\CS2_DATASET_STRATEGY.md
+
+=== Farm fleet ===
+  EnsureWeights.bat

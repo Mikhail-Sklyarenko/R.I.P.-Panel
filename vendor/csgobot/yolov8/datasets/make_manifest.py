@@ -32,9 +32,15 @@ def parse_label(path: Path) -> Counter:
     return c
 
 
-def build_manifest(root: Path, class_names: list[str], sources: list[str]) -> dict:
+def build_manifest(
+    root: Path,
+    class_names: list[str],
+    sources: list[str],
+    *,
+    include_file_hashes: bool = False,
+) -> dict:
     out: dict = {
-        "dataset_root": str(root.resolve()),
+        "dataset_root": root.name,
         "class_names": class_names,
         "sources": sources,
         "splits": {},
@@ -79,10 +85,12 @@ def build_manifest(root: Path, class_names: list[str], sources: list[str]) -> di
         "boxes": total_boxes,
         "class_counts": {str(i): total_counts[i] for i in range(len(class_names))},
     }
-    out["label_file_hashes_sha256"] = dict(sorted(label_hashes.items()))
+    sorted_hashes = dict(sorted(label_hashes.items()))
     out["dataset_hash_sha256"] = hashlib.sha256(
-        json.dumps(out["label_file_hashes_sha256"], sort_keys=True).encode("utf-8")
+        json.dumps(sorted_hashes, sort_keys=True).encode("utf-8")
     ).hexdigest()
+    if include_file_hashes:
+        out["label_file_hashes_sha256"] = sorted_hashes
     return out
 
 
@@ -97,10 +105,20 @@ def main() -> int:
         help="Optional source provenance notes (can repeat)",
     )
     parser.add_argument("--out", type=Path, required=True, help="Output manifest json path")
+    parser.add_argument(
+        "--include-file-hashes",
+        action="store_true",
+        help="Embed per-label sha256 map (large). Default is slim summary + dataset_hash only.",
+    )
     args = parser.parse_args()
 
     class_names = [x.strip() for x in args.classes.split(",") if x.strip()]
-    manifest = build_manifest(args.root, class_names, args.source)
+    manifest = build_manifest(
+        args.root,
+        class_names,
+        args.source,
+        include_file_hashes=args.include_file_hashes,
+    )
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(manifest, indent=2, ensure_ascii=True) + "\n", encoding="utf-8")
     print(f"manifest written: {args.out}")

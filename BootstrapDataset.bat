@@ -1,7 +1,7 @@
 @echo off
-REM One-click CS2 dataset bootstrap (csgobot-style: data not in git).
-REM Downloads approved HF source via Python API, converts to YOLO,
-REM builds product_v1_bootstrap, audits quality, writes immutable manifest.
+REM TRAIN MACHINE ONLY: build product YOLO dataset from external HF source.
+REM Does NOT train. Does NOT belong on farm PCs (multi-GB download).
+REM Farm fleet: use EnsureWeights.bat instead (~50 MB .pt).
 setlocal EnableExtensions
 cd /d "%~dp0"
 
@@ -9,6 +9,12 @@ set "CSGOBOT=%~dp0vendor\csgobot"
 set "DS=%CSGOBOT%\yolov8\datasets"
 set "PY=%CSGOBOT%\venv\Scripts\python.exe"
 set "PIP=%CSGOBOT%\venv\Scripts\pip.exe"
+
+echo.
+echo === R.I.P. Panel: BootstrapDataset (TRAIN ONLY) ===
+echo WARNING: downloads multi-GB images. Do NOT run on every farm PC.
+echo Farm PCs need EnsureWeights.bat only.
+echo.
 
 if not exist "%PY%" (
   echo ERROR: csgobot venv not found.
@@ -20,8 +26,6 @@ if not exist "%PY%" (
   exit /b 1
 )
 
-echo.
-echo === R.I.P. Panel: dataset bootstrap ===
 echo Workdir: %DS%
 echo Source:  fvossel/csgo-player-detection  ^(CS2, external, not in git^)
 echo.
@@ -56,12 +60,13 @@ if errorlevel 1 (
 )
 
 echo.
-echo OK: dataset ready
+echo OK: product dataset ready on this TRAIN machine
 echo   YOLO root:  %DS%\product_v1_bootstrap
+echo   data yaml:  %DS%\product_data.yaml
 echo   Manifest:   %DS%\manifests\product_v1_bootstrap_manifest.json
 echo.
-echo Next ^(optional^): put your own CS2 captures into
-echo   %DS%\sources\our_cs2\train\images + labels
-echo then re-run with --source ours=...  ^(see docs\CS2_DATASET_PIPELINE.md^)
+echo Next on TRAIN PC: TrainProductModel.bat
+echo Then promote .pt via scripts\promote_weights.py and host URL.
+echo Farm fleet never needs this dataset — only EnsureWeights.bat.
 echo.
 exit /b 0

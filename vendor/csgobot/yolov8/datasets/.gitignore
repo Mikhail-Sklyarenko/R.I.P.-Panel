@@ -3,8 +3,8 @@ prepared
 prepared-csgo-dataset-24.05.24.zip
 hf_raw
 sources
-product_*
-manifests
+product_v*/
+!product_data.yaml
 
 # Keep only our_cs2 scaffold in git (actual data files stay ignored)
 !sources/
@@ -25,3 +25,8 @@ sources/*
 !sources/our_cs2/test/images/.gitkeep
 !sources/our_cs2/test/labels/
 !sources/our_cs2/test/labels/.gitkeep
+
+# Local full manifests stay on TRAIN machine (optional slim copies can be force-added)
+manifests/*
+!manifests/.gitkeep
+!manifests/*_summary.json

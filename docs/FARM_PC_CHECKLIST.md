@@ -60,15 +60,23 @@ python -m venv venv
 
 `preflight.py` → JSON `"ok": true`, `"cuda_available": true`. `check_cuda_torch.py` → `"cuda": true` and GPU name.
 
-## 5. YOLO weights (~52 MB, not in git)
+## 5. YOLO weights (~52 MB, not the dataset)
 
-Place file:
+**Farm PCs download only the production `.pt`.** Never run `BootstrapDataset.bat` here (multi-GB training data).
+
+```bat
+EnsureWeights.bat
+```
+
+This reads `resources/csgobot/weights_registry.json`, downloads the active artifact, and verifies sha256.
+
+Expected path (baseline):
 
 ```
 vendor/csgobot/yolov8/cs2_yolov8m_640_augmented_v4.pt
 ```
 
-Panel startup warns if missing.
+Panel startup warns if missing. Full lifecycle: `docs/PRODUCT_MODEL_LIFECYCLE.md`.
 
 ## 6. OBS Virtual Camera
 

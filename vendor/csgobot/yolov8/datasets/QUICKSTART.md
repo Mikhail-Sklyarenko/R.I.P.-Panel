@@ -1,11 +1,12 @@
-# Dataset Quickstart (Operators)
+# Product dataset (TRAIN machine)
 
-**Same model as upstream csgobot:** images/labels are **not in git**.  
-Git has scripts + empty `sources/our_cs2` scaffold. Data is downloaded externally.
+## Farm PCs
+Do **not** bootstrap here. Run `EnsureWeights.bat` (~50 MB `.pt` only).
+See `docs/PRODUCT_MODEL_LIFECYCLE.md`.
 
-## Windows (recommended): one click
+## Train PC — build dataset
 
-From repo root after `git pull`:
+From repo root:
 
 ```bat
 BootstrapDataset.bat
@@ -21,54 +22,13 @@ This will:
 
 No `huggingface-cli` / PATH required (Windows-safe).
 
-## Manual / Mac / Linux
+## Train PC — train + promote
 
-```bash
-python vendor/csgobot/yolov8/datasets/run_product_pipeline.py \
-  --workdir vendor/csgobot/yolov8/datasets \
-  --hf-repo fvossel/csgo-player-detection \
-  --hf-local-dir hf_raw/fvossel_cs2 \
-  --hf-data-subdir data \
-  --out-root product_v1_bootstrap \
-  --classes c,ch,t,th \
-  --train-pct 80 \
-  --val-pct 10 \
-  --dedup-stem \
-  --manifest-out manifests/product_v1_bootstrap_manifest.json
+```bat
+TrainProductModel.bat
+python scripts\promote_weights.py path\to\best.pt --version v0.2.0-ctfix --filename cs2_yolov8m_640_product_v1.pt
 ```
 
-## Merge with your own CS2 captures (later)
+Host `.pt`, update `resources/csgobot/weights_registry.json`, then farm fleet runs `EnsureWeights.bat`.
 
-1. Put YOLO pairs into `sources/our_cs2/{train,val,test}/{images,labels}`.
-2. Re-run pipeline with both sources:
-
-```bash
-python vendor/csgobot/yolov8/datasets/run_product_pipeline.py \
-  --workdir vendor/csgobot/yolov8/datasets \
-  --hf-local-dir hf_raw/fvossel_cs2 \
-  --hf-data-subdir data \
-  --source ours=vendor/csgobot/yolov8/datasets/sources/our_cs2 \
-  --out-root product_v1 \
-  --classes c,ch,t,th \
-  --train-pct 80 \
-  --val-pct 10 \
-  --dedup-stem \
-  --manifest-out manifests/product_v1_manifest.json
-```
-
-## Audit only
-
-```bash
-python vendor/csgobot/yolov8/datasets/audit_dataset.py \
-  --root vendor/csgobot/yolov8/datasets/product_v1_bootstrap \
-  --names c,ch,t,th
-```
-
-## Gate checklist before training
-
-- audit exit code is `0`;
-- no `bbox_invalid`, no parse errors;
-- CT share (`c+ch`) meets strategy target;
-- manifest exists and dataset hash is recorded with training run.
-
-See also: `docs/CS2_DATASET_STRATEGY.md`, `docs/CS2_DATASET_PIPELINE.md`.
+YOLO data yaml: `product_data.yaml` (points at `product_v1_bootstrap`).

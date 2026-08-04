@@ -1,0 +1,15 @@
+# YOLO data config for product dataset (TRAIN MACHINE ONLY).
+# Built by BootstrapDataset.bat / run_product_pipeline.py → product_v1_bootstrap/
+# Paths are relative to this file's directory.
+
+path: product_v1_bootstrap
+train: train/images
+val: val/images
+test: test/images
+
+nc: 4
+names:
+  0: c
+  1: ch
+  2: t
+  3: th

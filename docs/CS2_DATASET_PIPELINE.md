@@ -10,7 +10,8 @@ Work under `vendor/csgobot/yolov8/datasets/`.
 - `sources/<name>/` - YOLO-formatted normalized sources.
 - `product_v1/` / `product_v1_bootstrap/` - merged + split output dataset.
 
-**Windows shortcut (same idea as upstream csgobot):** from repo root run `BootstrapDataset.bat` — downloads external dataset, builds, audits, writes manifest. No manual image copy required for bootstrap.
+**TRAIN machine only:** `BootstrapDataset.bat` — downloads external dataset, builds, audits, writes manifest.  
+**Farm fleet:** do **not** run this. Use `EnsureWeights.bat` (~50 MB `.pt`). See `docs/PRODUCT_MODEL_LIFECYCLE.md`.
 
 ## 1) Download a public source (optional bootstrap)
 
@@ -99,23 +100,50 @@ Gate expectations:
 - `class_oob=0`,
 - `bbox_invalid=0`.
 
-## 6) Release criteria before training promotion
+## 6) Train (TRAIN machine only)
+
+```bat
+TrainProductModel.bat
+```
+
+Or:
+
+```bash
+vendor/csgobot/venv/Scripts/python.exe vendor/csgobot/yolov8/train_product.py \
+  --data vendor/csgobot/yolov8/datasets/product_data.yaml
+```
+
+## 7) Promote weights to the farm fleet
+
+```bash
+python scripts/promote_weights.py path/to/best.pt \
+  --version v0.2.0-ctfix \
+  --filename cs2_yolov8m_640_product_v1.pt \
+  --dataset-manifest vendor/csgobot/yolov8/datasets/manifests/product_v1_bootstrap_manifest.json
+```
+
+1. Host the `.pt` (GitHub Release / CDN).
+2. Add artifact + set `active` in `resources/csgobot/weights_registry.json`.
+3. Farm PCs: `git pull` && `EnsureWeights.bat`.
+
+## 8) Release criteria before setting registry `active`
 
 - CT uplift target:
   - `c` recall +8% minimum vs current production baseline.
   - `ch` recall +10% minimum.
 - Regression guard:
   - `t`/`th` recall drop <= 2%.
-- Live soak:
+- Live soak on 1–2 farm PCs:
   - no false-positive spike during long farm sessions.
 
-## 7) Storage policy
+## 9) Storage policy
 
-- Keep dataset binaries out of core git repo.
+- Keep dataset binaries out of core git repo and **off farm PCs**.
 - Keep scripts/config/docs and dataset manifests in git.
 - Store heavy assets in HF/DVC/object storage with explicit version tags.
+- Runtime artifact channel: `weights_registry.json` + hosted `.pt`.
 
-## 8) Dataset provenance registry
+## 10) Dataset provenance registry
 
 - `vendor/csgobot/yolov8/datasets/source_registry.yaml` tracks approved/conditional sources and rationale.
 - Update this file whenever adding a new external source.

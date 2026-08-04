@@ -13,6 +13,16 @@ vendor/csgobot/venv/
 # YOLO weights (download separately; never commit LFS pointers)
 vendor/csgobot/**/*.pt
 
+# Product / HF datasets (TRAIN machine only — never commit binaries)
+vendor/csgobot/yolov8/datasets/hf_raw/
+vendor/csgobot/yolov8/datasets/product_*/
+vendor/csgobot/yolov8/datasets/sources/hf_converted/
+vendor/csgobot/yolov8/runs/
+vendor/csgobot/yolov8/datasets/sources/**/images/*
+!vendor/csgobot/yolov8/datasets/sources/**/images/.gitkeep
+vendor/csgobot/yolov8/datasets/sources/**/labels/*
+!vendor/csgobot/yolov8/datasets/sources/**/labels/.gitkeep
+
 # Python
 __pycache__/
 *.py[cod]

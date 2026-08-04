@@ -1,0 +1,59 @@
+{
+  "dataset_root": "product_v1_bootstrap",
+  "class_names": [
+    "c",
+    "ch",
+    "t",
+    "th"
+  ],
+  "sources": [
+    "hf=fvossel/csgo-player-detection"
+  ],
+  "splits": {
+    "train": {
+      "images": 4393,
+      "labels": 4393,
+      "boxes": 8623,
+      "class_counts": {
+        "0": 2150,
+        "1": 1881,
+        "2": 2431,
+        "3": 2161
+      }
+    },
+    "val": {
+      "images": 509,
+      "labels": 509,
+      "boxes": 977,
+      "class_counts": {
+        "0": 231,
+        "1": 202,
+        "2": 283,
+        "3": 261
+      }
+    },
+    "test": {
+      "images": 571,
+      "labels": 571,
+      "boxes": 1043,
+      "class_counts": {
+        "0": 252,
+        "1": 223,
+        "2": 298,
+        "3": 270
+      }
+    }
+  },
+  "totals": {
+    "images": 5473,
+    "labels": 5473,
+    "boxes": 10643,
+    "class_counts": {
+      "0": 2633,
+      "1": 2306,
+      "2": 3012,
+      "3": 2692
+    }
+  },
+  "dataset_hash_sha256": "678d66032345ba18acfe786870f619febfb52bc4b3cedb8e76f85b524cc2a3fe"
+}

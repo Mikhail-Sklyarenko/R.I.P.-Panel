@@ -10,19 +10,18 @@ Upstream: https://github.com/Priler/csgobot — **vendored** in `vendor/csgobot/
 dir vendor\csgobot\run.py
 ```
 
-## YOLO weights (не в git)
+## YOLO weights (не в git) — только `.pt` на ферме
 
-Файлы `*.pt` **не хранятся** в репозитории (слишком большие). Для `bot_mode: ai` скачайте веса вручную в `vendor\csgobot\yolov8\`:
+Файлы `*.pt` **не хранятся** в репозитории. На **farm PC** датасет **не** скачивается.
 
-- Файл: `cs2_yolov8m_640_augmented_v4.pt` (~50 МБ)
-- Путь: `vendor\csgobot\yolov8\cs2_yolov8m_640_augmented_v4.pt`
-- Прямая ссылка (PowerShell, из папки `yolov8`):
-
-```powershell
-Invoke-WebRequest -Uri https://media.githubusercontent.com/media/Priler/csgobot/main/yolov8/cs2_yolov8m_640_augmented_v4.pt -OutFile cs2_yolov8m_640_augmented_v4.pt
+```bat
+EnsureWeights.bat
 ```
 
-Проверка: `dir` → ~52 078 401 bytes (не 0).
+Registry: `resources/csgobot/weights_registry.json` (active version, URL, sha256).  
+Lifecycle: `docs/PRODUCT_MODEL_LIFECYCLE.md`.
+
+Baseline path: `vendor\csgobot\yolov8\cs2_yolov8m_640_augmented_v4.pt` (~52 078 401 bytes).
 
 Для `bot_mode: simple` веса **не нужны**.
 
@@ -118,9 +117,10 @@ Env без правки `run.py`: `CS2_SENSITIVITY`, `CSGOBOT_X360`, `CSGOBOT_SM
 
 **Roadmap:** `docs/COMBAT_ROADMAP.md` — следующие: **E1** → **A2** (strafes) → **L2–L4**.
 
-**Dataset strategy (CT detect):** `docs/CS2_DATASET_STRATEGY.md` — отбор публичных датасетов, legal/risk фильтр, и production-пайплайн для собственного CS2 CT-heavy датасета.  
-**Dataset runbook:** `docs/CS2_DATASET_PIPELINE.md` — пошаговый E2E процесс: download/convert/merge/audit/release-gates.  
-**Windows one-click (как у csgobot — данные вне git):** после `git pull` запусти `BootstrapDataset.bat` в корне репо.
+**Model lifecycle (farm vs train):** `docs/PRODUCT_MODEL_LIFECYCLE.md` — ферма = `EnsureWeights.bat`; датасет/train только на train PC.  
+**Dataset strategy (CT detect):** `docs/CS2_DATASET_STRATEGY.md`.  
+**Dataset runbook:** `docs/CS2_DATASET_PIPELINE.md`.  
+**TRAIN only:** `BootstrapDataset.bat` → `TrainProductModel.bat` → `scripts/promote_weights.py` (не на farm PC).
 
 **Fire (PR-6d):** default `CSGOBOT_SHOOT_MODE=hold` (зажим LMB). Альтернативы: `burst`, `tap`. См. `docs/AIM_TUNING.md`.
 

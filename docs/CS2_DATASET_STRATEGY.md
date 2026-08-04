@@ -110,19 +110,29 @@ Why: domain match beats volume. Our issue is domain shift + class robustness for
   - source provenance,
   - split checksums,
   - class counts.
+- **Fleet policy:** farm PCs receive only versioned `.pt` via
+  `resources/csgobot/weights_registry.json` + `EnsureWeights.bat`.
+  Never distribute `hf_raw/` / `product_v1_*` to the farm fleet.
 
 ## 5) Immediate execution plan
 
-1. Build/refresh local dataset in YOLO structure.
-2. Run dataset audit script:
-   - `vendor/csgobot/yolov8/datasets/audit_dataset.py`
-3. Fix label issues + rebalance CT-heavy shards.
-4. Train candidate model.
-5. Evaluate against holdout + live farm soak.
-6. Promote if release gate passes.
+**Train machine (once):**
 
-Execution details (commands and folder conventions) are documented in:
-- `docs/CS2_DATASET_PIPELINE.md`
+1. `BootstrapDataset.bat` → `product_v1_bootstrap` + manifest.
+2. Audit must pass (`audit_dataset.py` / pipeline gate).
+3. Optional: merge `sources/our_cs2` CT-heavy captures → rebuild product set.
+4. `TrainProductModel.bat` (fine-tune from current production weights).
+5. `scripts/promote_weights.py` → host `.pt` → update registry `active`.
+6. Soak 1–2 farm PCs → roll `EnsureWeights.bat` to fleet.
+
+**Farm machines (always):**
+
+1. `git pull`
+2. `EnsureWeights.bat` (~50 MB)
+3. Run panel — no dataset download.
+
+Canonical product doc: `docs/PRODUCT_MODEL_LIFECYCLE.md`.  
+Commands: `docs/CS2_DATASET_PIPELINE.md`.
 
 ---
 

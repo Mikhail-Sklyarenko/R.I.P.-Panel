@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "active": "v0.1.0-priler-baseline",
+  "install_path": "vendor/csgobot/yolov8",
+  "notes": [
+    "Farm PCs download ONLY the active .pt (~50 MB). Never the training dataset.",
+    "After a CT-fix train promote: add a new artifact, set active, bump EnsureWeights consumers."
+  ],
+  "artifacts": {
+    "v0.1.0-priler-baseline": {
+      "filename": "cs2_yolov8m_640_augmented_v4.pt",
+      "url": "https://media.githubusercontent.com/media/Priler/csgobot/main/yolov8/cs2_yolov8m_640_augmented_v4.pt",
+      "sha256": "3d64a62f6dc95b8c22883cdd4c97b4a9ffd330948dfb3b319f23c5caf29b2b6b",
+      "size_bytes": 52078401,
+      "classes": ["c", "ch", "t", "th"],
+      "imgsz": 640,
+      "source": "Priler/csgobot (upstream baseline)",
+      "dataset_manifest": null,
+      "notes": "Production runtime baseline until CT-fix weights are promoted."
+    }
+  }
+}
