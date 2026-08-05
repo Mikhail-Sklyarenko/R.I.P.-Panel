@@ -12,6 +12,8 @@ vendor/looter/node_modules/
 vendor/csgobot/venv/
 # YOLO weights (download separately; never commit LFS pointers)
 vendor/csgobot/**/*.pt
+# Farm auto-captures (collector PCs only — never commit)
+vendor/csgobot/data/captures/
 
 # Product / HF datasets (TRAIN machine only — never commit binaries)
 vendor/csgobot/yolov8/datasets/hf_raw/

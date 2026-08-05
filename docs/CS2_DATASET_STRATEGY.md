@@ -68,16 +68,17 @@ Why: domain match beats volume. Our issue is domain shift + class robustness for
   - Both team perspectives.
 
 ### Labeling workflow
-1. Auto-label with current model.
-2. Human correction pass for all CT-heavy scenes.
-3. Second pass QC on sampled shards (at least 10-15%).
+1. **Preferred (product):** farm auto-capture (`docs/AUTO_CAPTURE.md`) + soft labels + `BuildOurCs2FromRaw.bat`.
+2. Optional: auto-label refresh with newer weights on raw shards.
+3. Human correction is **not required** for MVP; soak gates replace manual QC.
+4. Second pass QC on sampled shards is optional for major releases.
 
 ### Quality gates before training
 - Broken label files: 0.
 - Missing image/label pairs: 0.
 - Out-of-range YOLO boxes: 0.
 - Duplicate-near-identical frames: controlled (drop obvious burst duplicates).
-- Class balance constraints above are met.
+- Class balance constraints above are met (collector should bias team=T sessions).
 
 ## 3) Training and release policy
 

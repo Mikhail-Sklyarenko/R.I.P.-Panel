@@ -11,6 +11,7 @@ import signal
 import sys
 import time
 from math import hypot
+from pathlib import Path
 from typing import Optional
 
 import cv2
@@ -392,6 +393,23 @@ def detection_process(
     last_target_aim: Optional[tuple] = None
     last_detect_debug_log = 0.0
     roi_used_last = False
+
+    auto_capture = None
+    try:
+        from dataset_capture import AutoCaptureController, resolve_auto_capture_config
+
+        capture_cfg = resolve_auto_capture_config(
+            default_enabled=bool(getattr(config.auto_capture, "enabled", False))
+        )
+        if capture_cfg.enabled:
+            auto_capture = AutoCaptureController(
+                capture_cfg,
+                cwd=Path(__file__).resolve().parent,
+                weights_name=str(Path(config.detector.weights_path).name),
+            )
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("auto_capture: init failed: %s", exc)
+        auto_capture = None
     autobuy_state = AutoBuyState()
     autobuy_press = None
     team_probe_set = None
@@ -619,6 +637,22 @@ def detection_process(
                 now=now,
                 last_log=last_detect_debug_log,
             )
+
+            if auto_capture is not None:
+                try:
+                    auto_capture.maybe_capture(
+                        img,
+                        detections=detections,
+                        team=current_team_str,
+                        activated=activated.is_set(),
+                        roi_used=roi_used_last,
+                        enemy_classes=config.aim.enemy_classes,
+                        now=now,
+                        combat_conf=config.detector.confidence_threshold,
+                        class_conf=config.detector.class_confidence_thresholds,
+                    )
+                except Exception as exc:  # noqa: BLE001
+                    logger.debug("auto_capture: %s", exc)
 
             enemy_target = None
             if activated.is_set() and detections:
@@ -994,6 +1028,11 @@ def detection_process(
 
                 preview_queue.put_nowait(img)
     finally:
+        if auto_capture is not None:
+            try:
+                auto_capture.stop()
+            except Exception:
+                pass
         if aim_mouse is not None:
             aim_mouse.stop()
         apply_fire_action(mouse, fire_controller.force_release(time.monotonic()))

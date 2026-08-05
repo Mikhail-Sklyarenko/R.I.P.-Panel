@@ -22,6 +22,7 @@ from config import (
     Team,
     PreviewConfig,
     HotkeyConfig,
+    AutoCaptureAppConfig,
     adjust_region_to_multiple,
 )
 
@@ -176,6 +177,10 @@ EXIT_HOTKEY = "ctrl+q"
 SHOW_PREVIEW = False
 PREVIEW_WIDTH = 640
 PREVIEW_HEIGHT = 360
+
+# Dataset auto-capture (OFF by default — enable only on collector farm PCs)
+# Env: CSGOBOT_AUTO_CAPTURE=1  (see docs/AUTO_CAPTURE.md)
+AUTO_CAPTURE = False
 
 
 # ===========================
@@ -462,6 +467,11 @@ def create_config() -> AppConfig:
         manual_override_sec=TEAM_MANUAL_OVERRIDE_SEC,
     )
 
+    from dataset_capture import resolve_auto_capture_config
+
+    capture_resolved = resolve_auto_capture_config(default_enabled=AUTO_CAPTURE)
+    auto_capture_config = AutoCaptureAppConfig(enabled=capture_resolved.enabled)
+
     # Build grabber options
     grabber_options = {}
     if GRABBER_TYPE == "obs_vc":
@@ -486,6 +496,7 @@ def create_config() -> AppConfig:
         look=look_config,
         preview=preview_config,
         hotkeys=hotkey_config,
+        auto_capture=auto_capture_config,
     )
 
     return config
@@ -568,6 +579,10 @@ def main() -> int:
         f"head_aim_min_conf={config.aim.head_aim_min_conf} "
         f"min_bbox_h={config.aim.min_bbox_height_for_head} "
         f"roi={config.detector.roi_enabled} frac={config.detector.roi_fraction}"
+    )
+    logger.info(
+        "AutoCapture: enabled=%s (CSGOBOT_AUTO_CAPTURE=1 on collector PCs only)",
+        getattr(config.auto_capture, "enabled", False),
     )
     logger.info(
         f"Aim advanced: lead={config.aim.lead_aim_enabled} "

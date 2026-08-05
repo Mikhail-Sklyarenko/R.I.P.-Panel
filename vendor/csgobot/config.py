@@ -298,6 +298,12 @@ class LookConfig:
 
 
 @dataclass
+class AutoCaptureAppConfig:
+    """Farm collector: save frames for CT dataset (see dataset_capture/)."""
+    enabled: bool = False
+
+
+@dataclass
 class HotkeyConfig:
     """Hotkey configuration."""
     activation: int = 58  # CAPS LOCK
@@ -330,6 +336,7 @@ class AppConfig:
     look: LookConfig = field(default_factory=LookConfig)
     preview: PreviewConfig = field(default_factory=PreviewConfig)
     hotkeys: HotkeyConfig = field(default_factory=HotkeyConfig)
+    auto_capture: AutoCaptureAppConfig = field(default_factory=AutoCaptureAppConfig)
 
     # Performance
     exit_on_error: bool = True
