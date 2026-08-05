@@ -206,6 +206,7 @@ def create_config() -> AppConfig:
         resolve_aim_smooth_enabled,
         resolve_body_fallback_sec,
         resolve_confidence,
+        resolve_class_confidence_thresholds,
         resolve_dead_zone,
         resolve_head_aim_min_conf,
         resolve_lead_enabled,
@@ -244,6 +245,11 @@ def create_config() -> AppConfig:
     aim_low = resolve_aim_dead_zone_low(AIM_DEAD_ZONE_LOW, aim_high)
     shoot_zone = resolve_shoot_dead_zone(SHOOT_DEAD_ZONE)
     confidence = resolve_confidence(CONFIDENCE_THRESHOLD)
+    class_conf_thresholds = resolve_class_confidence_thresholds()
+    # Let lower class-specific thresholds pass through YOLO, then filter per class.
+    runtime_confidence = min(
+        [confidence, *class_conf_thresholds.values()]
+    ) if class_conf_thresholds else confidence
     prioritize_heads = resolve_prioritize_heads(PRIORITIZE_HEADS)
     max_assist_distance = resolve_max_assist_distance(MAX_ASSIST_DISTANCE)
     lead_enabled = resolve_lead_enabled(LEAD_AIM_ENABLED)
@@ -266,13 +272,14 @@ def create_config() -> AppConfig:
     detector_config = DetectorConfig(
         type=DetectorType.YOLOV8,
         weights_path=YOLO_WEIGHTS,
-        confidence_threshold=confidence,
+        confidence_threshold=runtime_confidence,
         iou_threshold=IOU_THRESHOLD,
         imgsz=YOLO_IMGSZ,
         device=DETECTOR_DEVICE,
         torch_num_threads=TORCH_NUM_THREADS,
         roi_enabled=resolve_roi_enabled(ROI_ZOOM_ENABLED),
         roi_fraction=resolve_roi_fraction(ROI_FRACTION),
+        class_confidence_thresholds=class_conf_thresholds,
     )
 
     aim_config = AimConfig(
@@ -549,10 +556,13 @@ def main() -> int:
         f"aim_hz={config.aim.aim_dead_zone_high}/{config.aim.aim_dead_zone_low} "
         f"shoot_dz={config.aim.shoot_dead_zone} "
         f"max_dist={config.aim.max_assist_distance} "
-        f"conf={config.detector.confidence_threshold} heads={config.aim.prioritize_heads}"
+        f"conf={config.detector.confidence_threshold} "
+        f"class_conf={config.detector.class_confidence_thresholds or '{}'} "
+        f"heads={config.aim.prioritize_heads}"
     )
     logger.info(
         f"Detect: conf={config.detector.confidence_threshold} "
+        f"class_conf={config.detector.class_confidence_thresholds or '{}'} "
         f"max_dist={config.aim.max_assist_distance} "
         f"heads={config.aim.prioritize_heads} "
         f"head_aim_min_conf={config.aim.head_aim_min_conf} "

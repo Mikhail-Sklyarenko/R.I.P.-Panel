@@ -168,12 +168,18 @@ Shoot confidence отдельно: head `0.60`, body `0.50` (fire_controller) �
 | Параметр | Default | Env |
 |----------|---------|-----|
 | Confidence (detect) | `0.50` | `CSGOBOT_CONFIDENCE` |
+| Per-class detect conf | off | `CSGOBOT_CONF_C`, `CSGOBOT_CONF_CH`, `CSGOBOT_CONF_T`, `CSGOBOT_CONF_TH` |
 | Max assist dist | `320` | `CSGOBOT_MAX_DIST` |
 | ROI center zoom | `on` (0.75) | `CSGOBOT_ROI_ZOOM=0`, `CSGOBOT_ROI_FRACTION` |
 
 Shoot confidence отдельно: head `0.60`, body `0.50` (fire_controller).
 
 **ROI fallback:** если на полном кадре 0 врагов — второй YOLO pass по центральному crop 75%. Лог при `CSGOBOT_DETECT_DEBUG=1`: `detect: enemies=N roi=True best=t conf=... bbox_h=...`.
+
+**Class-specific thresholds (быстрый CT fix):**
+- Понизь `CSGOBOT_CONF_C` и `CSGOBOT_CONF_CH` (например `0.38/0.40`),
+- оставь `CSGOBOT_CONF_T` и `CSGOBOT_CONF_TH` выше (например `0.50/0.52`),
+- чтобы поднять recall CT без лавины лишних T-детектов.
 
 Smoothing делит шаг мыши на N каждый тик мыши (при PR-A1 — на 120 Hz; при `AIM_MOUSE_HZ=0` — каждый кадр YOLO).
 

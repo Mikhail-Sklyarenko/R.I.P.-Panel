@@ -55,7 +55,8 @@ def log_detect_status(
         )
     elif activated:
         logger.info(
-            "detect: no enemies (roi=%s) — try CSGOBOT_CONFIDENCE=0.45 or ROI on",
+            "detect: no enemies (roi=%s) — try CSGOBOT_CONFIDENCE=0.45 "
+            "or per-class CSGOBOT_CONF_C/CH/T/TH",
             roi_used,
         )
     return now

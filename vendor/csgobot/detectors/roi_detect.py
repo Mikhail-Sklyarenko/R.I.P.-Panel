@@ -69,6 +69,25 @@ def merge_detections(
     return merged
 
 
+def apply_class_conf_thresholds(
+    detections: dict[str, list[dict[str, Any]]],
+    class_thresholds: dict[str, float],
+) -> dict[str, list[dict[str, Any]]]:
+    """Drop boxes below per-class confidence overrides."""
+    if not class_thresholds:
+        return detections
+    out: dict[str, list[dict[str, Any]]] = {}
+    for class_name, boxes in detections.items():
+        min_conf = class_thresholds.get(class_name)
+        if min_conf is None:
+            out[class_name] = boxes
+            continue
+        kept = [b for b in boxes if float(b.get("conf", 0.0)) >= float(min_conf)]
+        if kept:
+            out[class_name] = kept
+    return out
+
+
 def count_enemy_detections(
     detections: dict[str, list[dict[str, Any]]],
     enemy_classes: tuple[str, ...],
@@ -96,19 +115,24 @@ def detect_with_roi_fallback(
     *,
     roi_config: RoiDetectConfig,
     enemy_classes: tuple[str, ...],
+    class_conf_thresholds: dict[str, float] | None = None,
     min_enemy_count: int = 1,
 ) -> tuple[dict[str, list[dict[str, Any]]], bool]:
     """
     Full-frame detect; optional center ROI second pass if too few enemies.
     """
-    detections = detector.detect(img)
+    conf_thresholds = class_conf_thresholds or {}
+    detections = apply_class_conf_thresholds(detector.detect(img), conf_thresholds)
     if not roi_config.enabled:
         return detections, False
 
     if count_enemy_detections(detections, enemy_classes) >= min_enemy_count:
         return detections, False
 
-    roi_detections = detect_roi_pass(detector, img, roi_config.fraction)
+    roi_detections = apply_class_conf_thresholds(
+        detect_roi_pass(detector, img, roi_config.fraction),
+        conf_thresholds,
+    )
     if count_enemy_detections(roi_detections, enemy_classes) < 1:
         return detections, False
 

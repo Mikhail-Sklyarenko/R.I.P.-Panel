@@ -13,6 +13,7 @@ if str(_CSGOBOT) not in sys.path:
     sys.path.insert(0, str(_CSGOBOT))
 
 from aim_tuning import (  # noqa: E402
+    resolve_class_confidence_thresholds,
     resolve_long_range_body_bias,
     resolve_min_bbox_height_for_head,
     resolve_roi_enabled,
@@ -22,6 +23,7 @@ from aiming.target_selector import TargetSelector  # noqa: E402
 from config import AimConfig, CaptureRegion  # noqa: E402
 from detectors.roi_detect import (  # noqa: E402
     RoiDetectConfig,
+    apply_class_conf_thresholds,
     crop_center,
     detect_with_roi_fallback,
     merge_detections,
@@ -115,6 +117,37 @@ def test_roi_disabled_single_pass() -> None:
     assert detector.calls == 1
 
 
+def test_apply_class_conf_thresholds_keeps_only_qualified() -> None:
+    dets = {
+        "c": [{"xyxy": [1, 1, 2, 2], "conf": 0.41}],
+        "ch": [{"xyxy": [1, 1, 2, 2], "conf": 0.39}],
+        "t": [{"xyxy": [1, 1, 2, 2], "conf": 0.49}],
+    }
+    out = apply_class_conf_thresholds(
+        dets,
+        {"c": 0.40, "ch": 0.40, "t": 0.50},
+    )
+    assert "c" in out
+    assert "ch" not in out
+    assert "t" not in out
+
+
+def test_roi_fallback_uses_class_specific_conf() -> None:
+    low_ct = {"xyxy": [340, 210, 400, 330], "conf": 0.41, "cls": 0}
+    detector = _MockDetector([{}, {"c": [low_ct]}])
+    img = np.zeros((720, 1280, 3), dtype=np.uint8)
+    dets, roi_used = detect_with_roi_fallback(
+        detector,
+        img,
+        roi_config=RoiDetectConfig(enabled=True, fraction=0.75),
+        enemy_classes=("c", "ch"),
+        class_conf_thresholds={"c": 0.40},
+    )
+    assert roi_used is True
+    assert detector.calls == 2
+    assert "c" in dets
+
+
 def test_body_bias_skips_tiny_head() -> None:
     cfg = AimConfig(
         prioritize_heads=True,
@@ -159,9 +192,22 @@ def test_env_resolvers_6f(monkeypatch) -> None:
     assert resolve_roi_fraction(0.75) == 0.6
 
 
+def test_env_resolve_class_conf_thresholds(monkeypatch) -> None:
+    monkeypatch.setenv("CSGOBOT_CONF_C", "0.38")
+    monkeypatch.setenv("CSGOBOT_CONF_CH", "0.42")
+    monkeypatch.setenv("CSGOBOT_CONF_T", "0.55")
+    monkeypatch.setenv("CSGOBOT_CONF_TH", "0.58")
+    out = resolve_class_confidence_thresholds()
+    assert out == {"c": 0.38, "ch": 0.42, "t": 0.55, "th": 0.58}
+
+
 def test_create_config_6f_defaults(monkeypatch) -> None:
     for key in (
         "CSGOBOT_CONFIDENCE",
+        "CSGOBOT_CONF_C",
+        "CSGOBOT_CONF_CH",
+        "CSGOBOT_CONF_T",
+        "CSGOBOT_CONF_TH",
         "CSGOBOT_PRIORITIZE_HEADS",
         "CSGOBOT_MAX_DIST",
         "CSGOBOT_ROI_ZOOM",
@@ -173,6 +219,7 @@ def test_create_config_6f_defaults(monkeypatch) -> None:
 
     cfg = create_config()
     assert cfg.detector.confidence_threshold == 0.50
+    assert cfg.detector.class_confidence_thresholds == {}
     assert cfg.aim.prioritize_heads is True
     assert cfg.aim.head_aim_min_conf == 0.8
     assert cfg.aim.max_assist_distance == 320
@@ -180,3 +227,15 @@ def test_create_config_6f_defaults(monkeypatch) -> None:
     assert cfg.detector.roi_fraction == 0.75
     assert cfg.aim.min_bbox_height_for_head == 28.0
     assert cfg.aim.long_range_body_bias is True
+
+
+def test_create_config_class_conf_runtime_floor(monkeypatch) -> None:
+    monkeypatch.setenv("CSGOBOT_CONFIDENCE", "0.50")
+    monkeypatch.setenv("CSGOBOT_CONF_C", "0.38")
+    monkeypatch.setenv("CSGOBOT_CONF_CH", "0.40")
+    from run import create_config  # noqa: E402
+
+    cfg = create_config()
+    assert cfg.detector.confidence_threshold == 0.38
+    assert cfg.detector.class_confidence_thresholds["c"] == 0.38
+    assert cfg.detector.class_confidence_thresholds["ch"] == 0.40

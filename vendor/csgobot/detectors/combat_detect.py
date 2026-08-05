@@ -25,5 +25,6 @@ def run_combat_detection(
         img,
         roi_config=roi,
         enemy_classes=aim_config.enemy_classes,
+        class_conf_thresholds=detector_config.class_confidence_thresholds,
         min_enemy_count=1,
     )

@@ -79,6 +79,10 @@ class DetectorConfig:
     torch_num_threads: int = 0  # 0 = PyTorch default
     roi_enabled: bool = True
     roi_fraction: float = 0.75
+    # Optional per-class detect thresholds, e.g. {"c": 0.40, "ch": 0.42}
+    # Runtime floor conf is min(global_conf, overrides...) so lower class
+    # thresholds can be reached, then non-matching classes are filtered out.
+    class_confidence_thresholds: Dict[str, float] = field(default_factory=dict)
 
     # Class names in order of class index
     class_names: List[str] = field(default_factory=lambda: ["c", "ch", "t", "th"])

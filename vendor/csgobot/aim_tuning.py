@@ -233,6 +233,31 @@ def resolve_confidence(default: float) -> float:
     return default
 
 
+def resolve_class_confidence_thresholds() -> dict[str, float]:
+    """
+    Optional per-class detect confidence overrides.
+
+    Env:
+      - CSGOBOT_CONF_C
+      - CSGOBOT_CONF_CH
+      - CSGOBOT_CONF_T
+      - CSGOBOT_CONF_TH
+    """
+    out: dict[str, float] = {}
+    env_map = {
+        "c": "CSGOBOT_CONF_C",
+        "ch": "CSGOBOT_CONF_CH",
+        "t": "CSGOBOT_CONF_T",
+        "th": "CSGOBOT_CONF_TH",
+    }
+    for cls_name, env_name in env_map.items():
+        raw = os.environ.get(env_name, "").strip()
+        if not raw:
+            continue
+        out[cls_name] = max(0.05, min(1.0, float(raw)))
+    return out
+
+
 def resolve_prioritize_heads(default: bool) -> bool:
     val = _env_bool("CSGOBOT_PRIORITIZE_HEADS")
     return default if val is None else val
