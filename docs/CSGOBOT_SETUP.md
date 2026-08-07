@@ -107,7 +107,9 @@ Env без правки `run.py`: `CS2_SENSITIVITY`, `CSGOBOT_X360`, `CSGOBOT_SM
 
 **Autobuy rifle (DM):** F5→`buy_rifle_dm`. После смерти — **окно спавна**: F5 @ 1.5–11 s, **пауза патруля 12 s** (неуязвимость + buy до WASD). Env: `CSGOBOT_AUTOBUY_RESPAWN_DELAYS_MS`, `CSGOBOT_AUTOBUY_PATROL_FREEZE_MS` (12000), `CSGOBOT_AUTOBUY_STARTUP_FREEZE_MS`. См. `docs/DM_CFG.md`.
 
-**Auto team CT/T (PR-T1):** color probes на HUD @ 1280×720 — синхронизирует YOLO `enemy_classes` и autobuy при смене стороны в DM. По умолчанию **включено** (`AUTO_TEAM_DETECT = True`). Hysteresis 3 кадра; Ctrl+T = manual override 5 s. Env: `CSGOBOT_AUTO_TEAM=0` (выкл), `CSGOBOT_TEAM_DEBUG=1` (лог scores). Probes: `resources/csgobot/team_probes_1280x720.yaml`; калибровка: `scripts/sample_probe_rgb.py` + эталоны `tests/fixtures/csgobot_team/`.
+**Target mode (DM FFA):** default **`ffa`** — aim/shoot по всем классам `c,ch,t,th` (Valve DM free-for-all). Сторона CT/T **не** режет цели. Для напарников/ranked позже: `CSGOBOT_TARGET_MODE=team` (только opposite). В логе: `target_mode=ffa enemies=c,ch,t,th`.
+
+**Auto team CT/T (PR-T1):** color probes на HUD @ 1280×720 — сторона для **autobuy** (AK vs M4) и превью `Team:`; при `target_mode=ffa` **не** фильтрует aim. Probes масштабируются если кадр ≠ base. Hysteresis 3 кадра; Ctrl+T = manual override **30 s** + sync hysteresis (без snap-back). Env: `CSGOBOT_AUTO_TEAM=0`, `CSGOBOT_TEAM_DEBUG=1`. Probes: `resources/csgobot/team_probes_1280x720.yaml`.
 
 **Auto map patrol (PR-M1):** template match + optional Tesseract на попапе «матч готов» и заголовке scoreboard (Tab). `dust2` / `mirage` → `resources/patrol/{map}.yaml`, иначе `generic_dm`. По умолчанию **включено** (`AUTO_MAP_DETECT = True`), hysteresis 3 кадра, lock после подтверждения. Env: `CSGOBOT_AUTO_MAP=0` (выкл), `CSGOBOT_MAP_DEBUG=1` (лог), `CSGOBOT_PATROL_SCRIPT=dust2` (фикс. скрипт, без автодетекта). Ресурсы: `resources/csgobot/map_regions_1280x720.yaml`, `resources/csgobot/map_templates/`. Пересборка шаблонов: `python scripts/build_map_templates.py`. Фикстуры: `tests/fixtures/csgobot_map/`.
 

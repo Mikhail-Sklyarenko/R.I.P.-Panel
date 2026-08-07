@@ -102,7 +102,54 @@ def test_create_config_team_detect_defaults() -> None:
     cfg = create_config()
     assert cfg.team_detect.enabled is True
     assert cfg.team_detect.confirm_frames == 3
-    assert cfg.team_detect.manual_override_sec == 5.0
+    assert cfg.team_detect.manual_override_sec == 30.0
+
+
+def test_force_confirm_resets_hysteresis() -> None:
+    state = TeamDetectState.from_team("ct")
+    update_team_hysteresis(state, "t", confirm_frames=3)
+    assert state.pending_count == 1
+    state.force_confirm("t")
+    assert state.confirmed_team == "t"
+    assert state.pending_team is None
+    assert state.pending_count == 0
+    # Same side as confirmed → no change even after confirm_frames
+    for _ in range(3):
+        changed, _ = update_team_hysteresis(state, "t", confirm_frames=3)
+        assert changed is None
+
+
+def test_scaled_probe_xy_maps_resolution() -> None:
+    from team.hud_team_detect import _scaled_probe_xy
+    from team.probes import ColorProbe
+
+    probe = ColorProbe(x=100, y=200, rgb=(10, 20, 30), tolerance=5)
+    assert _scaled_probe_xy(
+        probe, img_w=1280, img_h=720, base_w=1280, base_h=720,
+    ) == (100, 200)
+    assert _scaled_probe_xy(
+        probe, img_w=640, img_h=360, base_w=1280, base_h=720,
+    ) == (50, 100)
+
+
+def test_scaled_probes_match_synthetic_half_res() -> None:
+    """Exact RGB at scaled coords still votes (OBS canvas ≠ probe base)."""
+    from team.probes import ColorProbe, TeamProbeSet
+
+    ct = (
+        ColorProbe(x=100, y=100, rgb=(0, 0, 255), tolerance=5),
+        ColorProbe(x=120, y=100, rgb=(0, 0, 255), tolerance=5),
+    )
+    t = (
+        ColorProbe(x=200, y=100, rgb=(255, 128, 0), tolerance=5),
+        ColorProbe(x=220, y=100, rgb=(255, 128, 0), tolerance=5),
+    )
+    probes = TeamProbeSet(ct=ct, t=t, base_width=1280, base_height=720)
+    img = np.zeros((360, 640, 3), dtype=np.uint8)
+    # half-res → probe (200,100) → (100,50)
+    for x, y in ((100, 50), (110, 50)):
+        img[y, x] = (255, 128, 0)
+    assert detect_team_hud(img, probes, min_votes=2) == "t"
 
 
 def test_env_CSGOBOT_AUTO_TEAM_disables() -> None:

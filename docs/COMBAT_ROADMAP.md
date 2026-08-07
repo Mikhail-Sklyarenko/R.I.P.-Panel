@@ -17,7 +17,8 @@
 | PR-6d | Fire modes: hold / burst / tap |
 | PR-6f | Long-range detect: ROI zoom, conf 0.50, body-first |
 | PR-H1 | Hybrid head aim (`head_aim_min_conf=0.8`) |
-| **PR-T1** | Auto team CT/T — HUD color probes, hysteresis, Ctrl+T override 5 s |
+| **PR-T1** | Auto team CT/T — HUD probes, hysteresis, Ctrl+T override 30 s + sync; buy/HUD (aim gated by target_mode) |
+| **PR-T2** | `target_mode=ffa` (DM default: all c/ch/t/th) vs `team` (opposite only for wingman later) |
 | **PR-M1** | Auto map patrol — match-ready probes + scoreboard templates → `dust2` / `mirage` / `generic_dm` |
 | **PR-L1** | Look A — `LookController` (80–90° sweeps, alternate direction) |
 | **PR-L1.1** | Look cadence: wall-clock `due_at`; combat abort no longer full-resets idle (DM-visible) |

@@ -12,12 +12,39 @@ from team.probes import ColorProbe, TeamProbeSet
 TeamSide = Literal["ct", "t"]
 
 
+def _scaled_probe_xy(
+    probe: ColorProbe,
+    *,
+    img_w: int,
+    img_h: int,
+    base_w: int,
+    base_h: int,
+) -> tuple[int, int]:
+    """Map probe coords from calibration resolution onto the live frame."""
+    if img_w == base_w and img_h == base_h:
+        return probe.x, probe.y
+    if base_w <= 0 or base_h <= 0:
+        return probe.x, probe.y
+    x = int(round(probe.x * img_w / base_w))
+    y = int(round(probe.y * img_h / base_h))
+    return x, y
+
+
 def _probe_match_rgb(
     img: np.ndarray,
     probe: ColorProbe,
+    *,
+    base_width: int = 1280,
+    base_height: int = 720,
 ) -> bool:
     h, w = img.shape[:2]
-    x, y = probe.x, probe.y
+    x, y = _scaled_probe_xy(
+        probe,
+        img_w=w,
+        img_h=h,
+        base_w=base_width,
+        base_h=base_height,
+    )
     if x < 0 or y < 0 or x >= w or y >= h:
         return False
     pixel = img[y, x]
@@ -31,8 +58,23 @@ def _probe_match_rgb(
     )
 
 
-def score_probes(img: np.ndarray, probes: tuple[ColorProbe, ...]) -> int:
-    return sum(1 for probe in probes if _probe_match_rgb(img, probe))
+def score_probes(
+    img: np.ndarray,
+    probes: tuple[ColorProbe, ...],
+    *,
+    base_width: int = 1280,
+    base_height: int = 720,
+) -> int:
+    return sum(
+        1
+        for probe in probes
+        if _probe_match_rgb(
+            img,
+            probe,
+            base_width=base_width,
+            base_height=base_height,
+        )
+    )
 
 
 def detect_team_hud(
@@ -42,8 +84,18 @@ def detect_team_hud(
     min_votes: int = 2,
 ) -> Optional[TeamSide]:
     """Return ct/t when probe voting is decisive; None if ambiguous."""
-    ct_score = score_probes(img, probes.ct)
-    t_score = score_probes(img, probes.t)
+    ct_score = score_probes(
+        img,
+        probes.ct,
+        base_width=probes.base_width,
+        base_height=probes.base_height,
+    )
+    t_score = score_probes(
+        img,
+        probes.t,
+        base_width=probes.base_width,
+        base_height=probes.base_height,
+    )
 
     if ct_score >= min_votes and ct_score > t_score:
         return "ct"
@@ -64,6 +116,15 @@ class TeamDetectState:
         if side not in ("ct", "t"):
             side = "ct"
         return cls(confirmed_team=side)
+
+    def force_confirm(self, team: str) -> None:
+        """Sync hysteresis after manual Ctrl+T (avoids snap-back to stale side)."""
+        side = team.lower()
+        if side not in ("ct", "t"):
+            side = "ct"
+        self.confirmed_team = side
+        self.pending_team = None
+        self.pending_count = 0
 
 
 def update_team_hysteresis(

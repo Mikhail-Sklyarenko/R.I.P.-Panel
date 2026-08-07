@@ -114,6 +114,7 @@ def test_start_ai_passes_auto_activate_env(monkeypatch) -> None:
     assert ok is True
     _, kwargs = popen.call_args
     assert kwargs["env"]["CSGOBOT_AUTO_ACTIVATE"] == "1"
+    assert kwargs["env"]["CSGOBOT_TARGET_MODE"] == "ffa"
     assert kwargs["stderr"] is not None
     assert kwargs["stderr"] is not subprocess.PIPE
 

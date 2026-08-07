@@ -71,7 +71,10 @@ FOV_VERTICAL = 73.74
 X360 = 7792  # fallback ~sens 2.1; override via CS2_SENSITIVITY / panel Config #1
 
 # Aim settings
-CURRENT_TEAM = Team.CT  # Your starting team
+CURRENT_TEAM = Team.CT  # Starting side (autobuy / HUD); aim uses TARGET_MODE
+# Deathmatch = free-for-all: aim all c/ch/t/th. Use "team" for wingman later.
+# Override: CSGOBOT_TARGET_MODE=team|ffa
+TARGET_MODE = "ffa"
 PRIORITIZE_HEADS = True  # hybrid head @ conf≥HEAD_AIM_MIN_CONF; env CSGOBOT_PRIORITIZE_HEADS=0
 HEAD_AIM_MIN_CONF = 0.8  # aim at head only when detect conf ≥ this
 MAX_ASSIST_DISTANCE = 320  # override: CSGOBOT_MAX_DIST
@@ -114,9 +117,9 @@ AUTO_BUY_RESPAWN_COOLDOWN_SEC = 0.5
 AUTO_BUY_PATROL_FREEZE_SEC = 12.0
 AUTO_BUY_STARTUP_FREEZE_SEC = 10.0
 AUTO_BUY_STARTUP_RETRY_DELAYS_SEC: tuple[float, ...] = ()
-AUTO_TEAM_DETECT = True
+AUTO_TEAM_DETECT = True  # HUD side for autobuy; does not gate aim when TARGET_MODE=ffa
 TEAM_DETECT_CONFIRM_FRAMES = 3
-TEAM_MANUAL_OVERRIDE_SEC = 5.0
+TEAM_MANUAL_OVERRIDE_SEC = 30.0  # Ctrl+T sticky window + sync confirmed_team
 AUTO_MAP_DETECT = True
 MAP_DETECT_CONFIRM_FRAMES = 3
 MAP_DETECT_LOCK = True
@@ -239,6 +242,7 @@ def create_config() -> AppConfig:
         resolve_patrol_script_override,
         resolve_shoot_mode,
         resolve_smoothing,
+        resolve_target_mode,
         resolve_x360,
     )
     from look.config_resolve import resolve_look_config
@@ -289,6 +293,7 @@ def create_config() -> AppConfig:
 
     aim_config = AimConfig(
         current_team=CURRENT_TEAM,
+        target_mode=resolve_target_mode(TARGET_MODE),  # type: ignore[arg-type]
         prioritize_heads=prioritize_heads,
         head_aim_min_conf=resolve_head_aim_min_conf(HEAD_AIM_MIN_CONF),
         long_range_body_bias=resolve_long_range_body_bias(LONG_RANGE_BODY_BIAS),
@@ -601,7 +606,12 @@ def main() -> int:
         f"hold_max={config.aim.hold_max_sec}s hold_gap={config.aim.hold_repress_gap_sec}s "
         f"conf head/body={config.aim.head_confidence}/{config.aim.body_confidence}"
     )
-    logger.info(f"Team: {config.aim.current_team.value.upper()} (initial)")
+    logger.info(
+        "Team: %s (initial) target_mode=%s enemies=%s",
+        config.aim.current_team.value.upper(),
+        config.aim.target_mode,
+        ",".join(config.aim.enemy_classes),
+    )
     from team.paths import resolve_team_probes_path
     from team.probes import load_team_probes
 
@@ -610,7 +620,7 @@ def main() -> int:
             probe_path = resolve_team_probes_path(config.team_detect.probes_path)
             probe_set = load_team_probes(probe_path)
             logger.info(
-                "Team detect: enabled confirm_frames=%d override_sec=%.0fs "
+                "Team detect: enabled (buy/HUD) confirm_frames=%d override_sec=%.0fs "
                 "probes=ct:%d t:%d path=%s",
                 config.team_detect.confirm_frames,
                 config.team_detect.manual_override_sec,

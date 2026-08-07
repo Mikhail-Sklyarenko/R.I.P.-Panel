@@ -1,11 +1,20 @@
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Dict, Any, Optional, Tuple, List
+from typing import Dict, Any, Optional, Tuple, List, Literal
 
 
 class Team(Enum):
     CT = "ct"
     T = "t"
+
+
+# YOLO class ids used by product weights (body/head × CT/T).
+ALL_PLAYER_CLASSES: Tuple[str, ...] = ("c", "ch", "t", "th")
+
+# Combat target filter:
+# - ffa  — Deathmatch: engage every player model (Valve DM is free-for-all)
+# - team — Wingman/comp later: only opposite side
+TargetMode = Literal["ffa", "team"]
 
 
 class DetectorType(Enum):
@@ -107,8 +116,10 @@ class RecoilConfig:
 @dataclass
 class AimConfig:
     """Aiming behavior configuration."""
-    # Team settings
+    # Team settings (still used for autobuy / HUD even when target_mode=ffa)
     current_team: Team = Team.CT
+    # DM product default: shoot all player classes. Use "team" for friendly-fire-off modes.
+    target_mode: TargetMode = "ffa"
 
     # Target priority (PR-H1: hybrid — head if conf≥0.8 + large bbox; else body @ range)
     prioritize_heads: bool = True
@@ -197,8 +208,10 @@ class AimConfig:
     recoil: RecoilConfig = field(default_factory=RecoilConfig)
 
     @property
-    def enemy_classes(self) -> Tuple[str, str]:
-        """Return enemy class names based on current team."""
+    def enemy_classes(self) -> Tuple[str, ...]:
+        """Classes eligible for aim/shoot (and ROI enemy counts)."""
+        if self.target_mode == "ffa":
+            return ALL_PLAYER_CLASSES
         if self.current_team == Team.CT:
             return ("t", "th")
         return ("c", "ch")
@@ -236,10 +249,11 @@ class PatrolConfig:
 
 @dataclass
 class TeamDetectConfig:
-    """Auto-detect CT/T from in-combat HUD color probes."""
+    """Auto-detect CT/T from in-combat HUD color probes (buy/HUD; not aim in ffa)."""
     enabled: bool = True
     confirm_frames: int = 3
-    manual_override_sec: float = 5.0
+    # After Ctrl+T: block auto overwrite long enough for HUD to stabilize
+    manual_override_sec: float = 30.0
     min_votes: int = 2
     probes_path: str = ""
 

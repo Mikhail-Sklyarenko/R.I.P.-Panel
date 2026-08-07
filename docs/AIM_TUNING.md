@@ -22,6 +22,29 @@ venv\Scripts\python.exe tools\check_cuda_torch.py
 
 ---
 
+## Target mode (DM FFA)
+
+Deathmatch Valve = free-for-all по моделям. Продуктовый default:
+
+| Mode | Aim classes | Когда |
+|------|-------------|--------|
+| **`ffa`** (default) | `c, ch, t, th` | Deathmatch farm |
+| **`team`** | opposite only | напарники / ranked позже |
+
+```bat
+set CSGOBOT_TARGET_MODE=ffa
+rem wingman later:
+set CSGOBOT_TARGET_MODE=team
+```
+
+В логе старта: `Team: CT (initial) target_mode=ffa enemies=c,ch,t,th`.
+
+**Сторона CT/T** (auto HUD / Ctrl+T) нужна для **autobuy** (AK vs M4) и оверлея `Team:`, не для фильтра целей в `ffa`.
+
+Ctrl+T: override **30 s** + sync hysteresis (не откатывает команду через 5 с из‑за stale `confirmed_team`).
+
+---
+
 ## X360 (обязательно под sens)
 
 `X360` — сколько «единиц мыши» нужно для поворота на 360°. Неверное значение → перелёт, недолёт, «карусель».

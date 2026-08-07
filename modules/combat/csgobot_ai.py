@@ -249,6 +249,11 @@ def _panel_config(ctx: dict[str, Any]) -> Any | None:
 
 
 def _apply_child_env_from_ctx(ctx: dict[str, Any], child_env: dict[str, str]) -> None:
+    """Map panel session context into csgobot subprocess environment."""
+    # Deathmatch product default: engage all player classes (c/ch/t/th).
+    # Panel can still override via parent env; unset → csgobot run.py default ffa.
+    if not child_env.get("CSGOBOT_TARGET_MODE", "").strip():
+        child_env["CSGOBOT_TARGET_MODE"] = "ffa"
     config = _panel_config(ctx)
     if config is not None:
         sens = getattr(config, "cs2_sensitivity", None)

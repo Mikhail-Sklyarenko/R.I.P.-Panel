@@ -99,6 +99,7 @@ class CS2Bot:
         self.shared_state = self.manager.dict({
             "team": config.aim.current_team.value,
             "team_manual_until": 0.0,
+            "team_force_sync": False,
             "fps": 0.0,
         })
 
@@ -129,18 +130,22 @@ class CS2Bot:
             logger.info("Bot ACTIVATED")
 
     def _toggle_team(self) -> None:
-        """Toggle between CT and T teams."""
+        """Toggle between CT and T teams (buy/HUD side; aim uses target_mode)."""
         current = self.shared_state["team"]
         new_team = "t" if current == "ct" else "ct"
         self.shared_state["team"] = new_team
+        # Detection process must reset hysteresis confirmed_team or auto
+        # snaps back to the stale side after override expires.
+        self.shared_state["team_force_sync"] = True
         override_until = (
             time.monotonic() + self.config.team_detect.manual_override_sec
         )
         self.shared_state["team_manual_until"] = override_until
         logger.info(
-            "Team changed to: %s (manual override %.0fs)",
+            "Team changed to: %s (manual override %.0fs, target_mode=%s)",
             new_team.upper(),
             self.config.team_detect.manual_override_sec,
+            self.config.aim.target_mode,
         )
 
     def _shutdown(self, *args) -> None:
@@ -584,43 +589,69 @@ def detection_process(
                 config.team_detect.enabled
                 and team_probe_set is not None
                 and team_detect_state is not None
-                and activated.is_set()
-                and now > shared_state.get("team_manual_until", 0.0)
             ):
-                winner = detect_team_hud(
-                    img,
-                    team_probe_set,
-                    min_votes=config.team_detect.min_votes,
-                )
-                changed, pending = update_team_hysteresis(
-                    team_detect_state,
-                    winner,
-                    confirm_frames=config.team_detect.confirm_frames,
-                )
-                if changed is not None:
-                    shared_state["team"] = changed
+                if shared_state.get("team_force_sync"):
+                    forced = str(shared_state.get("team", "ct"))
+                    team_detect_state.force_confirm(forced)
+                    shared_state["team_force_sync"] = False
                     logger.info(
-                        "team: auto %s (confirmed %d/%d)",
-                        changed,
-                        config.team_detect.confirm_frames,
-                        config.team_detect.confirm_frames,
+                        "team: manual sync confirmed=%s (hysteresis reset)",
+                        forced.upper(),
                     )
-                if team_debug_enabled() and now - last_team_debug_log >= 3.0:
-                    ct_score = score_probes(img, team_probe_set.ct)
-                    t_score = score_probes(img, team_probe_set.t)
-                    logger.info(
-                        "team: detect ct_score=%d t_score=%d winner=%s pending=%d/%d",
-                        ct_score,
-                        t_score,
-                        winner or "none",
-                        pending,
-                        config.team_detect.confirm_frames,
+
+                if (
+                    activated.is_set()
+                    and now > shared_state.get("team_manual_until", 0.0)
+                ):
+                    winner = detect_team_hud(
+                        img,
+                        team_probe_set,
+                        min_votes=config.team_detect.min_votes,
                     )
-                    last_team_debug_log = now
+                    changed, pending = update_team_hysteresis(
+                        team_detect_state,
+                        winner,
+                        confirm_frames=config.team_detect.confirm_frames,
+                    )
+                    if changed is not None:
+                        shared_state["team"] = changed
+                        logger.info(
+                            "team: auto %s (confirmed %d/%d)",
+                            changed,
+                            config.team_detect.confirm_frames,
+                            config.team_detect.confirm_frames,
+                        )
+                    if team_debug_enabled() and now - last_team_debug_log >= 3.0:
+                        ct_score = score_probes(
+                            img,
+                            team_probe_set.ct,
+                            base_width=team_probe_set.base_width,
+                            base_height=team_probe_set.base_height,
+                        )
+                        t_score = score_probes(
+                            img,
+                            team_probe_set.t,
+                            base_width=team_probe_set.base_width,
+                            base_height=team_probe_set.base_height,
+                        )
+                        logger.info(
+                            "team: detect ct_score=%d t_score=%d winner=%s "
+                            "pending=%d/%d confirmed=%s target_mode=%s",
+                            ct_score,
+                            t_score,
+                            winner or "none",
+                            pending,
+                            config.team_detect.confirm_frames,
+                            team_detect_state.confirmed_team,
+                            config.aim.target_mode,
+                        )
+                        last_team_debug_log = now
 
             # Update team from shared state
             current_team_str = shared_state.get("team", "ct")
             target_selector.config.current_team = Team(current_team_str)
+            # Keep AimConfig.target_mode as source of truth for enemy_classes
+            target_selector.config.target_mode = config.aim.target_mode
 
             # Run detection (full frame + optional ROI fallback)
             detections, roi_used_last = run_combat_detection(

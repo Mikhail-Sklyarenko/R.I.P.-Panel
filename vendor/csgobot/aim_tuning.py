@@ -201,6 +201,20 @@ def resolve_auto_team_enabled(default: bool) -> bool:
     return default if val is None else val
 
 
+def resolve_target_mode(default: str = "ffa") -> str:
+    """
+    Combat target filter.
+
+    Env CSGOBOT_TARGET_MODE:
+      - ffa  — engage all player classes (Deathmatch default)
+      - team — opposite side only (wingman / competitive later)
+    """
+    raw = os.environ.get("CSGOBOT_TARGET_MODE", "").strip().lower()
+    if raw in ("ffa", "team"):
+        return raw
+    return default if default in ("ffa", "team") else "ffa"
+
+
 def resolve_auto_map_enabled(default: bool) -> bool:
     val = _env_bool("CSGOBOT_AUTO_MAP")
     return default if val is None else val
