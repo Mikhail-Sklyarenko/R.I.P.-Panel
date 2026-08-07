@@ -22,6 +22,8 @@ echo.
   --raw-root "%CSGOBOT%\data\captures" ^
   --out-root "%CSGOBOT%\yolov8\datasets\sources\our_cs2" ^
   --prefer-team-t ^
+  --allow-empty ^
+  --max-empty-pct 15 ^
   --min-ct-share 0.50
 
 if errorlevel 1 (

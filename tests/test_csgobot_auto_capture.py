@@ -98,6 +98,7 @@ def test_controller_timer_capture(tmp_path, monkeypatch) -> None:
         pc_id="testpc",
         session_id="sess1",
         save_soft_labels=True,
+        empty_scene_enabled=False,
     )
     ctl = AutoCaptureController(cfg, cwd=tmp_path, weights_name="w.pt")
     submitted: list = []
@@ -122,4 +123,92 @@ def test_controller_timer_capture(tmp_path, monkeypatch) -> None:
     assert trigger in ("timer_t", "soft_ct", "enemy_appear", "timer")
     assert len(submitted) == 1
     assert f"__{trigger}" in submitted[0].stem
+    assert submitted[0].label_lines
     ctl.stop()
+
+
+def test_empty_scene_forces_empty_labels(tmp_path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    from dataset_capture.config import AutoCaptureConfig
+
+    cfg = AutoCaptureConfig(
+        enabled=True,
+        root_dir=str(tmp_path / "captures"),
+        interval_sec=99.0,
+        min_interval_sec=0.0,
+        empty_scene_enabled=True,
+        empty_scene_interval_sec=0.5,
+        max_per_hour=50,
+        max_mb=50,
+        dedup_hamming_max=0,
+        pc_id="pc",
+        session_id="s1",
+        save_soft_labels=True,
+    )
+    ctl = AutoCaptureController(cfg, cwd=tmp_path)
+    submitted: list = []
+    ctl._writer.start = lambda: None  # type: ignore[method-assign]
+    ctl._writer.submit = lambda job: submitted.append(job) or True  # type: ignore[method-assign]
+    img = np.zeros((720, 1280, 3), dtype=np.uint8)
+    img[:] = (10, 20, 30)
+    trigger = ctl.maybe_capture(
+        img,
+        detections={},
+        team="ct",
+        activated=True,
+        roi_used=False,
+        enemy_classes=("c", "ch", "t", "th"),
+        now=2000.0,
+    )
+    assert trigger == "empty_scene"
+    assert submitted[0].label_lines == []
+    assert submitted[0].meta["force_empty"] is True
+    ctl.stop()
+
+
+def test_hard_neg_mode_texture_fp_empty_labels(tmp_path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    from dataset_capture.config import AutoCaptureConfig
+
+    cfg = AutoCaptureConfig(
+        enabled=True,
+        root_dir=str(tmp_path / "captures"),
+        hard_neg_mode=True,
+        hard_neg_interval_sec=0.5,
+        min_interval_sec=0.0,
+        max_per_hour=50,
+        max_mb=50,
+        dedup_hamming_max=0,
+        pc_id="pc",
+        session_id="hn1",
+        save_soft_labels=True,
+    )
+    ctl = AutoCaptureController(cfg, cwd=tmp_path)
+    submitted: list = []
+    ctl._writer.start = lambda: None  # type: ignore[method-assign]
+    ctl._writer.submit = lambda job: submitted.append(job) or True  # type: ignore[method-assign]
+    img = np.zeros((720, 1280, 3), dtype=np.uint8)
+    img[:] = (80, 70, 60)
+    trigger = ctl.maybe_capture(
+        img,
+        detections={"c": [{"xyxy": [400, 200, 500, 400], "conf": 0.88, "cls": 0}]},
+        team="t",
+        activated=True,
+        roi_used=False,
+        enemy_classes=("c", "ch", "t", "th"),
+        now=3000.0,
+    )
+    assert trigger == "texture_fp"
+    assert submitted[0].label_lines == []
+    assert submitted[0].meta["force_empty"] is True
+    ctl.stop()
+
+
+def test_env_hard_neg_resolve(monkeypatch) -> None:
+    monkeypatch.setenv("CSGOBOT_AUTO_CAPTURE", "1")
+    monkeypatch.setenv("CSGOBOT_CAPTURE_HARD_NEG", "1")
+    monkeypatch.setenv("CSGOBOT_CAPTURE_EMPTY_SCENE", "0")
+    cfg = resolve_auto_capture_config()
+    assert cfg.enabled is True
+    assert cfg.hard_neg_mode is True
+    assert cfg.empty_scene_enabled is False

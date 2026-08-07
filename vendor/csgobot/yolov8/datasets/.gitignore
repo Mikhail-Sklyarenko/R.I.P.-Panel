@@ -5,8 +5,9 @@ hf_raw
 sources
 product_v*/
 !product_data.yaml
+!product_data_hn.yaml
 
-# Keep only our_cs2 scaffold in git (actual data files stay ignored)
+# Keep only our_cs2 + hard_negatives scaffold in git (actual data files stay ignored)
 !sources/
 sources/*
 !sources/our_cs2/
@@ -25,6 +26,26 @@ sources/*
 !sources/our_cs2/test/images/.gitkeep
 !sources/our_cs2/test/labels/
 !sources/our_cs2/test/labels/.gitkeep
+!sources/hard_negatives/
+!sources/hard_negatives/train/
+!sources/hard_negatives/train/images/
+!sources/hard_negatives/train/images/.gitkeep
+!sources/hard_negatives/train/labels/
+!sources/hard_negatives/train/labels/.gitkeep
+!sources/hard_negatives/val/
+!sources/hard_negatives/val/images/
+!sources/hard_negatives/val/images/.gitkeep
+!sources/hard_negatives/val/labels/
+!sources/hard_negatives/val/labels/.gitkeep
+!sources/hard_negatives/test/
+!sources/hard_negatives/test/images/
+!sources/hard_negatives/test/images/.gitkeep
+!sources/hard_negatives/test/labels/
+!sources/hard_negatives/test/labels/.gitkeep
+
+# Full HN manifests stay local (summary lives under manifests/)
+sources/hard_negatives/manifest.json
+sources/hard_negatives/**/manifest.json
 
 # Local full manifests stay on TRAIN machine (optional slim copies can be force-added)
 manifests/*

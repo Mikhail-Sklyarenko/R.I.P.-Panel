@@ -119,11 +119,21 @@ def has_soft_ct(
     return False
 
 
+def count_all_boxes(
+    detections: dict[str, list[dict[str, Any]]],
+) -> int:
+    return sum(len(boxes) for boxes in detections.values())
+
+
 def count_enemy_boxes(
     detections: dict[str, list[dict[str, Any]]],
     enemy_classes: tuple[str, ...],
 ) -> int:
     return sum(len(detections.get(c, [])) for c in enemy_classes)
+
+
+# Triggers that must never carry soft labels (texture / empty hard negatives).
+FORCE_EMPTY_TRIGGERS = frozenset({"empty_scene", "texture_fp", "hard_neg_timer"})
 
 
 class AutoCaptureController:
@@ -145,6 +155,7 @@ class AutoCaptureController:
         self.labels_dir = self.session_dir / "labels_soft"
         self._writer = CaptureWriter(queue_size=cfg.queue_size)
         self._last_save = 0.0
+        self._last_empty_scene = 0.0
         self._hour_start = time.time()
         self._hour_count = 0
         self._recent_hashes: list[int] = []
@@ -153,10 +164,13 @@ class AutoCaptureController:
         if cfg.enabled:
             self.session_dir.mkdir(parents=True, exist_ok=True)
             logger.info(
-                "auto_capture: ON dir=%s interval=%.2fs max/h=%d",
+                "auto_capture: ON dir=%s interval=%.2fs max/h=%d "
+                "empty_scene=%s hard_neg=%s",
                 self.session_dir,
                 cfg.interval_sec,
                 cfg.max_per_hour,
+                cfg.empty_scene_enabled,
+                cfg.hard_neg_mode,
             )
 
     def stop(self) -> None:
@@ -183,6 +197,8 @@ class AutoCaptureController:
         return True
 
     def _interval(self, team: str) -> float:
+        if self.cfg.hard_neg_mode:
+            return max(self.cfg.min_interval_sec, self.cfg.hard_neg_interval_sec)
         interval = self.cfg.interval_sec
         if self.cfg.team_t_boost and team.lower() == "t":
             interval *= self.cfg.team_t_interval_scale
@@ -230,18 +246,34 @@ class AutoCaptureController:
             return None
 
         enemy_n = count_enemy_boxes(detections, enemy_classes)
+        total_n = count_all_boxes(detections)
         trigger: str | None = None
 
-        if roi_used and enemy_n == 0:
-            trigger = "roi_miss"
-        elif self.cfg.soft_ct_enabled and has_soft_ct(
-            detections, lo=self.cfg.soft_ct_lo, hi=self.cfg.soft_ct_hi
-        ):
-            trigger = "soft_ct"
-        elif enemy_n > 0 and not self._had_enemy:
-            trigger = "enemy_appear"
-        elif now - self._last_save >= self._interval(team):
-            trigger = "timer_t" if team.lower() == "t" else "timer"
+        if self.cfg.hard_neg_mode:
+            # Dedicated walk-around: save map textures as empty labels even if
+            # YOLO hallucinates players on crates/walls.
+            if total_n > 0 and now - self._last_save >= self._interval(team):
+                trigger = "texture_fp"
+            elif now - self._last_save >= self._interval(team):
+                trigger = "hard_neg_timer"
+        else:
+            if roi_used and enemy_n == 0:
+                trigger = "roi_miss"
+            elif self.cfg.soft_ct_enabled and has_soft_ct(
+                detections, lo=self.cfg.soft_ct_lo, hi=self.cfg.soft_ct_hi
+            ):
+                trigger = "soft_ct"
+            elif enemy_n > 0 and not self._had_enemy:
+                trigger = "enemy_appear"
+            elif (
+                self.cfg.empty_scene_enabled
+                and total_n == 0
+                and now - self._last_empty_scene >= self.cfg.empty_scene_interval_sec
+                and now - self._last_save >= self.cfg.min_interval_sec
+            ):
+                trigger = "empty_scene"
+            elif now - self._last_save >= self._interval(team):
+                trigger = "timer_t" if team.lower() == "t" else "timer"
 
         self._had_enemy = enemy_n > 0
         if trigger is None:
@@ -250,8 +282,12 @@ class AutoCaptureController:
             return None
 
         h, w = image.shape[:2]
+        force_empty = (
+            self.cfg.hard_neg_mode
+            or trigger in FORCE_EMPTY_TRIGGERS
+        )
         label_lines: list[str] = []
-        if self.cfg.save_soft_labels:
+        if self.cfg.save_soft_labels and not force_empty:
             label_lines = build_soft_labels(
                 detections, width=w, height=h, cfg=self.cfg
             )
@@ -274,6 +310,8 @@ class AutoCaptureController:
             "ts": now,
             "team": team.lower(),
             "trigger": trigger,
+            "force_empty": force_empty,
+            "hard_neg_mode": self.cfg.hard_neg_mode,
             "roi_used": bool(roi_used),
             "resolution": [int(w), int(h)],
             "weights": self.weights_name,
@@ -301,5 +339,7 @@ class AutoCaptureController:
         if not self._writer.submit(job):
             return None
         self._last_save = now
+        if trigger == "empty_scene":
+            self._last_empty_scene = now
         self._hour_count += 1
         return trigger

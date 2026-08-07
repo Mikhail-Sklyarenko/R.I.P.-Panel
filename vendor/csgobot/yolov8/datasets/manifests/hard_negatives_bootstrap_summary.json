@@ -1,0 +1,19 @@
+{
+  "created_utc": "2026-08-07T12:36:56.529394+00:00",
+  "tool": "import_empty_yolo_splits.py",
+  "purpose": "hard_negatives from empty YOLO labels (texture FP fix)",
+  "prefix": "hn_bs_",
+  "sources": {
+    "test": "/Volumes/NO NAME/test",
+    "train": "/Volumes/NO NAME/train",
+    "val": "/Volumes/NO NAME/val"
+  },
+  "counts": {
+    "train": 880,
+    "val": 109,
+    "test": 125
+  },
+  "total": 1114,
+  "skipped_dup": 1,
+  "skipped_exists": 0
+}

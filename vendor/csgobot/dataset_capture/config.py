@@ -61,6 +61,12 @@ class AutoCaptureConfig:
     dedup_hamming_max: int = 4
     pc_id: str = ""
     session_id: str = ""
+    # Hard-negative / texture-FP loop
+    empty_scene_enabled: bool = True
+    empty_scene_interval_sec: float = 2.5
+    # When True: every capture forces empty YOLO labels (walk map → teach "not a player")
+    hard_neg_mode: bool = False
+    hard_neg_interval_sec: float = 1.0
 
     def label_conf_for(self, class_name: str) -> float:
         return {
@@ -76,6 +82,8 @@ def resolve_auto_capture_config(default_enabled: bool = False) -> AutoCaptureCon
     soft = _env_bool("CSGOBOT_CAPTURE_SOFT_CT")
     boost = _env_bool("CSGOBOT_CAPTURE_WHEN_TEAM_T_BOOST")
     save_labels = _env_bool("CSGOBOT_CAPTURE_SOFT_LABELS")
+    empty_scene = _env_bool("CSGOBOT_CAPTURE_EMPTY_SCENE")
+    hard_neg = _env_bool("CSGOBOT_CAPTURE_HARD_NEG")
 
     pc_id = os.environ.get("CSGOBOT_CAPTURE_PC_ID", "").strip()
     if not pc_id:
@@ -112,6 +120,14 @@ def resolve_auto_capture_config(default_enabled: bool = False) -> AutoCaptureCon
         dedup_hamming_max=max(0, _env_int("CSGOBOT_CAPTURE_DEDUP_HAMMING", 4)),
         pc_id=pc_id,
         session_id=session_id,
+        empty_scene_enabled=True if empty_scene is None else empty_scene,
+        empty_scene_interval_sec=max(
+            0.5, _env_float("CSGOBOT_CAPTURE_EMPTY_INTERVAL_SEC", 2.5)
+        ),
+        hard_neg_mode=False if hard_neg is None else hard_neg,
+        hard_neg_interval_sec=max(
+            0.3, _env_float("CSGOBOT_CAPTURE_HARD_NEG_INTERVAL_SEC", 1.0)
+        ),
     )
 
 

@@ -121,6 +121,7 @@ Env без правки `run.py`: `CS2_SENSITIVITY`, `CSGOBOT_X360`, `CSGOBOT_SM
 
 **Model lifecycle (farm vs train):** `docs/PRODUCT_MODEL_LIFECYCLE.md` — ферма = `EnsureWeights.bat`; датасет/train только на train PC.  
 **Auto-capture (CT data):** `docs/AUTO_CAPTURE.md` — collector PC: `EnableAutoCapture.bat` → farm → `BuildOurCs2FromRaw.bat`.  
+**Hard negatives (texture FP):** `docs/HARD_NEGATIVES.md` — `ImportEmptyYoloSplits.bat` / `EnableHardNegCapture.bat` / `EnableFpGuard.bat` → `BuildProductWithHardNegatives.bat`.  
 **Dataset strategy (CT detect):** `docs/CS2_DATASET_STRATEGY.md`.  
 **Dataset runbook:** `docs/CS2_DATASET_PIPELINE.md`.  
 **TRAIN only:** `BootstrapDataset.bat` → `TrainProductModel.bat` → `scripts/promote_weights.py` (не на farm PC).

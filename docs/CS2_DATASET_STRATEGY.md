@@ -79,6 +79,9 @@ Why: domain match beats volume. Our issue is domain shift + class robustness for
 - Out-of-range YOLO boxes: 0.
 - Duplicate-near-identical frames: controlled (drop obvious burst duplicates).
 - Class balance constraints above are met (collector should bias team=T sessions).
+- **Hard negatives:** include empty-label map frames (crates/walls/cars) via
+  `docs/HARD_NEGATIVES.md` — target 500–2000 before calling texture FP solved.
+  Do **not** delete empty scenes; they teach “not a player”.
 
 ## 3) Training and release policy
 
@@ -86,6 +89,7 @@ Why: domain match beats volume. Our issue is domain shift + class robustness for
 - Start from current production weights.
 - Keep one immutable holdout set from our own captures.
 - Track per-class metrics (`c`, `ch`, `t`, `th`) and not only global mAP.
+- Merge `sources/hard_negatives` (empty labels) with positives each CT/FP train cycle.
 
 ### Go/No-go metrics (release gate)
 - CT recall uplift vs previous production model:
@@ -95,6 +99,7 @@ Why: domain match beats volume. Our issue is domain shift + class robustness for
   - `t` and `th` recall drop <= 2%.
 - Precision floor:
   - No FP explosion in live farm soak.
+  - Known texture sites (Mirage crates, Dust2 car/walls): FP rate must drop after HN merge.
 
 ### Deployment policy
 - Version weights as immutable artifacts (`weights-vX.Y.Z-ctfix.pt`).

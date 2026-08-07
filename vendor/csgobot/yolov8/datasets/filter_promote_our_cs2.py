@@ -123,6 +123,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--copy-images", action="store_true", default=True)
     parser.add_argument("--allow-empty", action="store_true", help="Keep empty labels")
     parser.add_argument("--max-empty-pct", type=float, default=8.0)
+    parser.add_argument(
+        "--prefer-empty-triggers",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Prefer empty_scene/texture_fp empties when filling empty quota",
+    )
     parser.add_argument("--min-ct-share", type=float, default=0.50)
     parser.add_argument("--prefer-team-t", action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument("--dry-run", action="store_true")
@@ -176,6 +182,10 @@ def main(argv: list[str] | None = None) -> int:
             priority += 1.5
         if trigger in ("soft_ct", "roi_miss", "timer_t"):
             priority += 1.0
+        if trigger in ("empty_scene", "texture_fp", "hard_neg_timer") or meta.get(
+            "force_empty"
+        ):
+            priority += 2.0
         cls_counts = Counter(b[0] for b in boxes)
         ct = cls_counts[0] + cls_counts[1]
         if ct > 0:
@@ -190,9 +200,20 @@ def main(argv: list[str] | None = None) -> int:
     # Prefer CT-heavy / team-T samples when trimming for balance messaging
     accepted.sort(key=lambda x: (-x[3], x[0].name))
 
-    # Optional empty quota
+    # Optional empty quota (prefer dedicated hard-neg triggers)
     with_boxes = [a for a in accepted if a[1]]
     empties = [a for a in accepted if not a[1]]
+    if getattr(args, "prefer_empty_triggers", True):
+        empties.sort(
+            key=lambda a: (
+                0
+                if str(a[2].get("trigger", ""))
+                in ("empty_scene", "texture_fp", "hard_neg_timer")
+                or a[2].get("force_empty")
+                else 1,
+                -a[3],
+            )
+        )
     max_empty = int(len(with_boxes) * (args.max_empty_pct / 100.0)) if args.allow_empty else 0
     selected = list(with_boxes)
     if max_empty > 0 and empties:

@@ -17,6 +17,8 @@ if not exist "%~dp0data" mkdir "%~dp0data"
   echo set CSGOBOT_CAPTURE_SOFT_CT=1
   echo set CSGOBOT_CAPTURE_WHEN_TEAM_T_BOOST=1
   echo set CSGOBOT_CAPTURE_SOFT_LABELS=1
+  echo set CSGOBOT_CAPTURE_EMPTY_SCENE=1
+  echo set CSGOBOT_CAPTURE_EMPTY_INTERVAL_SEC=2.5
   echo set CSGOBOT_DETECT_DEBUG=1
   echo REM Prefer softer CT detect while collecting:
   echo set CSGOBOT_CONF_C=0.38
@@ -37,6 +39,7 @@ echo Captures land in:
 echo   vendor\csgobot\data\captures\
 echo.
 echo After sessions: BuildOurCs2FromRaw.bat  then train.
-echo Docs: docs\AUTO_CAPTURE.md
+echo For texture FP: EnableHardNegCapture.bat + BuildHardNegativesFromRaw.bat
+echo Docs: docs\AUTO_CAPTURE.md  docs\HARD_NEGATIVES.md
 echo.
 exit /b 0

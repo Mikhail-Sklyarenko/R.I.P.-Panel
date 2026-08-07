@@ -36,6 +36,7 @@ See `docs/AUTO_CAPTURE.md`.
 
 1. `BootstrapDataset.bat` — build `product_v1_bootstrap` + audit + manifest.  
 2. Optional: collector captures → `BuildOurCs2FromRaw.bat` → merge `sources/our_cs2`.  
+2b. Texture FP: `ImportEmptyYoloSplits.bat` (bootstrap empties) and/or `EnableHardNegCapture.bat` → `BuildHardNegativesFromRaw.bat` → `BuildProductWithHardNegatives.bat` (`docs/HARD_NEGATIVES.md`).  
 3. `TrainProductModel.bat` — fine-tune from current production `.pt`.  
 4. `python scripts/promote_weights.py runs/.../best.pt --version v0.2.0-ctfix --filename ...`  
 5. Host the `.pt` (GitHub Release / CDN), put real `url` in registry, set `active`.  

@@ -52,6 +52,20 @@ Limits: max frames/hour, max MB, async writer (aim/detect not blocked), near-dup
 - `soft_ct` — CT box in soft confidence band
 - `roi_miss` — ROI ran but no enemies
 - `enemy_appear` — enemy just appeared
+- `empty_scene` — no YOLO boxes (background / hard negative, **empty** label)
+- `texture_fp` / `hard_neg_timer` — only in **hard-neg mode** (force empty labels)
+
+## Texture FP / hard negatives
+
+Map crates/walls false positives: see **`docs/HARD_NEGATIVES.md`**.
+
+Quick path:
+
+```bat
+EnableFpGuard.bat          REM raise conf now
+EnableHardNegCapture.bat   REM walk empty map → empty labels
+BuildHardNegativesFromRaw.bat
+```
 
 ## Promote to our_cs2
 
@@ -61,10 +75,8 @@ On machine that has the captures (or after copying `data/captures`):
 BuildOurCs2FromRaw.bat
 ```
 
-This filters, dedups, splits, and copies into:
-
-`vendor/csgobot/yolov8/datasets/sources/our_cs2/`
-
+Accepts empty labels up to 15% (prefers `empty_scene`).  
+Hard-neg-only promote: `BuildHardNegativesFromRaw.bat` → `sources/hard_negatives/`.
 ## Then train
 
 Merge `our_cs2` with public bootstrap (see `docs/CS2_DATASET_PIPELINE.md`), then:

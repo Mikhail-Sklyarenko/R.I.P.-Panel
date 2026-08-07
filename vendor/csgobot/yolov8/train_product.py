@@ -36,8 +36,14 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     # Ultralytics resolves path: relative to yaml parent
-    bootstrap = DATASETS / "product_v1_bootstrap" / "train" / "images"
-    if "product_v1" in data.name or data.name == "product_data.yaml":
+    if data.name == "product_data_hn.yaml" or "product_v2_hn" in data.name:
+        hn_root = DATASETS / "product_v2_hn" / "train" / "images"
+        if not hn_root.is_dir() or not any(hn_root.iterdir()):
+            print(f"ERROR: dataset images missing under {hn_root.parent}")
+            print("  Run BuildProductWithHardNegatives.bat on this TRAIN machine.")
+            return 1
+    elif "product_v1" in data.name or data.name == "product_data.yaml":
+        bootstrap = DATASETS / "product_v1_bootstrap" / "train" / "images"
         if not bootstrap.is_dir() or not any(bootstrap.iterdir()):
             print(f"ERROR: dataset images missing under {bootstrap.parent}")
             print("  Run BootstrapDataset.bat on this TRAIN machine only.")

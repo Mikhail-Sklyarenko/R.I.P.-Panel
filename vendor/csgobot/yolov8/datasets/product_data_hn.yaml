@@ -1,0 +1,15 @@
+# YOLO data config: bootstrap + hard_negatives (± our_cs2). TRAIN MACHINE ONLY.
+# Built by BuildProductWithHardNegatives.bat → product_v2_hn/
+# Paths are relative to this file's directory.
+
+path: product_v2_hn
+train: train/images
+val: val/images
+test: test/images
+
+nc: 4
+names:
+  0: c
+  1: ch
+  2: t
+  3: th
