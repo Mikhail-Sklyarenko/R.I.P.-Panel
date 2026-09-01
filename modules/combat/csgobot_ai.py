@@ -17,6 +17,7 @@ _STDERR_READ_LIMIT = 8192
 _STDERR_TAIL_EMIT = 200
 _PROCESS: subprocess.Popen[Any] | None = None
 _PROCESS_STDERR_FILE: IO[str] | None = None
+_STDERR_TAIL_OFFSET: dict[str, int] = {}
 
 
 class _Emit(Protocol):
@@ -60,6 +61,30 @@ def _min_runtime_sec() -> int:
         return max(0, int(raw))
     except ValueError:
         return 30
+
+
+def _login_from_ctx(ctx: dict[str, Any]) -> str:
+    return str(ctx.get("login") or ctx.get("account") or "")
+
+
+def _ingest_nav_metrics_from_stderr(session_id: str, ctx: dict[str, Any]) -> None:
+    """Tail csgobot stderr and append new nav_metrics rows to fleet JSONL."""
+    from modules.nav_metrics.ingest import tail_nav_metrics
+    from modules.nav_metrics.store import append_nav_metric
+
+    path = _stderr_log_path(session_id)
+    offset = _STDERR_TAIL_OFFSET.get(session_id, 0)
+    metrics_list, new_offset = tail_nav_metrics(path, offset)
+    _STDERR_TAIL_OFFSET[session_id] = new_offset
+    if not metrics_list:
+        return
+    login = _login_from_ctx(ctx)
+    for metrics in metrics_list:
+        append_nav_metric(metrics, login=login, session_id=session_id)
+
+
+def _reset_stderr_tail(session_id: str) -> None:
+    _STDERR_TAIL_OFFSET.pop(session_id, None)
 
 
 def _session_id(ctx: dict[str, Any]) -> str:
@@ -199,6 +224,45 @@ def check_cuda_torch() -> tuple[bool, dict[str, object]]:
     return bool(data.get("cuda")), data
 
 
+def check_nav_preflight(
+    pack_id: str = "dust2_dm",
+) -> tuple[bool, dict[str, object]]:
+    """Validate minimap nav assets in csgobot venv. Returns (ok, info dict)."""
+    if sys.platform != "win32":
+        return True, {}
+    py = python_executable()
+    script = _csgobot_dir() / "tools" / "nav_preflight.py"
+    if py is None or not script.is_file():
+        return True, {}
+    env = os.environ.copy()
+    env["CSGOBOT_NAV_PACK"] = pack_id.strip() or "dust2_dm"
+    try:
+        result = subprocess.run(
+            [str(py), str(script)],
+            cwd=str(_csgobot_dir()),
+            capture_output=True,
+            text=True,
+            timeout=20.0,
+            env=env,
+            creationflags=(
+                subprocess.CREATE_NO_WINDOW
+                if hasattr(subprocess, "CREATE_NO_WINDOW")
+                else 0
+            ),
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        return False, {"error": str(exc), "ok": False}
+    payload = (result.stdout or "").strip()
+    if not payload:
+        detail = (result.stderr or "").strip() or f"nav_preflight exit {result.returncode}"
+        return False, {"error": detail, "ok": False}
+    try:
+        data = json.loads(payload)
+    except json.JSONDecodeError:
+        return False, {"error": payload[:200], "ok": False}
+    return bool(data.get("ok")), data
+
+
 def check_csgobot_preflight() -> tuple[bool, list[str]]:
     """
     Quick subprocess check: weights, pygrabber, torch/YOLO imports.
@@ -267,12 +331,54 @@ def _apply_child_env_from_ctx(ctx: dict[str, Any], child_env: dict[str, str]) ->
     x360_override = os.environ.get("CSGOBOT_X360", "").strip()
     if x360_override:
         child_env["CSGOBOT_X360"] = x360_override
+    nav_env = os.environ.get("CSGOBOT_NAV", "").strip().lower()
+    nav_enabled = nav_env in ("1", "true", "yes", "on")
+    nav_pack = os.environ.get("CSGOBOT_NAV_PACK", "").strip() or "auto"
+    if config is not None:
+        if getattr(config, "csgobot_nav_enabled", False):
+            nav_enabled = True
+        pack_cfg = getattr(config, "csgobot_nav_pack", "") or ""
+        if pack_cfg.strip():
+            nav_pack = pack_cfg.strip()
+    if nav_enabled:
+        child_env["CSGOBOT_NAV"] = "1"
+        child_env["CSGOBOT_NAV_PACK"] = nav_pack
     hwnd = ctx.get("hwnd") or ctx.get("cs2_hwnd")
     if hwnd is not None:
         try:
             child_env["CSGOBOT_CS2_HWND"] = str(int(hwnd))
         except (TypeError, ValueError):
             pass
+
+
+def _nav_env_summary(ctx: dict[str, Any]) -> str | None:
+    config = _panel_config(ctx)
+    nav_on = os.environ.get("CSGOBOT_NAV", "").strip().lower() in ("1", "true", "yes", "on")
+    pack_id = os.environ.get("CSGOBOT_NAV_PACK", "").strip() or "auto"
+    if config is not None:
+        if getattr(config, "csgobot_nav_enabled", False):
+            nav_on = True
+        pack_cfg = getattr(config, "csgobot_nav_pack", "") or ""
+        if pack_cfg.strip():
+            pack_id = pack_cfg.strip()
+    if not nav_on:
+        return None
+    ok, info = check_nav_preflight(pack_id)
+    if ok:
+        if pack_id == "auto":
+            versions = info.get("pack_versions") or {}
+            packs_ok = info.get("packs_ok") or []
+            if versions:
+                detail = ", ".join(f"{k} v{v}" for k, v in sorted(versions.items()))
+                return f"csgobot: nav auto packs ok — {detail}"
+            return f"csgobot: nav auto packs ok — {packs_ok}"
+        ver = info.get("pack_version") or "?"
+        goals = info.get("goals") or []
+        return f"csgobot: nav pack {pack_id} v{ver} goals={goals}"
+    err = info.get("errors") or info.get("error") or "preflight failed"
+    if isinstance(err, list):
+        err = "; ".join(str(e) for e in err[:2])
+    return f"csgobot: nav preflight failed — {err} (macro patrol fallback)"
 
 
 def _aim_env_summary(ctx: dict[str, Any]) -> str:
@@ -308,6 +414,8 @@ def _finalize_process(
     """
     code = proc.returncode
     sid = _session_id(ctx)
+    _ingest_nav_metrics_from_stderr(sid, ctx)
+    _reset_stderr_tail(sid)
     stderr_text = _read_stderr_log(sid)
     log_path = _stderr_log_path_if_nonempty(sid)
     elapsed = time.monotonic() - started_at
@@ -483,6 +591,9 @@ def start_ai(ctx: dict[str, Any]) -> bool:
         )
         emit(EventType.COMBAT_AI_STARTED, detail)
         emit(EventType.FARMING, _aim_env_summary(ctx))
+        nav_line = _nav_env_summary(ctx)
+        if nav_line:
+            emit(EventType.FARMING, nav_line)
 
     started_at = time.monotonic()
     timeout = _max_runtime_sec(ctx)
@@ -497,6 +608,7 @@ def start_ai(ctx: dict[str, Any]) -> bool:
         if ctx.get("stop_requested"):
             stop_ai()
             return True
+        _ingest_nav_metrics_from_stderr(sid, ctx)
         if emit and time.monotonic() >= next_farm:
             emit(EventType.FARMING, "csgobot: farming")
             next_farm = time.monotonic() + farming_interval

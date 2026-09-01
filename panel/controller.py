@@ -38,6 +38,8 @@ class PanelController:
         self._checkbox_vars: dict[str, Any] = {}
         self._main_log_widget: Any | None = None
         self._drop_log_widget: Any | None = None
+        self._nav_metrics_widget: Any | None = None
+        self._nav_metrics_poll_at: float = 0.0
         self.on_accounts_changed: Callable[[], None] | None = None
         self.on_counters_changed: Callable[[], None] | None = None
         self.on_config_paths_changed: Callable[[], None] | None = None
@@ -56,6 +58,10 @@ class PanelController:
     def bind_log_widgets(self, main_log: Any, drop_log: Any) -> None:
         self._main_log_widget = main_log
         self._drop_log_widget = drop_log
+
+    def bind_nav_metrics_widget(self, widget: Any) -> None:
+        self._nav_metrics_widget = widget
+        self.refresh_nav_metrics_dashboard()
 
     def start(self) -> None:
         from core.startup_checks import (
@@ -78,8 +84,143 @@ class PanelController:
 
     def _poll_logs_tick(self) -> None:
         self._drain_log_queue()
+        self._maybe_refresh_nav_metrics()
         if self.root is not None:
             self.root.after(100, self._poll_logs_tick)
+
+    def _maybe_refresh_nav_metrics(self) -> None:
+        import time
+
+        now = time.monotonic()
+        if now - self._nav_metrics_poll_at < 2.0:
+            return
+        self._nav_metrics_poll_at = now
+        self.refresh_nav_metrics_dashboard()
+
+    def refresh_nav_metrics_dashboard(self) -> None:
+        widget = self._nav_metrics_widget
+        if widget is None:
+            return
+        from modules.nav_metrics.aggregate import list_inbox_files
+        from modules.nav_metrics.store import format_fleet_dashboard
+
+        inbox_n = len(list_inbox_files())
+        text = format_fleet_dashboard(hours=24.0, include_inbox=True)
+        if inbox_n:
+            text += f"\n  inbox: {inbox_n} file(s) pending import"
+        status = self.nav_fleet_collector_status()
+        if status.get("running"):
+            text += (
+                f"\n  collector: RUNNING :{status.get('port')} "
+                f"ingested={status.get('ingest_count', 0)}"
+            )
+        else:
+            text += "\n  collector: stopped (start on master PC)"
+        push_url = (self.config.nav_fleet_push_url or "").strip()
+        if push_url:
+            text += f"\n  push_url: {push_url}"
+        try:
+            widget.configure(state="normal")
+            widget.delete("1.0", "end")
+            widget.insert("1.0", text)
+            widget.configure(state="disabled")
+        except Exception:
+            pass
+
+    def import_fleet_inbox_metrics(self) -> None:
+        from modules.nav_metrics.aggregate import import_fleet_inbox
+
+        result = import_fleet_inbox(archive=True)
+        self.append_log(
+            f"nav fleet: imported {result['imported_rows']} rows "
+            f"from {result['imported_files']} file(s)"
+        )
+        self.refresh_nav_metrics_dashboard()
+
+    def start_nav_fleet_collector(self) -> dict[str, Any]:
+        from modules.nav_metrics.collector import NavFleetCollectorError, start_collector
+
+        self.config = load_config()
+        try:
+            info = start_collector(
+                port=self.config.nav_fleet_collector_port,
+                token=self.config.nav_fleet_collector_token,
+            )
+        except NavFleetCollectorError as exc:
+            self.append_log(f"nav collector: {exc}")
+            return {"running": False, "error": str(exc)}
+        self.append_log(f"nav collector: listening {info.get('url')}")
+        return info
+
+    def stop_nav_fleet_collector(self) -> None:
+        from modules.nav_metrics.collector import stop_collector
+
+        stop_collector()
+        self.append_log("nav collector: stopped")
+
+    def nav_fleet_collector_status(self) -> dict[str, Any]:
+        from modules.nav_metrics.collector import collector_status
+
+        return collector_status()
+
+    def list_nav_pack_ids(self) -> list[str]:
+        from modules.nav_pack.editor import list_pack_ids
+
+        return list_pack_ids()
+
+    def load_nav_pack_editor(self, pack_id: str):
+        from modules.nav_pack.editor import load_pack_view
+
+        return load_pack_view(pack_id)
+
+    def save_nav_pack_override(
+        self,
+        pack_id: str,
+        *,
+        goal_x: float,
+        goal_y: float,
+        goal_arrive_radius: float,
+        goal2_x: float,
+        goal2_y: float,
+        goal2_arrive_radius: float,
+        dwell_at_goal_sec: float,
+        direct_goal_dist: float,
+    ) -> None:
+        from modules.nav_pack.editor import save_pack_override
+
+        path = save_pack_override(
+            pack_id,
+            goal_x=goal_x,
+            goal_y=goal_y,
+            goal_arrive_radius=goal_arrive_radius,
+            goal2_x=goal2_x,
+            goal2_y=goal2_y,
+            goal2_arrive_radius=goal2_arrive_radius,
+            dwell_at_goal_sec=dwell_at_goal_sec,
+            direct_goal_dist=direct_goal_dist,
+        )
+        self.append_log(f"nav pack: saved override → {path}")
+
+    def reset_nav_pack_override(self, pack_id: str) -> None:
+        from modules.nav_pack.editor import reset_pack_override
+
+        if reset_pack_override(pack_id):
+            self.append_log(f"nav pack: reset override for {pack_id} (using bundled)")
+        else:
+            self.append_log(f"nav pack: no override for {pack_id}")
+
+    def validate_nav_pack(self, pack_id: str) -> None:
+        from modules.combat import csgobot_ai
+
+        ok, info = csgobot_ai.check_nav_preflight(pack_id)
+        if ok:
+            ver = info.get("pack_version") or "?"
+            self.append_log(f"nav pack: {pack_id} preflight ok v{ver}")
+        else:
+            errs = info.get("errors") or info.get("error") or "failed"
+            if isinstance(errs, list):
+                errs = "; ".join(str(e) for e in errs[:2])
+            self.append_log(f"nav pack: {pack_id} preflight FAILED — {errs}")
 
     def reload_accounts(self) -> None:
         self.config = load_config()

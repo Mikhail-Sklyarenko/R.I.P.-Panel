@@ -9,7 +9,7 @@ import numpy as np
 
 _CSGOBOT = Path(__file__).resolve().parents[1] / "vendor" / "csgobot"
 if str(_CSGOBOT) not in sys.path:
-    sys.path.insert(0, str(_CSGOBOT))
+    sys.path.append( str(_CSGOBOT))
 
 from patrol.state import PatrolMode  # noqa: E402
 from patrol.stuck import StuckDetector, should_trigger_unstuck  # noqa: E402

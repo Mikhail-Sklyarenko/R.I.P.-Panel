@@ -21,6 +21,7 @@ Run panel: `FarmPanel.bat` or `python -m panel.main`.
 | `cs2_path` | Path to `cs2.exe` |
 | **`trade_offer_link`** | **Required** — Trade URL of storage account |
 | **`cs2_sensitivity`** | CS2 console `sensitivity` (default `2.1`) → csgobot X360 |
+| **`cs_resolution`** | `1280x720` for AI farm + minimap nav |
 | `auto_collect_drop` | `true` |
 | `bot_mode` | `ai` or `auto` |
 | `cs_resolution` | `1280x720` (AI farm PC) |
@@ -59,6 +60,26 @@ python -m venv venv
 ```
 
 `preflight.py` → JSON `"ok": true`, `"cuda_available": true`. `check_cuda_torch.py` → `"cuda": true` and GPU name.
+
+Nav preflight (when Config #3 **csgobot_nav_enabled** is on):
+
+```powershell
+.\venv\Scripts\python tools\nav_preflight.py
+set CSGOBOT_NAV_PACK=auto
+.\venv\Scripts\python tools\nav_preflight.py
+```
+
+Expected auto: `"ok": true`, `"packs_ok": ["dust2_dm", "mirage_dm"]`. Panel startup log shows `csgobot nav: auto preflight ok (dust2_dm v1.2.0, mirage_dm v1.0.0)`.
+
+**Mirage soak (PR-N6):** 30+ min Mirage DM with `csgobot_nav_pack=auto` — log `nav: auto pack mirage_dm` and `nav_metrics` every 30s (`pose_valid_pct` ≥ 80%). See `docs/NAV_IMPLEMENTATION.md`.
+
+**Fleet nav metrics (PR-N7):** Panel → **Nav Fleet** tab or `python scripts\nav_fleet_report.py`. JSONL: `data\logs\nav_metrics.jsonl`.
+
+**Multi-PC fleet (PR-N8):** Copy each PC's `nav_metrics.jsonl` to `data\fleet_inbox\`. Panel → **Import fleet inbox** or `python scripts\nav_fleet_import.py`. Tune goals: **Nav Packs** tab → Save override → `data\nav_packs\`.
+
+**HTTP fleet push (PR-N9):** Master PC → **Nav Fleet** → **Start collector**. Farm PC → Config #3 `nav_fleet_push_url=http://<master>:8765/api/v1/nav_metrics`. Visual goal editor: **Nav Packs** → click radar map.
+
+See `docs/NAV_IMPLEMENTATION.md`.
 
 ## 5. YOLO weights (~52 MB, not the dataset)
 
@@ -113,6 +134,7 @@ cs2_ok
 in_menu
 in_dm
 combat_ai_started (auto_activate)
+csgobot: nav pack dust2_dm v1.2.0 goals=['mid', 'bombsite_a']
 farming
 level_up
 drop_picked
@@ -138,6 +160,8 @@ Must **not** appear: `loot_failed`, `session_failed`, long idle on main menu whe
 | Misses on running enemies | `CSGOBOT_LEAD_MS=100`; `CSGOBOT_BODY_FALLBACK_MS=200`; `CSGOBOT_AIM_DEBUG=1` |
 | No detect at long range | PR-6f: ROI zoom + conf 0.50; `CSGOBOT_DETECT_DEBUG=1`; try `CSGOBOT_CONFIDENCE=0.45` |
 | Bot farms with pistol/SMG | PR autobuy: `git pull`; restart CS2; log `autobuy: startup burst` / `autobuy: respawn stagger` |
+| Bot walks into walls / no nav | Config #3 `csgobot_nav_enabled`; run `tools\nav_preflight.py`; check `nav: preflight ok` in stderr log |
+| `nav: preflight failed` | Missing `resources/nav/` — `git pull`; macro patrol still runs |
 | Slow single-tap fire | PR-6d default `hold`; or `CSGOBOT_SHOOT_MODE=burst` + `BURST_SIZE=5` |
 | `WARN: PyTorch CPU-only` | Install torch+cu124 in csgobot venv; optional **csgobot_require_cuda** in Config #3 |
 | False `csgobot: finished ok` after 1s | Fixed — should show `early exit` + stderr tail |

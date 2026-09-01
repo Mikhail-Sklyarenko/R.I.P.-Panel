@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -13,6 +14,7 @@ WEIGHTS = ROOT / "yolov8" / "cs2_yolov8m_640_augmented_v4.pt"
 def run_checks() -> dict[str, object]:
     warnings: list[str] = []
     errors: list[str] = []
+    nav: dict[str, object] | None = None
 
     if not WEIGHTS.is_file():
         errors.append(f"weights missing: {WEIGHTS.name}")
@@ -41,7 +43,27 @@ def run_checks() -> dict[str, object]:
     except Exception as exc:
         errors.append(f"torch/ultralytics import failed: {exc}")
 
-    return {
+    nav_enabled = os.environ.get("CSGOBOT_NAV", "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+        "on",
+    )
+    if nav_enabled:
+        try:
+            from nav.preflight import run_nav_preflight
+
+            pack_id = os.environ.get("CSGOBOT_NAV_PACK", "auto").strip() or "auto"
+            cal_path = os.environ.get("CSGOBOT_NAV_CALIBRATION", "").strip()
+            nav = run_nav_preflight(pack_id=pack_id, calibration_path=cal_path)
+            for msg in nav.get("warnings", []):
+                warnings.append(f"nav: {msg}")
+            for msg in nav.get("errors", []):
+                errors.append(f"nav: {msg}")
+        except Exception as exc:
+            errors.append(f"nav preflight failed: {exc}")
+
+    result: dict[str, object] = {
         "ok": not errors,
         "warnings": warnings,
         "errors": errors,
@@ -49,6 +71,10 @@ def run_checks() -> dict[str, object]:
         "device_name": device_name,
         "torch_version": torch_version,
     }
+    if nav is not None:
+        result["nav"] = nav
+    result["ok"] = not errors
+    return result
 
 
 def main() -> int:

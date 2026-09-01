@@ -7,7 +7,13 @@ from typing import Any
 
 import yaml
 
-from config.paths import ensure_fsm_import_dirs, get_config_path, get_data_dir
+from config.paths import (
+    ensure_fsm_import_dirs,
+    get_config_path,
+    get_data_dir,
+    get_fleet_inbox_dir,
+    get_nav_packs_override_dir,
+)
 from config.schema import AppConfig
 
 
@@ -15,6 +21,8 @@ def _ensure_data_dir() -> Path:
     data_dir = get_data_dir()
     data_dir.mkdir(parents=True, exist_ok=True)
     ensure_fsm_import_dirs()
+    get_fleet_inbox_dir().mkdir(parents=True, exist_ok=True)
+    get_nav_packs_override_dir().mkdir(parents=True, exist_ok=True)
     return data_dir
 
 

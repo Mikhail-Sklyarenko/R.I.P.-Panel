@@ -1,0 +1,20 @@
+{
+  "fixture_only": true,
+  "never_train": true,
+  "resolution": [1280, 720],
+  "labels": {
+    "dust2_t_spawn.jpg": {
+      "zone": "t_spawn",
+      "expect_pose_valid": true
+    },
+    "dust2_mid.jpg": {
+      "zone": "mid",
+      "expect_pose_valid": true,
+      "expect_near_center": true
+    },
+    "dust2_long.jpg": {
+      "zone": "long",
+      "expect_pose_valid": true
+    }
+  }
+}

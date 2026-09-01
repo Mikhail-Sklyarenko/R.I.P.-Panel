@@ -1,0 +1,20 @@
+{
+  "generated_at": "2026-08-28T14:00:00+00:00",
+  "status": "ready_for_train_pc",
+  "bootstrap_complete": true,
+  "bootstrap_images": 5473,
+  "hard_negatives_images": 1670,
+  "our_cs2": "empty scaffold only",
+  "quarantine": {
+    "our_cs2_BAD": 482,
+    "captures_soft_positive": 482,
+    "note": "manifests in dataset_export/quarantine/*.json — never train"
+  },
+  "hn_sources": [
+    "hard_negatives.rar archive (~1114)",
+    "captures empty labels (555)",
+    "deduped on content hash"
+  ],
+  "train_use": "product_v1_bootstrap (full, on Mac repo) + sources/hard_negatives",
+  "note": "Aggressive tiny-box train filter was NOT applied — would remove too many legitimate small player boxes. Texture fix relies on expanded HN + no poison merge."
+}

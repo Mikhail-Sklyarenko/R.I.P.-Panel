@@ -19,6 +19,7 @@ from config import (
     TeamDetectConfig,
     MapDetectConfig,
     LookConfig,
+    NavConfig,
     Team,
     PreviewConfig,
     HotkeyConfig,
@@ -185,6 +186,15 @@ PREVIEW_HEIGHT = 360
 # Env: CSGOBOT_AUTO_CAPTURE=1  (see docs/AUTO_CAPTURE.md)
 AUTO_CAPTURE = False
 
+# Minimap navigation (PR-N0/N1) — pose read + log; movement in PR-N2
+NAV_ENABLED = False
+NAV_READ_ONLY = False
+NAV_PACK = "auto"
+NAV_DEBUG = False
+NAV_DEBUG_INTERVAL_SEC = 2.0
+NAV_POSE_LOST_FALLBACK_SEC = 2.5
+NAV_METRICS_INTERVAL_SEC = 30.0
+
 
 # ===========================
 # DON'T TOUCH BELOW THIS LINE
@@ -246,6 +256,7 @@ def create_config() -> AppConfig:
         resolve_x360,
     )
     from look.config_resolve import resolve_look_config
+    from nav.config_resolve import resolve_nav_config
 
     x360 = resolve_x360(X360)
     smoothing = resolve_smoothing(SMOOTHING)
@@ -351,6 +362,18 @@ def create_config() -> AppConfig:
         move_interval_sec=MOVE_INTERVAL_SEC,
         dead_zone=aim_high,
         one_shot=ONE_SHOT,
+    )
+
+    nav_config = resolve_nav_config(
+        NavConfig(
+            enabled=NAV_ENABLED,
+            read_only=NAV_READ_ONLY,
+            debug=NAV_DEBUG,
+            pack_id=NAV_PACK,
+            debug_log_interval_sec=NAV_DEBUG_INTERVAL_SEC,
+            pose_lost_fallback_sec=NAV_POSE_LOST_FALLBACK_SEC,
+            metrics_log_interval_sec=NAV_METRICS_INTERVAL_SEC,
+        )
     )
 
     look_config = resolve_look_config(
@@ -499,6 +522,7 @@ def create_config() -> AppConfig:
         map_detect=map_detect_config,
         autobuy=autobuy_config,
         look=look_config,
+        nav=nav_config,
         preview=preview_config,
         hotkeys=hotkey_config,
         auto_capture=auto_capture_config,
@@ -655,6 +679,30 @@ def main() -> int:
             config.map_detect.enabled = False
     else:
         logger.info("Map detect: disabled (CSGOBOT_AUTO_MAP=0 or CSGOBOT_PATROL_SCRIPT)")
+    if config.nav.enabled:
+        from nav.paths import resolve_calibration_path, resolve_nav_pack_path
+
+        try:
+            cal_path = resolve_calibration_path(config.nav.calibration_path)
+            pack_path = resolve_nav_pack_path(config.nav.pack_id)
+            from nav.preflight import run_nav_preflight
+
+            pf = run_nav_preflight(
+                pack_id=config.nav.pack_id,
+                calibration_path=config.nav.calibration_path,
+            )
+            logger.info(
+                "Nav: enabled read_only=%s pack=%s v%s strategy=%s goals=%s",
+                config.nav.read_only,
+                pf.get("pack_id"),
+                pf.get("pack_version"),
+                pf.get("strategy"),
+                pf.get("goals"),
+            )
+        except Exception as exc:
+            logger.warning("Nav: enabled but preflight failed (%s)", exc)
+    else:
+        logger.info("Nav: disabled (CSGOBOT_NAV=1 to enable pose reader)")
     logger.info(
         "Look: enabled=%s yaw=%.0f-%.0f° idle=%.0f-%.0fs sweep=%.2f-%.2fs",
         config.look.enabled,

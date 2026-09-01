@@ -1,0 +1,28 @@
+# Minimap HUD calibration @ 1280x720 — ArmoryFarm (offline calibrate_nav.py on farm PC)
+meta:
+  profile: armoryfarm_1280x720
+  resolution: [1280, 720]
+  calibrated_at: "2026-09-01"
+  source: offline_calibrate_nav
+
+minimap:
+  rect:
+    x: 16
+    y: 17
+    w: 166
+    h: 166
+  shape: circle
+  center: { x: 99, y: 100 }
+  radius_px: 83
+  player_icon:
+    mode: color_blob
+    rgb_min: [0, 170, 170]
+    rgb_max: [160, 255, 255]
+    min_area_px: 5
+    max_area_px: 90
+    prefer_center_px: 18
+
+pose:
+  smooth_alpha: 0.35
+  lost_timeout_sec: 0.8
+  min_confidence: 0.35

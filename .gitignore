@@ -14,6 +14,7 @@ vendor/csgobot/venv/
 vendor/csgobot/**/*.pt
 # Farm auto-captures (collector PCs only — never commit)
 vendor/csgobot/data/captures/
+data/nav_calibration_work/
 
 # Product / HF datasets (TRAIN machine only — never commit binaries)
 vendor/csgobot/yolov8/datasets/hf_raw/

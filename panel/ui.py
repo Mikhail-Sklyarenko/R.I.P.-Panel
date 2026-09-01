@@ -9,6 +9,7 @@ import customtkinter as ctk
 from config.schema import BotMode
 from panel.controller import PanelController
 from panel.icon import apply_window_icon
+from panel.nav_radar_editor import NavRadarEditor
 from panel.path_picker import path_picker_available, truncate_path
 
 
@@ -109,8 +110,15 @@ class PanelView:
         self._main_log = ctk.CTkTextbox(frame, state="disabled")
         self._main_log.grid(row=1, column=0, sticky="nsew", padx=8, pady=4)
 
+        ctk.CTkLabel(
+            frame, text="Nav fleet (24h)", font=ctk.CTkFont(weight="bold")
+        ).grid(row=2, column=0, sticky="w", padx=8, pady=(8, 4))
+        self._nav_metrics_log = ctk.CTkTextbox(frame, height=120, state="disabled")
+        self._nav_metrics_log.grid(row=3, column=0, sticky="nsew", padx=8, pady=4)
+        frame.grid_rowconfigure(3, weight=1)
+
         header = ctk.CTkFrame(frame, fg_color="transparent")
-        header.grid(row=2, column=0, sticky="ew", padx=8, pady=(8, 0))
+        header.grid(row=4, column=0, sticky="ew", padx=8, pady=(8, 0))
         ctk.CTkLabel(
             header, text="Accounts", font=ctk.CTkFont(weight="bold")
         ).pack(side="left")
@@ -206,10 +214,14 @@ class PanelView:
         tabs.add("Config #1")
         tabs.add("Config #2")
         tabs.add("Config #3")
+        tabs.add("Nav Fleet")
+        tabs.add("Nav Packs")
         self._build_config1(tabs.tab("Config #1"))
         self._config2_frame = tabs.tab("Config #2")
         self._build_config2(self._config2_frame)
         self._build_config3(tabs.tab("Config #3"))
+        self._build_nav_fleet(tabs.tab("Nav Fleet"))
+        self._build_nav_packs(tabs.tab("Nav Packs"))
         return row + 1
 
     def _build_config1(self, parent: ctk.CTkFrame) -> None:
@@ -349,11 +361,231 @@ class PanelView:
             "csgobot_require_cuda",
             getattr(cfg, "csgobot_require_cuda", False),
         )
+        self._add_switch(
+            parent,
+            "csgobot_nav_enabled",
+            getattr(cfg, "csgobot_nav_enabled", True),
+        )
+        self._add_entry(
+            parent,
+            "csgobot_nav_pack",
+            getattr(cfg, "csgobot_nav_pack", "auto"),
+        )
+        self._add_entry(
+            parent,
+            "nav_fleet_push_url",
+            getattr(cfg, "nav_fleet_push_url", ""),
+        )
+        self._add_entry(
+            parent,
+            "nav_fleet_collector_port",
+            str(getattr(cfg, "nav_fleet_collector_port", 8765)),
+        )
+        self._add_entry(
+            parent,
+            "nav_fleet_collector_token",
+            getattr(cfg, "nav_fleet_collector_token", ""),
+            show="*",
+        )
         ctk.CTkButton(
             parent,
             text="Save Config #3",
             command=self._save_config3,
         ).pack(fill="x", padx=8, pady=8)
+
+    def _build_nav_fleet(self, parent: ctk.CTkFrame) -> None:
+        ctk.CTkLabel(
+            parent,
+            text="Fleet nav metrics (data/logs/nav_metrics.jsonl)",
+            font=ctk.CTkFont(weight="bold"),
+        ).pack(anchor="w", padx=8, pady=(8, 4))
+        self._nav_metrics_log = ctk.CTkTextbox(parent, height=240, state="disabled")
+        self._nav_metrics_log.pack(fill="both", expand=True, padx=8, pady=4)
+        collector_row = ctk.CTkFrame(parent, fg_color="transparent")
+        collector_row.pack(fill="x", padx=8, pady=(0, 4))
+        ctk.CTkButton(
+            collector_row,
+            text="Start collector (master)",
+            command=self._start_nav_collector,
+        ).pack(side="left", expand=True, fill="x", padx=(0, 4))
+        ctk.CTkButton(
+            collector_row,
+            text="Stop collector",
+            command=self.ctrl.stop_nav_fleet_collector,
+        ).pack(side="left", expand=True, fill="x", padx=(4, 0))
+        ctk.CTkButton(
+            parent,
+            text="Refresh now",
+            command=self.ctrl.refresh_nav_metrics_dashboard,
+        ).pack(fill="x", padx=8, pady=(0, 4))
+        ctk.CTkButton(
+            parent,
+            text="Import fleet inbox",
+            command=self.ctrl.import_fleet_inbox_metrics,
+        ).pack(fill="x", padx=8, pady=(0, 8))
+        self.ctrl.bind_nav_metrics_widget(self._nav_metrics_log)
+
+    def _build_nav_packs(self, parent: ctk.CTkFrame) -> None:
+        ctk.CTkLabel(
+            parent,
+            text="Nav pack editor (saves to data/nav_packs/)",
+            font=ctk.CTkFont(weight="bold"),
+        ).pack(anchor="w", padx=8, pady=(8, 4))
+
+        body = ctk.CTkFrame(parent, fg_color="transparent")
+        body.pack(fill="both", expand=True, padx=4, pady=4)
+        left = ctk.CTkFrame(body, fg_color="transparent")
+        left.pack(side="left", fill="both", expand=True, padx=(0, 8))
+        right = ctk.CTkFrame(body, fg_color="transparent")
+        right.pack(side="right", anchor="n")
+
+        pack_ids = self.ctrl.list_nav_pack_ids() or ["dust2_dm"]
+        self._vars["nav_pack_id"] = ctk.StringVar(value=pack_ids[0])
+        ctk.CTkLabel(left, text="pack_id").pack(anchor="w", padx=8)
+        pack_menu = ctk.CTkOptionMenu(
+            left,
+            values=pack_ids,
+            variable=self._vars["nav_pack_id"],
+            command=self._on_nav_pack_selected,
+        )
+        pack_menu.pack(fill="x", padx=8, pady=2)
+
+        self._nav_pack_info = ctk.CTkLabel(left, text="", anchor="w", justify="left")
+        self._nav_pack_info.pack(fill="x", padx=8, pady=4)
+
+        fields = [
+            ("goal_x", "0.52"),
+            ("goal_y", "0.48"),
+            ("goal_arrive_radius", "0.06"),
+            ("goal2_x", "0.80"),
+            ("goal2_y", "0.16"),
+            ("goal2_arrive_radius", "0.06"),
+            ("dwell_at_goal_sec", "35"),
+            ("direct_goal_dist", "0.12"),
+        ]
+        for key, default in fields:
+            self._add_entry(left, key, default)
+
+        btn_row = ctk.CTkFrame(left, fg_color="transparent")
+        btn_row.pack(fill="x", padx=8, pady=8)
+        ctk.CTkButton(btn_row, text="Load", command=lambda: self._load_nav_pack_editor()).pack(
+            side="left", expand=True, fill="x", padx=(0, 4)
+        )
+        ctk.CTkButton(btn_row, text="Save override", command=self._save_nav_pack).pack(
+            side="left", expand=True, fill="x", padx=4
+        )
+        ctk.CTkButton(btn_row, text="Reset", command=self._reset_nav_pack).pack(
+            side="left", expand=True, fill="x", padx=(4, 0)
+        )
+        ctk.CTkButton(
+            left,
+            text="Validate preflight",
+            command=self._validate_nav_pack,
+        ).pack(fill="x", padx=8, pady=(0, 8))
+
+        self._nav_radar = NavRadarEditor(
+            right,
+            display_size=300,
+            on_coords_changed=self._on_nav_radar_click,
+        )
+        self._nav_radar.pack(padx=4, pady=4)
+
+        for key in ("goal_x", "goal_y", "goal2_x", "goal2_y"):
+            self._vars[key].trace_add("write", lambda *_a: self._refresh_nav_radar())
+
+        self._load_nav_pack_editor(pack_ids[0])
+
+    def _start_nav_collector(self) -> None:
+        self.ctrl.start_nav_fleet_collector()
+        self.ctrl.refresh_nav_metrics_dashboard()
+
+    def _on_nav_radar_click(self, target: str, x: float, y: float) -> None:
+        if target == "goal1":
+            self._vars["goal_x"].set(str(x))
+            self._vars["goal_y"].set(str(y))
+        else:
+            self._vars["goal2_x"].set(str(x))
+            self._vars["goal2_y"].set(str(y))
+        self._refresh_nav_radar()
+
+    def _refresh_nav_radar(self) -> None:
+        if not hasattr(self, "_nav_radar"):
+            return
+        pid_var = self._vars.get("nav_pack_id")
+        if pid_var is None:
+            return
+        try:
+            self._nav_radar.set_pack(
+                pid_var.get().strip(),
+                goal_x=float(self._vars["goal_x"].get()),
+                goal_y=float(self._vars["goal_y"].get()),
+                goal2_x=float(self._vars["goal2_x"].get()),
+                goal2_y=float(self._vars["goal2_y"].get()),
+            )
+        except (ValueError, TypeError):
+            return
+
+    def _on_nav_pack_selected(self, pack_id: str) -> None:
+        self._load_nav_pack_editor(pack_id)
+
+    def _load_nav_pack_editor(self, pack_id: str | None = None) -> None:
+        pid = (pack_id or self._vars.get("nav_pack_id", ctk.StringVar(value="dust2_dm")).get()).strip()
+        try:
+            view = self.ctrl.load_nav_pack_editor(pid)
+        except Exception as exc:
+            self.ctrl.append_log(f"nav pack: load failed — {exc}")
+            return
+        self._vars["goal_x"].set(str(view.goal_x))
+        self._vars["goal_y"].set(str(view.goal_y))
+        self._vars["goal_arrive_radius"].set(str(view.goal_arrive_radius))
+        self._vars["goal2_x"].set(str(view.goal2_x))
+        self._vars["goal2_y"].set(str(view.goal2_y))
+        self._vars["goal2_arrive_radius"].set(str(view.goal2_arrive_radius))
+        self._vars["dwell_at_goal_sec"].set(str(view.dwell_at_goal_sec))
+        self._vars["direct_goal_dist"].set(str(view.direct_goal_dist))
+        self._nav_pack_info.configure(
+            text=(
+                f"{view.pack_id} v{view.version} ({view.source})\n"
+                f"map={view.map_id} strategy={view.strategy}\n"
+                f"goals: {view.goal_id}"
+                + (f", {view.goal2_id}" if view.goal2_id else "")
+            )
+        )
+        if hasattr(self, "_nav_radar"):
+            self._nav_radar.set_pack(
+                pid,
+                goal_x=view.goal_x,
+                goal_y=view.goal_y,
+                goal2_x=view.goal2_x,
+                goal2_y=view.goal2_y,
+            )
+
+    def _save_nav_pack(self) -> None:
+        pid = self._vars["nav_pack_id"].get().strip()
+        try:
+            self.ctrl.save_nav_pack_override(
+                pid,
+                goal_x=float(self._vars["goal_x"].get()),
+                goal_y=float(self._vars["goal_y"].get()),
+                goal_arrive_radius=float(self._vars["goal_arrive_radius"].get()),
+                goal2_x=float(self._vars["goal2_x"].get()),
+                goal2_y=float(self._vars["goal2_y"].get()),
+                goal2_arrive_radius=float(self._vars["goal2_arrive_radius"].get()),
+                dwell_at_goal_sec=float(self._vars["dwell_at_goal_sec"].get()),
+                direct_goal_dist=float(self._vars["direct_goal_dist"].get()),
+            )
+            self._load_nav_pack_editor(pid)
+        except (ValueError, TypeError) as exc:
+            self.ctrl.append_log(f"nav pack: invalid values — {exc}")
+
+    def _reset_nav_pack(self) -> None:
+        pid = self._vars["nav_pack_id"].get().strip()
+        self.ctrl.reset_nav_pack_override(pid)
+        self._load_nav_pack_editor(pid)
+
+    def _validate_nav_pack(self) -> None:
+        pid = self._vars["nav_pack_id"].get().strip()
+        self.ctrl.validate_nav_pack(pid)
 
     def _add_entry(
         self,
@@ -484,6 +716,18 @@ class PanelView:
                 "csgobot_require_cuda": bool(
                     self._vars["csgobot_require_cuda"].get()
                 ),
+                "csgobot_nav_enabled": bool(
+                    self._vars["csgobot_nav_enabled"].get()
+                ),
+                "csgobot_nav_pack": self._vars["csgobot_nav_pack"].get().strip()
+                or "dust2_dm",
+                "nav_fleet_push_url": self._vars["nav_fleet_push_url"].get().strip(),
+                "nav_fleet_collector_port": int(
+                    self._vars["nav_fleet_collector_port"].get() or "8765"
+                ),
+                "nav_fleet_collector_token": self._vars[
+                    "nav_fleet_collector_token"
+                ].get().strip(),
             }
         )
 

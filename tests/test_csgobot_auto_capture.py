@@ -9,7 +9,7 @@ import numpy as np
 
 _CSGOBOT = Path(__file__).resolve().parents[1] / "vendor" / "csgobot"
 if str(_CSGOBOT) not in sys.path:
-    sys.path.insert(0, str(_CSGOBOT))
+    sys.path.append( str(_CSGOBOT))
 
 from dataset_capture.config import resolve_auto_capture_config  # noqa: E402
 from dataset_capture.controller import (  # noqa: E402

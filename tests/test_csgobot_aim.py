@@ -7,7 +7,7 @@ from pathlib import Path
 
 _CSGOBOT = Path(__file__).resolve().parents[1] / "vendor" / "csgobot"
 if str(_CSGOBOT) not in sys.path:
-    sys.path.insert(0, str(_CSGOBOT))
+    sys.path.append( str(_CSGOBOT))
 
 from aim_tuning import (  # noqa: E402
     aim_debug_enabled,

@@ -1,0 +1,8 @@
+{
+  "pack_version": "1.4.0",
+  "calibration_profile": "armoryfarm_1280x720",
+  "maps": ["de_dust2", "de_mirage", "generic_dm"],
+  "packs": ["dust2_dm", "mirage_dm", "generic_dm"],
+  "never_train": true,
+  "note": "Nav assets are config/reference only — not a YOLO dataset"
+}

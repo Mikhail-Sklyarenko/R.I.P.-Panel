@@ -183,6 +183,28 @@ class AppConfig(BaseModel):
         default=False,
         description="Блокировать AI если PyTorch без CUDA (farm GPU only)",
     )
+    csgobot_nav_enabled: bool = Field(
+        default=True,
+        description="Minimap Navigator в csgobot (CSGOBOT_NAV=1, auto pack по карте)",
+    )
+    csgobot_nav_pack: str = Field(
+        default="auto",
+        description="Nav pack id or auto (map_detect picks dust2_dm / mirage_dm)",
+    )
+    nav_fleet_collector_port: int = Field(
+        default=8765,
+        ge=1024,
+        le=65535,
+        description="HTTP port for central nav fleet collector (master PC)",
+    )
+    nav_fleet_collector_token: str = Field(
+        default="",
+        description="Bearer token for fleet collector + push auth (empty = no auth)",
+    )
+    nav_fleet_push_url: str = Field(
+        default="",
+        description="Farm PC: POST nav metrics to master collector URL",
+    )
     combat_simple_minutes: int = Field(
         default=10, ge=1, description="Длительность simple-бота (мин)"
     )

@@ -21,6 +21,8 @@ def _csgobot_run_module():
     inserted = str(_CSGOBOT)
     saved_config = sys.modules.get("config")
     saved_run = sys.modules.pop("run", None)
+    if inserted in sys.path:
+        sys.path.remove(inserted)
     sys.path.insert(0, inserted)
     try:
         sys.modules.pop("config", None)
@@ -73,6 +75,11 @@ def _patch_start_ai_deps(monkeypatch, csgobot_ai) -> None:
         csgobot_ai,
         "check_csgobot_preflight",
         lambda: (True, []),
+    )
+    monkeypatch.setattr(
+        csgobot_ai,
+        "check_nav_preflight",
+        lambda pack_id="dust2_dm": (True, {"pack_version": "1.2.0", "goals": ["mid"]}),
     )
     monkeypatch.setattr(
         csgobot_ai,

@@ -84,6 +84,18 @@ def get_events_log_path() -> Path:
     return get_logs_dir() / "events.jsonl"
 
 
+def get_nav_metrics_log_path() -> Path:
+    return get_logs_dir() / "nav_metrics.jsonl"
+
+
+def get_fleet_inbox_dir() -> Path:
+    return get_data_dir() / "fleet_inbox"
+
+
+def get_nav_packs_override_dir() -> Path:
+    return get_data_dir() / "nav_packs"
+
+
 def get_artifacts_dir(session_id: str) -> Path:
     return get_data_dir() / "artifacts" / session_id
 

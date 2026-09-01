@@ -1,0 +1,77 @@
+meta:
+  pack_id: dust2_dm
+  map_id: de_dust2
+  mode: deathmatch
+  version: "1.2.0"
+
+strategy: route_cycle
+
+goal:
+  id: mid
+  x: 0.52
+  y: 0.48
+  arrive_radius: 0.06
+
+goals:
+  - id: mid
+    x: 0.52
+    y: 0.48
+    arrive_radius: 0.06
+  - id: bombsite_a
+    x: 0.80
+    y: 0.16
+    arrive_radius: 0.06
+
+routing:
+  mode: cycle
+  dwell_at_goal_sec: 35.0
+  direct_goal_dist: 0.12
+
+entries:
+  - id: t_lower
+    x: 0.39
+    y: 0.78
+    arrive_radius: 0.05
+    team: any
+  - id: long_doors
+    x: 0.25
+    y: 0.58
+    arrive_radius: 0.05
+    team: any
+  - id: catwalk
+    x: 0.48
+    y: 0.32
+    arrive_radius: 0.05
+    team: any
+
+at_goal:
+  mode: wander
+  radius: 0.08
+  wander_sec_min: 1.5
+  wander_sec_max: 4.0
+
+humanize:
+  speed_jitter: 0.12
+  micro_pause_chance: 0.03
+  micro_pause_sec_min: 0.1
+  micro_pause_sec_max: 0.35
+  turn_rate_deg_per_sec: 90.0
+  path_wobble_deg: 4.0
+  forward_max_yaw_deg: 22.0
+  turn_smooth_alpha: 0.42
+  wobble_refresh_sec: 0.85
+  forward_jitter_chance: 0.04
+  forward_jitter_sec_min: 0.05
+  forward_jitter_sec_max: 0.14
+  look_yield_turn: true
+
+fallback:
+  macro_script: generic_dm
+  macro_sec: 60.0
+  retry_nav_after_macro: true
+
+stuck:
+  progress_timeout_sec: 3.0
+  min_progress_norm: 0.008
+  escape_duration_sec: 0.45
+  escape_angles_deg: [30, -30, 60, -60, 90, -90]

@@ -9,7 +9,7 @@ import pytest
 
 _CSGOBOT = Path(__file__).resolve().parents[1] / "vendor" / "csgobot"
 if str(_CSGOBOT) not in sys.path:
-    sys.path.insert(0, str(_CSGOBOT))
+    sys.path.append( str(_CSGOBOT))
 
 from config import AutoBuyConfig  # noqa: E402
 from controls.autobuy import (  # noqa: E402

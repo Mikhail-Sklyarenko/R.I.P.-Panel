@@ -11,7 +11,7 @@ from PIL import Image
 
 _CSGOBOT = Path(__file__).resolve().parents[1] / "vendor" / "csgobot"
 if str(_CSGOBOT) not in sys.path:
-    sys.path.insert(0, str(_CSGOBOT))
+    sys.path.append( str(_CSGOBOT))
 
 from config import TeamDetectConfig  # noqa: E402
 from aim_tuning import resolve_auto_team_enabled  # noqa: E402

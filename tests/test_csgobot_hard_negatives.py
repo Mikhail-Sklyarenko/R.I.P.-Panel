@@ -14,7 +14,7 @@ _DATASETS = (
     / "datasets"
 )
 if str(_DATASETS) not in sys.path:
-    sys.path.insert(0, str(_DATASETS))
+    sys.path.append( str(_DATASETS))
 
 from promote_hard_negatives import is_hard_neg  # noqa: E402
 

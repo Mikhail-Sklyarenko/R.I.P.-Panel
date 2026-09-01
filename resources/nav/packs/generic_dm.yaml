@@ -1,0 +1,58 @@
+meta:
+  pack_id: generic_dm
+  map_id: generic_dm
+  mode: deathmatch
+  version: "1.0.0"
+
+strategy: single_goal
+
+goal:
+  id: mid
+  x: 0.50
+  y: 0.50
+  arrive_radius: 0.08
+
+goals:
+  - id: mid
+    x: 0.50
+    y: 0.50
+    arrive_radius: 0.08
+
+routing:
+  mode: single
+  dwell_at_goal_sec: 30.0
+  direct_goal_dist: 0.15
+
+entries: []
+
+at_goal:
+  mode: wander
+  radius: 0.10
+  wander_sec_min: 1.5
+  wander_sec_max: 4.0
+
+humanize:
+  speed_jitter: 0.12
+  micro_pause_chance: 0.03
+  micro_pause_sec_min: 0.1
+  micro_pause_sec_max: 0.35
+  turn_rate_deg_per_sec: 90.0
+  path_wobble_deg: 4.0
+  forward_max_yaw_deg: 22.0
+  turn_smooth_alpha: 0.42
+  wobble_refresh_sec: 0.85
+  forward_jitter_chance: 0.04
+  forward_jitter_sec_min: 0.05
+  forward_jitter_sec_max: 0.14
+  look_yield_turn: true
+
+fallback:
+  macro_script: generic_dm
+  macro_sec: 60.0
+  retry_nav_after_macro: true
+
+stuck:
+  progress_timeout_sec: 3.0
+  min_progress_norm: 0.008
+  escape_duration_sec: 0.45
+  escape_angles_deg: [30, -30, 60, -60, 90, -90]

@@ -7,12 +7,11 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from config.schema import AppConfig, BotMode
 from core.events import EventType
-from core.startup_checks import collect_startup_warnings
 
 
 def test_start_ai_passes_cs2_sensitivity_env(monkeypatch) -> None:
+    from config.schema import AppConfig, BotMode
     from modules.combat import csgobot_ai
 
     monkeypatch.setattr("sys.platform", "win32")
@@ -31,6 +30,11 @@ def test_start_ai_passes_cs2_sensitivity_env(monkeypatch) -> None:
         csgobot_ai,
         "check_csgobot_preflight",
         lambda: (True, []),
+    )
+    monkeypatch.setattr(
+        csgobot_ai,
+        "check_nav_preflight",
+        lambda pack_id="dust2_dm": (True, {"pack_version": "1.2.0", "goals": ["mid"]}),
     )
     monkeypatch.setattr(
         csgobot_ai,
@@ -74,6 +78,10 @@ def test_start_ai_passes_cs2_sensitivity_env(monkeypatch) -> None:
 
 @patch("shutil.which", return_value="/usr/bin/node")
 @patch("modules.combat.csgobot_ai.check_cuda_torch", return_value=(False, {"install_hint": "pip cuda"}))
+@patch(
+    "modules.combat.csgobot_ai.check_nav_preflight",
+    return_value=(True, {"pack_version": "1.2.0", "goals": ["mid"]}),
+)
 @patch("modules.combat.csgobot_ai.check_csgobot_preflight", return_value=(True, []))
 @patch("modules.combat.csgobot_ai.check_obs_virtual_camera", return_value=(True, ""))
 @patch("modules.combat.csgobot_ai.is_installed", return_value=True)
@@ -83,11 +91,15 @@ def test_startup_warns_cpu_torch(
     _installed: object,
     _obs: object,
     _preflight: object,
+    _nav: object,
     _cuda: object,
     _which: object,
     tmp_path,
     monkeypatch,
 ) -> None:
+    from config.schema import AppConfig
+    from core.startup_checks import collect_startup_warnings
+
     monkeypatch.setenv("FARM_PANEL_DATA_DIR", str(tmp_path))
     monkeypatch.setattr("sys.platform", "win32")
     cfg = AppConfig(
@@ -100,6 +112,7 @@ def test_startup_warns_cpu_torch(
 
 
 def test_start_ai_require_cuda_blocks(monkeypatch) -> None:
+    from config.schema import AppConfig, BotMode
     from modules.combat import csgobot_ai
 
     monkeypatch.setattr("sys.platform", "win32")

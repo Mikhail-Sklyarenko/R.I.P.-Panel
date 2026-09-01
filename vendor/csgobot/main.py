@@ -424,6 +424,14 @@ def detection_process(
     map_templates: tuple = ()
     map_detect_state: Optional[MapDetectState] = None
     last_map_debug_log = 0.0
+    last_nav_debug_log = 0.0
+    last_nav_metrics_at = 0.0
+    nav_reader = None
+    nav_pose_filter = None
+    nav_pack = None
+    active_nav_pack_id = ""
+    nav_controller = None
+    nav_metrics = None
     patrol_key_down = None
     patrol_key_up = None
     patrol_press = None
@@ -515,6 +523,97 @@ def detection_process(
             logger.error(f"patrol: failed to load ({e}); disabled")
             config.patrol.enabled = False
 
+    if config.nav.enabled:
+        try:
+            from nav.pack_resolve import resolve_initial_nav_pack_id
+            from nav.preflight import run_nav_preflight
+            from nav.paths import resolve_calibration_path, resolve_nav_pack_path
+
+            active_nav_pack_id = resolve_initial_nav_pack_id(
+                explicit_pack=config.nav.pack_id,
+                patrol_script=config.patrol.script_name,
+            )
+            pf = run_nav_preflight(
+                pack_id=config.nav.pack_id,
+                calibration_path=config.nav.calibration_path,
+            )
+            for warn in pf.get("warnings", []):
+                logger.warning("nav: preflight warn — %s", warn)
+            if not pf.get("ok"):
+                for err in pf.get("errors", []):
+                    logger.error("nav: preflight — %s", err)
+                logger.error("nav: preflight failed; disabled (macro patrol fallback)")
+                config.nav.enabled = False
+            else:
+                cal_path = resolve_calibration_path(config.nav.calibration_path)
+                pack_path = resolve_nav_pack_path(active_nav_pack_id)
+                logger.info(
+                    "nav: preflight ok pack=%s v%s strategy=%s goals=%s",
+                    active_nav_pack_id,
+                    pf.get("pack_version") or pf.get("pack_versions"),
+                    pf.get("strategy"),
+                    pf.get("goals") or pf.get("packs_ok"),
+                )
+        except Exception as exc:
+            logger.error("nav: preflight error (%s); disabled", exc)
+            config.nav.enabled = False
+
+    if config.nav.enabled:
+        try:
+            from nav.calibration import load_calibration
+            from nav.controller import NavController
+            from nav.metrics import NavMetrics
+            from nav.minimap_reader import MinimapReader
+            from nav.pack import load_nav_pack
+            from nav.paths import resolve_calibration_path, resolve_nav_pack_path
+            from nav.pose_filter import PoseFilter
+
+            nav_cal_path = resolve_calibration_path(config.nav.calibration_path)
+            nav_cal = load_calibration(nav_cal_path)
+            nav_pack_path = resolve_nav_pack_path(active_nav_pack_id)
+            nav_pack = load_nav_pack(nav_pack_path)
+            nav_reader = MinimapReader(nav_cal)
+            nav_pose_filter = PoseFilter(nav_cal.pose)
+            if not config.nav.read_only:
+                if patrol_key_down is None or patrol_key_up is None:
+                    raise RuntimeError(
+                        "nav movement requires patrol keys (pydirectinput)"
+                    )
+                nav_controller = NavController(
+                    nav_pack,
+                    fov_mouse,
+                    key_down=patrol_key_down,
+                    key_up=patrol_key_up,
+                    move_relative=mouse.move_relative,
+                    logger=logger,
+                    pose_lost_sec=config.nav.pose_lost_fallback_sec,
+                )
+                nav_metrics = NavMetrics(
+                    log_interval_sec=config.nav.metrics_log_interval_sec,
+                )
+                nav_metrics.set_pack_id(nav_pack.pack_id)
+                goal_ids = ", ".join(g.id for g in nav_pack.goals)
+                entry_ids = ", ".join(e.id for e in nav_pack.entries) or "none"
+                logger.info(
+                    "nav: movement enabled pack=%s strategy=%s goals=[%s] entries=[%s]",
+                    nav_pack.pack_id,
+                    nav_pack.strategy,
+                    goal_ids,
+                    entry_ids,
+                )
+            else:
+                logger.info(
+                    "nav: read_only pose pack=%s map=%s goal=%s (%.2f,%.2f)",
+                    nav_pack.pack_id,
+                    nav_pack.map_id,
+                    nav_pack.goal.id,
+                    nav_pack.goal.x,
+                    nav_pack.goal.y,
+                )
+        except Exception as exc:
+            logger.error("nav: init failed (%s); disabled", exc)
+            config.nav.enabled = False
+
     try:
         while not stop_event.is_set():
             try:
@@ -571,6 +670,42 @@ def detection_process(
                             config.map_detect.confirm_frames,
                             config.map_detect.confirm_frames,
                         )
+                        if (
+                            config.nav.enabled
+                            and nav_controller is not None
+                            and nav_pack is not None
+                        ):
+                            from nav.pack_resolve import nav_pack_for_script
+
+                            new_pack_id = nav_pack_for_script(
+                                map_changed,
+                                config.nav.pack_id,
+                            )
+                            if (
+                                new_pack_id
+                                and new_pack_id != nav_pack.pack_id
+                            ):
+                                from nav.pack import load_nav_pack
+                                from nav.paths import resolve_nav_pack_path
+
+                                new_pack = load_nav_pack(
+                                    resolve_nav_pack_path(new_pack_id)
+                                )
+                                nav_controller.reload_pack(new_pack)
+                                nav_pack = new_pack
+                                active_nav_pack_id = new_pack_id
+                                if nav_metrics is not None:
+                                    nav_metrics = NavMetrics(
+                                        log_interval_sec=config.nav.metrics_log_interval_sec,
+                                    )
+                                    nav_metrics.set_pack_id(new_pack.pack_id)
+                                    nav_metrics.start(now)
+                                logger.info(
+                                    "nav: auto pack %s v%s goals=%s",
+                                    new_pack.pack_id,
+                                    new_pack.version,
+                                    ", ".join(g.id for g in new_pack.goals),
+                                )
                     except Exception as exc:
                         logger.error("map: patrol reload failed (%s)", exc)
                 if map_debug_enabled() and now - last_map_debug_log >= 3.0:
@@ -728,6 +863,24 @@ def detection_process(
                 unstuck_seq is not None and unstuck_seq.is_running
             )
 
+            nav_pose = None
+            if (
+                config.nav.enabled
+                and nav_reader is not None
+                and nav_pose_filter is not None
+                and activated.is_set()
+            ):
+                raw_pose = nav_reader.read(img)
+                nav_pose = nav_pose_filter.update(raw_pose, now=now)
+
+            use_nav_movement = (
+                config.nav.enabled
+                and not config.nav.read_only
+                and nav_controller is not None
+                and activated.is_set()
+            )
+            nav_tick_result = None
+
             if not activated.is_set():
                 if fire_controller.is_holding:
                     fire_action = fire_controller.force_release(now)
@@ -737,8 +890,114 @@ def detection_process(
                     unstuck_seq.abort()
                 if look_controller is not None:
                     look_controller.abort(now=now)
+                if nav_controller is not None:
+                    nav_controller.release_keys()
                 stuck_since = None
                 patrol_mode = PatrolMode.PATROL
+            elif use_nav_movement and nav_pose is not None:
+                prev_mode = patrol_mode
+                patrol_mode = next_mode_after_combat_check(
+                    mode=patrol_mode,
+                    in_combat=in_combat,
+                    now=now,
+                    last_enemy_seen=last_enemy_seen,
+                    combat_clear_sec=config.patrol.combat_clear_sec,
+                )
+                if in_combat:
+                    if nav_controller is not None:
+                        nav_controller.release_keys()
+                    if look_controller is not None:
+                        look_controller.abort(now=now)
+
+                look_hold_movement = (
+                    look_controller is not None
+                    and config.look.pause_movement
+                    and look_controller.is_sweeping
+                )
+                nav_paused = (
+                    in_combat
+                    or patrol_buy_freeze
+                    or look_hold_movement
+                )
+                if nav_paused:
+                    if nav_controller is not None:
+                        nav_controller.release_keys()
+                else:
+                    look_sweeping = (
+                        look_controller is not None
+                        and look_controller.is_sweeping
+                    )
+                    nav_tick_result = nav_controller.tick(
+                        nav_pose,
+                        now=now,
+                        paused=False,
+                        team=current_team_str,
+                        look_sweeping=look_sweeping,
+                    )
+                    if nav_metrics is not None and nav_tick_result is not None:
+                        nav_dt = (
+                            1.0 / 60.0
+                            if last_nav_metrics_at <= 0.0
+                            else min(0.1, max(1.0 / 240.0, now - last_nav_metrics_at))
+                        )
+                        nav_metrics.observe_tick(
+                            nav_tick_result,
+                            nav_pose,
+                            now=now,
+                            dt=nav_dt,
+                            goal_id=nav_tick_result.goal_id,
+                            target_id=nav_tick_result.target_id,
+                        )
+                        nav_metrics.maybe_log(now, logger)
+                        last_nav_metrics_at = now
+                    if nav_tick_result.use_macro_patrol:
+                        if patrol_runner is not None:
+                            if patrol_runner.is_paused:
+                                patrol_runner.resume()
+                            patrol_runner.tick(now)
+                    elif patrol_runner is not None:
+                        patrol_runner.pause()
+
+                if (
+                    config.nav.debug
+                    or config.nav.read_only
+                    or now - last_nav_debug_log >= config.nav.debug_log_interval_sec
+                ):
+                    goal_label = (
+                        nav_tick_result.goal_id
+                        if nav_tick_result is not None and nav_tick_result.goal_id
+                        else (nav_pack.goal.id if nav_pack is not None else "?")
+                    )
+                    target_label = (
+                        nav_tick_result.target_id
+                        if nav_tick_result is not None and nav_tick_result.target_id
+                        else goal_label
+                    )
+                    phase_label = (
+                        nav_tick_result.phase
+                        if nav_tick_result is not None and nav_tick_result.phase
+                        else "?"
+                    )
+                    state_label = (
+                        nav_tick_result.state.value
+                        if nav_tick_result is not None
+                        else "paused"
+                    )
+                    logger.info(
+                        "nav: state=%s phase=%s pose=(%.2f,%.2f) yaw=%.0f conf=%.2f "
+                        "valid=%s dist=%.3f goal=%s target=%s",
+                        state_label,
+                        phase_label,
+                        nav_pose.x_norm,
+                        nav_pose.y_norm,
+                        nav_pose.yaw_deg,
+                        nav_pose.confidence,
+                        nav_pose.valid,
+                        nav_tick_result.dist_to_goal if nav_tick_result else 0.0,
+                        goal_label,
+                        target_label,
+                    )
+                    last_nav_debug_log = now
             elif config.patrol.enabled and patrol_runner is not None:
                 prev_mode = patrol_mode
                 patrol_mode = next_mode_after_combat_check(
@@ -869,7 +1128,14 @@ def detection_process(
                     logger.debug(f"auto_move failed: {e}")
 
             if look_controller is not None:
-                look_patrol_tick = should_patrol_tick(
+                nav_locomotion = (
+                    use_nav_movement
+                    and nav_tick_result is not None
+                    and not nav_tick_result.use_macro_patrol
+                    and not in_combat
+                    and not patrol_buy_freeze
+                )
+                look_patrol_tick = nav_locomotion or should_patrol_tick(
                     patrol_enabled=config.patrol.enabled,
                     activated=activated.is_set(),
                     mode=patrol_mode,
@@ -880,9 +1146,14 @@ def detection_process(
                     or in_combat
                     or patrol_buy_freeze
                     or unstuck_running
-                    or not config.patrol.enabled
-                    or patrol_runner is None
-                    or patrol_runner.is_paused
+                    or (
+                        not nav_locomotion
+                        and (
+                            not config.patrol.enabled
+                            or patrol_runner is None
+                            or patrol_runner.is_paused
+                        )
+                    )
                     or patrol_mode != PatrolMode.PATROL
                 )
                 if look_should_abort:
@@ -897,8 +1168,13 @@ def detection_process(
                     and look_patrol_tick
                     and not patrol_buy_freeze
                     and not unstuck_running
-                    and patrol_runner is not None
-                    and not patrol_runner.is_paused
+                    and (
+                        nav_locomotion
+                        or (
+                            patrol_runner is not None
+                            and not patrol_runner.is_paused
+                        )
+                    )
                 )
                 look_controller.tick(
                     now=now,
@@ -907,13 +1183,11 @@ def detection_process(
                         mouse.move_relative if look_active else None
                     ),
                 )
-                if (
-                    look_active
-                    and config.look.pause_movement
-                    and look_controller.is_sweeping
-                    and patrol_runner is not None
-                ):
-                    patrol_runner.release_all_keys()
+                if look_active and config.look.pause_movement and look_controller.is_sweeping:
+                    if patrol_runner is not None:
+                        patrol_runner.release_all_keys()
+                    if nav_controller is not None:
+                        nav_controller.release_keys()
 
             if activated.is_set() and enemy_target is not None:
                 target = enemy_target
@@ -1071,6 +1345,10 @@ def detection_process(
             unstuck_seq.abort()
         if patrol_runner is not None:
             patrol_runner.release_all_keys()
+        if nav_controller is not None:
+            nav_controller.release_keys()
+        if nav_metrics is not None:
+            nav_metrics.maybe_log(time.monotonic(), logger, force=True)
 
     logger.info("Stopped")
 

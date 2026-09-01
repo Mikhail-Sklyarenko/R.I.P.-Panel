@@ -1,0 +1,82 @@
+meta:
+  pack_id: mirage_dm
+  map_id: de_mirage
+  mode: deathmatch
+  version: "1.0.0"
+
+strategy: route_cycle
+
+goal:
+  id: mid
+  x: 0.49
+  y: 0.52
+  arrive_radius: 0.06
+
+goals:
+  - id: mid
+    x: 0.49
+    y: 0.52
+    arrive_radius: 0.06
+  - id: bombsite_a
+    x: 0.54
+    y: 0.76
+    arrive_radius: 0.06
+
+routing:
+  mode: cycle
+  dwell_at_goal_sec: 35.0
+  direct_goal_dist: 0.12
+
+entries:
+  - id: t_spawn
+    x: 0.87
+    y: 0.36
+    arrive_radius: 0.05
+    team: any
+  - id: ct_spawn
+    x: 0.28
+    y: 0.70
+    arrive_radius: 0.05
+    team: any
+  - id: connector
+    x: 0.49
+    y: 0.40
+    arrive_radius: 0.05
+    team: any
+  - id: palace
+    x: 0.62
+    y: 0.62
+    arrive_radius: 0.05
+    team: any
+
+at_goal:
+  mode: wander
+  radius: 0.08
+  wander_sec_min: 1.5
+  wander_sec_max: 4.0
+
+humanize:
+  speed_jitter: 0.12
+  micro_pause_chance: 0.03
+  micro_pause_sec_min: 0.1
+  micro_pause_sec_max: 0.35
+  turn_rate_deg_per_sec: 90.0
+  path_wobble_deg: 4.0
+  forward_max_yaw_deg: 22.0
+  turn_smooth_alpha: 0.42
+  wobble_refresh_sec: 0.85
+  forward_jitter_chance: 0.04
+  forward_jitter_sec_min: 0.05
+  forward_jitter_sec_max: 0.14
+  look_yield_turn: true
+
+fallback:
+  macro_script: mirage
+  macro_sec: 60.0
+  retry_nav_after_macro: true
+
+stuck:
+  progress_timeout_sec: 3.0
+  min_progress_norm: 0.008
+  escape_duration_sec: 0.45
+  escape_angles_deg: [30, -30, 60, -60, 90, -90]

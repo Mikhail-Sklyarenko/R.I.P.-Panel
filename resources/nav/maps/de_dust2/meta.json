@@ -1,0 +1,21 @@
+{
+  "map_id": "de_dust2",
+  "script_id": "dust2",
+  "display_name": "Dust II",
+  "pos_x": -2476,
+  "pos_y": 3239,
+  "scale": 4.4,
+  "rotate": 1,
+  "zoom": 1.1,
+  "radar_size_px": 1024,
+  "landmarks": {
+    "t_spawn": { "x": 0.39, "y": 0.91 },
+    "ct_spawn": { "x": 0.62, "y": 0.21 },
+    "bombsite_a": { "x": 0.8, "y": 0.16 },
+    "bombsite_b": { "x": 0.21, "y": 0.12 },
+    "mid": { "x": 0.52, "y": 0.48 }
+  },
+  "source": "cs2-map-icons",
+  "source_url": "https://github.com/MurkyYT/cs2-map-icons",
+  "radar_info_url": "https://raw.githubusercontent.com/MurkyYT/cs2-map-icons/main/data/radar_info/de_dust2.txt"
+}

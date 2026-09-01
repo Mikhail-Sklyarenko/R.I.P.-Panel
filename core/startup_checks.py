@@ -142,6 +142,36 @@ def collect_startup_warnings(config: AppConfig | None = None) -> list[str]:
                         "OBS Virtual Camera not found — start OBS and enable VC "
                         f"({obs_detail[:120]})"
                     )
+                if getattr(cfg, "csgobot_nav_enabled", False):
+                    pack_id = (getattr(cfg, "csgobot_nav_pack", "") or "auto").strip()
+                    nav_ok, nav_info = csgobot_ai.check_nav_preflight(pack_id)
+                    if nav_ok:
+                        if pack_id == "auto":
+                            versions = nav_info.get("pack_versions") or {}
+                            if versions:
+                                detail = ", ".join(
+                                    f"{k} v{v}" for k, v in sorted(versions.items())
+                                )
+                                warnings.append(
+                                    f"csgobot nav: auto preflight ok ({detail})"
+                                )
+                            else:
+                                warnings.append("csgobot nav: auto preflight ok")
+                        else:
+                            ver = nav_info.get("pack_version") or "?"
+                            warnings.append(
+                                f"csgobot nav: pack {pack_id} v{ver} preflight ok"
+                            )
+                    else:
+                        errs = nav_info.get("errors") or nav_info.get("error") or []
+                        if isinstance(errs, list):
+                            detail = "; ".join(str(e) for e in errs[:2])
+                        else:
+                            detail = str(errs)
+                        warnings.append(
+                            f"csgobot nav preflight failed: {detail} "
+                            "(will use macro patrol)"
+                        )
 
     if cfg.auto_collect_drop and not (cfg.trade_offer_link or "").strip():
         warnings.append(

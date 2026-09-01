@@ -10,7 +10,7 @@ from PIL import Image
 
 _CSGOBOT = Path(__file__).resolve().parents[1] / "vendor" / "csgobot"
 if str(_CSGOBOT) not in sys.path:
-    sys.path.insert(0, str(_CSGOBOT))
+    sys.path.append( str(_CSGOBOT))
 
 from map.hud_map_detect import (  # noqa: E402
     MapDetectState,

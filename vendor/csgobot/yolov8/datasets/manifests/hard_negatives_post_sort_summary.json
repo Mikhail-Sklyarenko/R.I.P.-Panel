@@ -1,0 +1,19 @@
+{
+  "created_utc": "2026-08-28T13:43:04.723205+00:00",
+  "tool": "import_empty_yolo_splits.py",
+  "purpose": "hard_negatives from empty YOLO labels (texture FP fix)",
+  "prefix": "hn_bs_",
+  "sources": {
+    "test": "/Users/mihailsklarenko/FSM_PANEL v.3.0.1/farm-panel-prototype/vendor/csgobot/yolov8/datasets/product_v1_bootstrap/test",
+    "train": "/Users/mihailsklarenko/FSM_PANEL v.3.0.1/farm-panel-prototype/vendor/csgobot/yolov8/datasets/product_v1_bootstrap/train",
+    "val": "/Users/mihailsklarenko/FSM_PANEL v.3.0.1/farm-panel-prototype/vendor/csgobot/yolov8/datasets/product_v1_bootstrap/val"
+  },
+  "counts": {
+    "train": 0,
+    "val": 0,
+    "test": 1
+  },
+  "total": 1,
+  "skipped_dup": 0,
+  "skipped_exists": 96
+}

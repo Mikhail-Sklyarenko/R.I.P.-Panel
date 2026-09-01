@@ -312,6 +312,19 @@ class LookConfig:
 
 
 @dataclass
+class NavConfig:
+    """Minimap goal navigation (PR-N0+). N2: movement when enabled and read_only=False."""
+    enabled: bool = False
+    read_only: bool = False
+    debug: bool = False
+    pack_id: str = "auto"
+    calibration_path: str = ""
+    debug_log_interval_sec: float = 2.0
+    pose_lost_fallback_sec: float = 2.5
+    metrics_log_interval_sec: float = 30.0
+
+
+@dataclass
 class AutoCaptureAppConfig:
     """Farm collector: save frames for CT dataset (see dataset_capture/)."""
     enabled: bool = False
@@ -348,6 +361,7 @@ class AppConfig:
     map_detect: MapDetectConfig = field(default_factory=MapDetectConfig)
     autobuy: AutoBuyConfig = field(default_factory=AutoBuyConfig)
     look: LookConfig = field(default_factory=LookConfig)
+    nav: NavConfig = field(default_factory=NavConfig)
     preview: PreviewConfig = field(default_factory=PreviewConfig)
     hotkeys: HotkeyConfig = field(default_factory=HotkeyConfig)
     auto_capture: AutoCaptureAppConfig = field(default_factory=AutoCaptureAppConfig)

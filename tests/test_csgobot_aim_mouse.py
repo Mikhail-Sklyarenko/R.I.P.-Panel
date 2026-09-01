@@ -8,7 +8,7 @@ from pathlib import Path
 
 _CSGOBOT = Path(__file__).resolve().parents[1] / "vendor" / "csgobot"
 if str(_CSGOBOT) not in sys.path:
-    sys.path.insert(0, str(_CSGOBOT))
+    sys.path.append( str(_CSGOBOT))
 
 from aiming.aim_mouse_controller import AimMouseController  # noqa: E402
 from aiming.fov_mouse import FOVMouseMovement  # noqa: E402
