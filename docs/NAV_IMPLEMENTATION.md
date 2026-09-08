@@ -2,6 +2,32 @@
 
 Goal-based navigation for CS2 DM farm bots. **Not a YOLO dataset** — config + code only.
 
+## Centered-radar goal navigation (product)
+
+CS2 HUD keeps the **player icon at the radar center** (map scrolls/rotates under it).
+Absolute blob XY away from center is map chrome — chasing it caused spin+W with a
+frozen pose at ~(0.68,0.68).
+
+Product behavior now:
+
+1. **Center-only icon lock** — peripheral cyan blobs are rejected
+2. **World pose = spawn seed + dead reckoning** — map landmarks/entries as life-start
+   priors; commanded yaw + W / radar-flow integrate map `(x, y, yaw)`
+3. **Classic goal-follow** to pack points (`mid`, `bombsite_a`, entries)
+4. **Radar ring flow** — confirms walk progress / stuck; brief sector fail-soft only
+   if world seed is missing
+5. Debug: `mode=world`, shrinking `dist`, `yaw_err` toward the active goal
+
+Expect:
+
+```
+nav: world-pose seed t_spawn … -> mid
+nav: goal-seek mode — world pose from seed+DR …
+nav: state=seek_goal … mode=world dist=0.2x yaw_err=.. fwd=1 goal=mid …
+```
+
+Not: endless sector chaos; not frozen pose at 0.68 chasing chrome.
+
 ## Product locomotion (walk-to-goal)
 
 Root cause of “spin then stand still” (Sep 8 farm soak `c5c8ad629481`):

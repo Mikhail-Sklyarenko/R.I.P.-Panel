@@ -71,7 +71,7 @@ def _hum(**overrides):
 
 def test_dust2_pack_product_locomotion_defaults() -> None:
     pack = load_nav_pack(resolve_nav_pack_path("dust2_dm"))
-    assert pack.version == "1.3.0"
+    assert pack.version == "1.5.0"
     assert pack.humanize.forward_max_yaw_deg >= 45.0
     assert pack.humanize.forward_crawl_yaw_deg >= 100.0
     assert pack.humanize.forward_fail_open_after_sec <= 1.5

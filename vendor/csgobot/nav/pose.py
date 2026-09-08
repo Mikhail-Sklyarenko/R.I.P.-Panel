@@ -1,13 +1,25 @@
-"""Player pose on the HUD minimap (normalized radar coordinates)."""
+"""Player pose on the HUD minimap / map frame."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 
 
+# centered = CS2 HUD icon lock only (XY is radar center, not world GPS)
+# world    = map-frame estimate (seed + dead reckoning) for goal seeking
+# classic  = rare fixed-map radar where the icon moves across the image
+# none     = no reliable player icon
+RadarMode = str
+
+
 @dataclass(frozen=True)
 class PoseResult:
-    """Pose in normalized minimap space (0..1, origin top-left of radar square)."""
+    """Pose for navigation.
+
+    - ``centered``: x/y ≈ 0.5 (icon center). Do not chase as world GPS.
+    - ``world``: x/y/yaw are map-normalized (0..1) for pack goals.
+    - ``classic``: icon position on a fixed radar image.
+    """
 
     x_norm: float
     y_norm: float
@@ -15,7 +27,8 @@ class PoseResult:
     confidence: float
     valid: bool
     blob_area_px: int = 0
+    radar_mode: RadarMode = "classic"
 
     @staticmethod
     def invalid() -> PoseResult:
-        return PoseResult(0.5, 0.5, 0.0, 0.0, False, 0)
+        return PoseResult(0.5, 0.5, 0.0, 0.0, False, 0, "none")

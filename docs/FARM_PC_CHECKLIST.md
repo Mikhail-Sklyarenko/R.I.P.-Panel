@@ -157,7 +157,7 @@ Must **not** appear: `loot_failed`, `session_failed`, long idle on main menu whe
 | Weak aim / carousel crosshair | Set **cs2_sensitivity** in Config #1; CUDA torch; PR-6c anti-jitter (`git pull`) |
 | Aim jerky / slideshow pacing | PR-A1: need `aim_hz=120` in log; `CSGOBOT_AIM_MOUSE_HZ=120`; step_max 18–22 |
 | Aim hunts up/down on target | PR-A1.1 settle: `settle=True` in debug; ↑ `CSGOBOT_AIM_SETTLE_PX` / unlock; coast min speed |
-| Spin in place / stand still / rare 1–2 steps | Pull latest nav locomotion: stderr should show `fwd=1` while seeking; `forward_held_pct` > 20 in metrics; not endless `stuck escape` with frozen pose |
+| Spin in place / stand still / rare 1–2 steps | Pull goal-seek nav: stderr `mode=world` + shrinking `dist` + `fwd=1`; `nav: world-pose seed … -> mid`; not pose stuck at 0.68 |
 | Screen jitters on running targets | PR-6c defaults; `CSGOBOT_AIM_DEBUG=1` → check `lead_stable`, `move=False` in band |
 | Misses on running enemies | `CSGOBOT_LEAD_MS=100`; `CSGOBOT_BODY_FALLBACK_MS=200`; `CSGOBOT_AIM_DEBUG=1` |
 | No detect at long range | PR-6f: ROI zoom + conf 0.50; `CSGOBOT_DETECT_DEBUG=1`; try `CSGOBOT_CONFIDENCE=0.45` |

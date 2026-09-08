@@ -2,7 +2,7 @@ meta:
   pack_id: mirage_dm
   map_id: de_mirage
   mode: deathmatch
-  version: "1.1.0"
+  version: "1.2.0"
 
 strategy: route_cycle
 

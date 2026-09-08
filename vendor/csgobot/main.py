@@ -433,6 +433,7 @@ def detection_process(
     map_transition_active = False
     nav_reader = None
     nav_pose_filter = None
+    nav_radar_flow = None
     nav_pack = None
     active_nav_pack_id = ""
     nav_controller = None
@@ -572,6 +573,7 @@ def detection_process(
             from nav.pack import load_nav_pack
             from nav.paths import resolve_calibration_path, resolve_nav_pack_path
             from nav.pose_filter import PoseFilter
+            from nav.radar_flow import RadarFlowSensor
 
             nav_cal_path = resolve_calibration_path(config.nav.calibration_path)
             nav_cal = load_calibration(nav_cal_path)
@@ -579,6 +581,7 @@ def detection_process(
             nav_pack = load_nav_pack(nav_pack_path)
             nav_reader = MinimapReader(nav_cal)
             nav_pose_filter = PoseFilter(nav_cal.pose)
+            nav_radar_flow = RadarFlowSensor()
             if not config.nav.read_only:
                 if patrol_key_down is None or patrol_key_up is None:
                     raise RuntimeError(
@@ -600,7 +603,8 @@ def detection_process(
                 goal_ids = ", ".join(g.id for g in nav_pack.goals)
                 entry_ids = ", ".join(e.id for e in nav_pack.entries) or "none"
                 logger.info(
-                    "nav: movement enabled pack=%s strategy=%s goals=[%s] entries=[%s]",
+                    "nav: movement enabled pack=%s strategy=%s goals=[%s] "
+                    "entries=[%s] radar=goal-seek(seed+DR)",
                     nav_pack.pack_id,
                     nav_pack.strategy,
                     goal_ids,
@@ -1040,12 +1044,17 @@ def detection_process(
                         and look_controller.is_sweeping
                         and not nav_locomoting
                     )
+                    radar_progressing = False
+                    if nav_radar_flow is not None and nav_reader is not None:
+                        flow = nav_radar_flow.update(nav_reader.last_ring_gray)
+                        radar_progressing = flow.progressing
                     nav_tick_result = nav_controller.tick(
                         nav_pose,
                         now=now,
                         paused=False,
                         team=current_team_str,
                         look_sweeping=look_sweeping,
+                        radar_progressing=radar_progressing,
                     )
                     if nav_metrics is not None and nav_tick_result is not None:
                         nav_dt = (
@@ -1121,17 +1130,30 @@ def detection_process(
                         if nav_tick_result is not None and nav_tick_result.forward_fail_open
                         else "0"
                     )
+                    log_pose = nav_pose
+                    if (
+                        nav_tick_result is not None
+                        and nav_tick_result.pose_mode == "world"
+                        and nav_controller is not None
+                        and nav_controller.last_pose is not None
+                    ):
+                        log_pose = nav_controller.last_pose
                     logger.info(
                         "nav: state=%s phase=%s pose=(%.2f,%.2f) yaw=%.0f conf=%.2f "
-                        "valid=%s dist=%.3f yaw_err=%.0f fwd=%s fail_open=%s "
+                        "valid=%s mode=%s dist=%.3f yaw_err=%.0f fwd=%s fail_open=%s "
                         "goal=%s target=%s%s",
                         state_label,
                         phase_label,
-                        nav_pose.x_norm,
-                        nav_pose.y_norm,
-                        nav_pose.yaw_deg,
-                        nav_pose.confidence,
-                        nav_pose.valid,
+                        log_pose.x_norm,
+                        log_pose.y_norm,
+                        log_pose.yaw_deg,
+                        log_pose.confidence,
+                        log_pose.valid,
+                        (
+                            nav_tick_result.pose_mode
+                            if nav_tick_result is not None and nav_tick_result.pose_mode
+                            else getattr(log_pose, "radar_mode", "?")
+                        ),
                         nav_tick_result.dist_to_goal if nav_tick_result else 0.0,
                         yaw_err,
                         fwd,

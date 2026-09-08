@@ -19,6 +19,7 @@ class HumanizedMotion:
     paused: bool
     yaw_error_deg: float
     dist_to_goal: float
+    turn_step_deg: float = 0.0
     micro_pause: bool = False
     forward_jitter: bool = False
     look_yield: bool = False
@@ -84,6 +85,7 @@ class NavHumanizer:
                 paused=True,
                 yaw_error_deg=0.0,
                 dist_to_goal=0.0,
+                turn_step_deg=0.0,
                 micro_pause=True,
             )
 
@@ -107,6 +109,7 @@ class NavHumanizer:
                 paused=True,
                 yaw_error_deg=0.0,
                 dist_to_goal=0.0,
+                turn_step_deg=0.0,
                 micro_pause=True,
             )
 
@@ -153,6 +156,7 @@ class NavHumanizer:
                 forward = False
                 forward_jitter = True
 
+        applied_turn = 0.0 if look_yield else self._smooth_turn_deg
         return HumanizedMotion(
             mouse_dx=mouse_dx,
             mouse_dy=mouse_dy,
@@ -160,6 +164,7 @@ class NavHumanizer:
             paused=False,
             yaw_error_deg=plan.yaw_error_deg,
             dist_to_goal=plan.dist_to_goal,
+            turn_step_deg=applied_turn,
             forward_jitter=forward_jitter,
             look_yield=look_yield,
         )

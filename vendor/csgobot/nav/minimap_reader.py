@@ -1,4 +1,9 @@
-"""Read player pose from the HUD minimap (color blob + arrow-tip yaw)."""
+"""Read player pose from the HUD minimap (center icon + arrow-tip yaw).
+
+Product rule for CS2: the live HUD uses a *centered* radar. Absolute blob XY
+away from the radar center is almost never the player — it is map chrome and
+causes spin-in-place goal following. We only lock the center chevron.
+"""
 
 from __future__ import annotations
 
@@ -72,11 +77,7 @@ def _yaw_from_arrow_tip(
     crop: np.ndarray,
     component: np.ndarray,
 ) -> float:
-    """Heading from blob centroid toward arrow tip (same frame as bearing_deg).
-
-    PCA axis alone is ±90° ambiguous and fails on near-round HUD icons.
-    Tip-of-mask points along the CS2 player chevron.
-    """
+    """Heading from blob centroid toward arrow tip (same frame as bearing_deg)."""
     ys, xs = np.where(component)
     if len(xs) < 4:
         return 0.0
@@ -91,18 +92,15 @@ def _yaw_from_arrow_tip(
     if float(np.max(dist2)) < 1e-6:
         return 0.0
 
-    # Prefer the farthest bright pixels (arrow tip is usually lighter cyan).
     order = np.argsort(dist2)
     tail_n = max(3, len(order) // 5)
     candidates = order[-tail_n:]
     samples = crop[ys[candidates], xs[candidates]].astype(np.float64)
     brightness = samples.mean(axis=1) if samples.ndim == 2 else samples
-    # Rank: distance first, brightness breaks ties among the outer ring.
     score = dist2[candidates] + 0.15 * brightness
     best = int(candidates[int(np.argmax(score))])
     tip_dx = float(xs_f[best] - cx)
     tip_dy = float(ys_f[best] - cy)
-    # Image coords: 0° = east, 90° = south — matches nav.coords.bearing_deg.
     return normalize_angle_deg(math.degrees(math.atan2(tip_dy, tip_dx)))
 
 
@@ -113,7 +111,6 @@ def _yaw_from_blob(
     local_cx: float,
     local_cy: float,
 ) -> float:
-    """Public helper used by tests — tip yaw on the seeded component."""
     component = _component_mask(mask, seed_x=local_cx, seed_y=local_cy)
     return _yaw_from_arrow_tip(crop, component)
 
@@ -122,10 +119,16 @@ class MinimapReader:
     def __init__(self, calibration: NavCalibration) -> None:
         self._cal = calibration
         self._mm = calibration.minimap
+        self._last_ring_gray: Optional[np.ndarray] = None
 
     @property
     def calibration(self) -> NavCalibration:
         return self._cal
+
+    @property
+    def last_ring_gray(self) -> Optional[np.ndarray]:
+        """Annular grayscale patch for RadarFlowSensor (player punched out)."""
+        return self._last_ring_gray
 
     def _player_mask(self, crop: np.ndarray) -> np.ndarray:
         icon = self._mm.player_icon
@@ -148,29 +151,52 @@ class MinimapReader:
             mask &= dist <= float(self._mm.radius_px)
         return mask
 
-    def _pick_blob(
+    def _pick_center_blob(
         self,
         components: list[tuple[int, int, float, float]],
-    ) -> Optional[tuple[int, float, float]]:
+    ) -> Optional[tuple[int, float, float, float]]:
+        """Pick player chevron: must sit near radar center (centered HUD)."""
         icon = self._mm.player_icon
         local_cx = self._mm.center_x - self._mm.rect.x
         local_cy = self._mm.center_y - self._mm.rect.y
-        best: Optional[tuple[float, int, float, float]] = None
+        # Product: never lock map chrome. Prefer_center is hard max, not soft.
+        max_dist = float(max(10.0, icon.prefer_center_px))
+        best: Optional[tuple[float, int, float, float, float]] = None
         for area, _label, cx, cy in components:
             if area < icon.min_area_px or area > icon.max_area_px:
                 continue
             dist = math.hypot(cx - local_cx, cy - local_cy)
-            if dist > icon.prefer_center_px * 4.0:
+            if dist > max_dist:
                 continue
             score = dist - area * 0.02
             if best is None or score < best[0]:
-                best = (score, area, cx, cy)
+                best = (score, area, cx, cy, dist)
         if best is None:
             return None
-        _score, area, cx, cy = best
-        return area, cx, cy
+        _score, area, cx, cy, dist = best
+        return area, cx, cy, dist
+
+    def _build_ring_gray(self, crop: np.ndarray, component: np.ndarray) -> np.ndarray:
+        """Grayscale radar ring with player icon removed — for motion sensing."""
+        gray = (
+            0.299 * crop[:, :, 0].astype(np.float32)
+            + 0.587 * crop[:, :, 1].astype(np.float32)
+            + 0.114 * crop[:, :, 2].astype(np.float32)
+        )
+        h, w = gray.shape
+        local_cx = self._mm.center_x - self._mm.rect.x
+        local_cy = self._mm.center_y - self._mm.rect.y
+        yy, xx = np.ogrid[:h, :w]
+        circ = (xx - local_cx) ** 2 + (yy - local_cy) ** 2 <= float(self._mm.radius_px) ** 2
+        hole_r = max(18.0, float(self._mm.player_icon.prefer_center_px) + 6.0)
+        hole = (xx - local_cx) ** 2 + (yy - local_cy) ** 2 <= hole_r ** 2
+        ring = gray.copy()
+        ring[~(circ & ~hole)] = 0.0
+        ring[component] = 0.0
+        return ring
 
     def read(self, frame: np.ndarray) -> PoseResult:
+        self._last_ring_gray = None
         if frame is None or frame.size == 0:
             return PoseResult.invalid()
 
@@ -186,38 +212,29 @@ class MinimapReader:
 
         mask = self._player_mask(crop)
         components = _label_components(mask)
-        picked = self._pick_blob(components)
+        picked = self._pick_center_blob(components)
         if picked is None:
             return PoseResult.invalid()
 
-        area, local_cx, local_cy = picked
-        frame_px = rect.x + local_cx
-        frame_py = rect.y + local_cy
-        x_norm, y_norm = pixel_to_norm(
-            frame_px,
-            frame_py,
-            rect_x=rect.x,
-            rect_y=rect.y,
-            rect_w=rect.w,
-            rect_h=rect.h,
-        )
+        area, local_cx, local_cy, center_dist = picked
         component = _component_mask(mask, seed_x=local_cx, seed_y=local_cy)
         yaw_deg = _yaw_from_arrow_tip(crop, component)
+        self._last_ring_gray = self._build_ring_gray(crop, component)
 
         icon = self._mm.player_icon
-        center_dist = math.hypot(
-            local_cx - (self._mm.center_x - rect.x),
-            local_cy - (self._mm.center_y - rect.y),
-        )
+        # Centered radar: report icon at radar center (world XY is unknown here).
+        center_x_norm = (self._mm.center_x - rect.x) / max(rect.w, 1)
+        center_y_norm = (self._mm.center_y - rect.y) / max(rect.h, 1)
         center_bonus = max(0.0, 1.0 - center_dist / max(icon.prefer_center_px, 1.0))
         area_score = min(1.0, area / float(icon.max_area_px))
-        confidence = max(0.0, min(1.0, 0.45 * area_score + 0.55 * center_bonus))
+        confidence = max(0.0, min(1.0, 0.35 * area_score + 0.65 * center_bonus))
 
         return PoseResult(
-            x_norm=x_norm,
-            y_norm=y_norm,
+            x_norm=float(center_x_norm),
+            y_norm=float(center_y_norm),
             yaw_deg=yaw_deg,
             confidence=confidence,
             valid=confidence >= self._cal.pose.min_confidence,
             blob_area_px=area,
+            radar_mode="centered",
         )

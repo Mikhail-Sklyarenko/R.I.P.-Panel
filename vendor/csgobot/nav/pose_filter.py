@@ -17,12 +17,14 @@ class PoseFilter:
         self._y: Optional[float] = None
         self._yaw: Optional[float] = None
         self._last_valid_at: float = 0.0
+        self._radar_mode: str = "centered"
 
     def reset(self) -> None:
         self._x = None
         self._y = None
         self._yaw = None
         self._last_valid_at = 0.0
+        self._radar_mode = "centered"
 
     def update(self, raw: PoseResult, *, now: Optional[float] = None) -> PoseResult:
         ts = time.monotonic() if now is None else now
@@ -35,10 +37,12 @@ class PoseFilter:
                     confidence=raw.confidence * 0.5,
                     valid=True,
                     blob_area_px=raw.blob_area_px,
+                    radar_mode=getattr(self, "_radar_mode", "centered"),
                 )
             return PoseResult.invalid()
 
         alpha = self._cfg.smooth_alpha
+        self._radar_mode = raw.radar_mode or "centered"
         if self._x is None:
             self._x = raw.x_norm
             self._y = raw.y_norm
@@ -57,4 +61,5 @@ class PoseFilter:
             confidence=raw.confidence,
             valid=True,
             blob_area_px=raw.blob_area_px,
+            radar_mode=self._radar_mode,
         )
