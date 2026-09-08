@@ -4,6 +4,7 @@ from map.hud_map_detect import (
     MapDetectState,
     detect_map_hud,
     match_ready_visible,
+    unlock_map_detect,
     update_map_hysteresis,
 )
 from map.parse import MapScriptId, normalize_map_text, parse_map_script
@@ -25,5 +26,6 @@ __all__ = [
     "parse_map_script",
     "resolve_map_regions_path",
     "resolve_map_templates_dir",
+    "unlock_map_detect",
     "update_map_hysteresis",
 ]

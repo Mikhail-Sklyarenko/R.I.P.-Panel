@@ -73,6 +73,8 @@ Expected auto: `"ok": true`, `"packs_ok": ["dust2_dm", "mirage_dm", "generic_dm"
 
 **Mirage soak (PR-N6):** 30+ min Mirage DM with `csgobot_nav_pack=auto` — log `nav: auto pack mirage_dm` and `nav_metrics` every 30s (`pose_valid_pct` ≥ 80%). See `docs/NAV_IMPLEMENTATION.md`.
 
+**Map change mid-farm:** Dust2 → Mirage must log `map: unlock (match_ready)` then `nav: auto pack mirage_dm (map hot-swap)`. If nav keeps Dust2 goals after map change, `git pull` the map re-detect fix.
+
 **Fleet nav metrics (PR-N7):** Panel → **Nav Fleet** tab or `python scripts\nav_fleet_report.py`. JSONL: `data\logs\nav_metrics.jsonl`.
 
 **Multi-PC fleet (PR-N8):** Copy each PC's `nav_metrics.jsonl` to `data\fleet_inbox\`. Panel → **Import fleet inbox** or `python scripts\nav_fleet_import.py`. Tune goals: **Nav Packs** tab → Save override → `data\nav_packs\`.

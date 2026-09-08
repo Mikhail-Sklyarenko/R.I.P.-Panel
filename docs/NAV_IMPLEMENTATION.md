@@ -2,6 +2,26 @@
 
 Goal-based navigation for CS2 DM farm bots. **Not a YOLO dataset** — config + code only.
 
+## Product map re-detect (Dust2 ↔ Mirage mid-session)
+
+Root cause of “map changed but nav stayed old”: soft-lock after first confirm
+never reopened (`lock_after_confirm` + hard ignore).
+
+Product behavior now:
+
+1. **match_ready** popup → `map: unlock` (clears soft-lock)
+2. Soft-lock still reduces flicker, but a **different** map for N frames
+   reconfirms → `map: auto patrol …` + `nav: auto pack … (map hot-swap)`
+3. During match-ready, **Nav is paused** (no walking with wrong pack)
+
+Expect in stderr on map change:
+
+```
+map: unlock (match_ready) was=dust2 — awaiting reconfirm
+map: auto patrol mirage via match_ready (3/3 frames)
+nav: auto pack mirage_dm … (map hot-swap)
+```
+
 ## Product nav hardening (post farm soak)
 
 Root-cause fix after Sep 1 Dust2 soak (`generic_dm` + Look fight):

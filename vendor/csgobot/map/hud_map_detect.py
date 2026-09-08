@@ -103,22 +103,47 @@ class MapDetectState:
         return cls(confirmed_script=name)
 
 
+def unlock_map_detect(state: MapDetectState) -> bool:
+    """Clear soft-lock so a new match can reconfirm (product mid-session map change)."""
+    if not state.locked and state.pending_count == 0:
+        return False
+    state.locked = False
+    state.pending_script = None
+    state.pending_count = 0
+    return True
+
+
 def update_map_hysteresis(
     state: MapDetectState,
     winner: Optional[MapScriptId],
     *,
     confirm_frames: int,
     lock_after_confirm: bool,
+    allow_reconfirm: bool = True,
 ) -> tuple[Optional[MapScriptId], int]:
     """
     Apply hysteresis. Returns (new_confirmed_script_if_changed, pending_count).
-    """
-    if state.locked:
-        return None, 0
 
+    Product soft-lock: ``locked`` suppresses flicker of the *same* map, but a
+    different winner still accumulates pending frames and can reconfirm
+    (Dust2 → Mirage between DM matches). Set ``allow_reconfirm=False`` for
+    legacy hard-lock behavior.
+    """
     if winner is None:
         state.pending_script = None
         state.pending_count = 0
+        return None, 0
+
+    # Same map as confirmed — hold lock, clear foreign pending.
+    if winner == state.confirmed_script:
+        state.pending_script = None
+        state.pending_count = 0
+        if lock_after_confirm:
+            state.locked = True
+        return None, 0
+
+    # Different map while hard-locked (legacy).
+    if state.locked and not allow_reconfirm:
         return None, 0
 
     if winner == state.pending_script:
@@ -127,10 +152,7 @@ def update_map_hysteresis(
         state.pending_script = winner
         state.pending_count = 1
 
-    if (
-        state.pending_count >= confirm_frames
-        and winner != state.confirmed_script
-    ):
+    if state.pending_count >= confirm_frames:
         state.confirmed_script = winner
         state.pending_script = None
         state.pending_count = 0

@@ -53,6 +53,8 @@ from team.probes import load_team_probes
 from map.hud_map_detect import (
     MapDetectState,
     detect_map_hud,
+    match_ready_visible,
+    unlock_map_detect,
     update_map_hysteresis,
 )
 from map.paths import resolve_map_regions_path, resolve_map_templates_dir
@@ -428,6 +430,7 @@ def detection_process(
     last_nav_metrics_at = 0.0
     nav_movement_started_at = 0.0
     nav_fail_open_done = False
+    map_transition_active = False
     nav_reader = None
     nav_pose_filter = None
     nav_pack = None
@@ -625,6 +628,7 @@ def detection_process(
 
             now = time.monotonic()
 
+            map_transition_active = False
             if (
                 config.map_detect.enabled
                 and map_regions is not None
@@ -635,17 +639,44 @@ def detection_process(
                 and patrol_key_down is not None
                 and patrol_key_up is not None
             ):
+                # Product: new match popup clears soft-lock so Dust2↔Mirage can hot-swap.
+                map_transition_active = match_ready_visible(img, map_regions)
+                if map_transition_active and map_detect_state.locked:
+                    prev_script = map_detect_state.confirmed_script
+                    if unlock_map_detect(map_detect_state):
+                        logger.info(
+                            "map: unlock (match_ready) was=%s — awaiting reconfirm",
+                            prev_script,
+                        )
+                        nav_fail_open_done = False
+
                 detected, detect_source = detect_map_hud(
                     img,
                     map_regions,
                     map_templates,
                     use_ocr_fallback=config.map_detect.use_ocr_fallback,
                 )
+                # Match-ready with a *different* map name also unlocks before hysteresis.
+                if (
+                    detect_source == "match_ready"
+                    and detected is not None
+                    and detected != map_detect_state.confirmed_script
+                    and map_detect_state.locked
+                ):
+                    if unlock_map_detect(map_detect_state):
+                        logger.info(
+                            "map: unlock (match_ready map=%s) was=%s",
+                            detected,
+                            map_detect_state.confirmed_script,
+                        )
+                        nav_fail_open_done = False
+
                 map_changed, map_pending = update_map_hysteresis(
                     map_detect_state,
                     detected,
                     confirm_frames=config.map_detect.confirm_frames,
                     lock_after_confirm=config.map_detect.lock_after_confirm,
+                    allow_reconfirm=True,
                 )
                 if map_changed is not None:
                     try:
@@ -696,6 +727,7 @@ def detection_process(
                                 nav_controller.reload_pack(new_pack)
                                 nav_pack = new_pack
                                 active_nav_pack_id = new_pack_id
+                                nav_fail_open_done = True
                                 if nav_metrics is not None:
                                     nav_metrics = NavMetrics(
                                         log_interval_sec=config.nav.metrics_log_interval_sec,
@@ -703,7 +735,7 @@ def detection_process(
                                     nav_metrics.set_pack_id(new_pack.pack_id)
                                     nav_metrics.start(now)
                                 logger.info(
-                                    "nav: auto pack %s v%s goals=%s",
+                                    "nav: auto pack %s v%s goals=%s (map hot-swap)",
                                     new_pack.pack_id,
                                     new_pack.version,
                                     ", ".join(g.id for g in new_pack.goals),
@@ -979,14 +1011,18 @@ def detection_process(
                     and look_controller.is_sweeping
                     and not nav_locomoting
                 )
+                # Pause nav during match-ready / map change (avoid wrong-pack walks).
                 nav_paused = (
                     in_combat
                     or patrol_buy_freeze
                     or look_hold_movement
+                    or map_transition_active
                 )
                 if nav_paused:
                     if nav_controller is not None:
                         nav_controller.release_keys()
+                    if map_transition_active and patrol_runner is not None:
+                        patrol_runner.pause()
                 else:
                     look_sweeping = (
                         look_controller is not None

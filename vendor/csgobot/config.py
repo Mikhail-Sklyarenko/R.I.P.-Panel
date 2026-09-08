@@ -263,6 +263,8 @@ class MapDetectConfig:
     """Auto-select patrol YAML from DM map (dust2 / mirage / generic_dm)."""
     enabled: bool = True
     confirm_frames: int = 3
+    # Soft-lock: reduces flicker, but allow_reconfirm in hysteresis permits
+    # Dust2↔Mirage mid-session when match-ready unlocks or N frames disagree.
     lock_after_confirm: bool = True
     use_ocr_fallback: bool = True
     regions_path: str = ""

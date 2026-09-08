@@ -16,6 +16,7 @@ from map.hud_map_detect import (  # noqa: E402
     MapDetectState,
     detect_map_hud,
     match_ready_visible,
+    unlock_map_detect,
     update_map_hysteresis,
 )
 from map.parse import normalize_map_text, parse_map_script  # noqa: E402
@@ -154,7 +155,8 @@ def test_map_hysteresis_confirms_after_frames() -> None:
     assert state.confirmed_script == "mirage"
 
 
-def test_map_hysteresis_locked_ignores_later_changes() -> None:
+def test_map_hysteresis_hard_lock_ignores_later_changes() -> None:
+    """Legacy allow_reconfirm=False keeps hard lock."""
     state = MapDetectState.from_script("generic_dm")
     state.confirmed_script = "mirage"
     state.locked = True
@@ -163,7 +165,65 @@ def test_map_hysteresis_locked_ignores_later_changes() -> None:
         "dust2",
         confirm_frames=1,
         lock_after_confirm=True,
+        allow_reconfirm=False,
     )
     assert changed is None
     assert pending == 0
     assert state.confirmed_script == "mirage"
+
+
+def test_map_hysteresis_soft_lock_reconfirms_other_map() -> None:
+    """Product: locked Dust2 can still switch to Mirage after confirm_frames."""
+    state = MapDetectState.from_script("dust2")
+    state.locked = True
+    assert state.confirmed_script == "dust2"
+
+    changed, pending = update_map_hysteresis(
+        state,
+        "mirage",
+        confirm_frames=3,
+        lock_after_confirm=True,
+        allow_reconfirm=True,
+    )
+    assert changed is None
+    assert pending == 1
+    assert state.locked is True
+
+    update_map_hysteresis(
+        state, "mirage", confirm_frames=3, lock_after_confirm=True, allow_reconfirm=True
+    )
+    changed, pending = update_map_hysteresis(
+        state, "mirage", confirm_frames=3, lock_after_confirm=True, allow_reconfirm=True
+    )
+    assert changed == "mirage"
+    assert state.confirmed_script == "mirage"
+    assert state.locked is True
+
+
+def test_unlock_map_detect_clears_lock() -> None:
+    state = MapDetectState.from_script("dust2")
+    state.locked = True
+    state.pending_script = "mirage"
+    state.pending_count = 2
+    assert unlock_map_detect(state) is True
+    assert state.locked is False
+    assert state.pending_count == 0
+    assert state.confirmed_script == "dust2"  # kept until reconfirm
+
+
+def test_same_map_while_locked_clears_foreign_pending() -> None:
+    state = MapDetectState.from_script("dust2")
+    state.locked = True
+    state.pending_script = "mirage"
+    state.pending_count = 2
+    changed, pending = update_map_hysteresis(
+        state,
+        "dust2",
+        confirm_frames=3,
+        lock_after_confirm=True,
+        allow_reconfirm=True,
+    )
+    assert changed is None
+    assert pending == 0
+    assert state.pending_script is None
+    assert state.confirmed_script == "dust2"
