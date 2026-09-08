@@ -2,31 +2,30 @@
 
 Goal-based navigation for CS2 DM farm bots. **Not a YOLO dataset** — config + code only.
 
-## Centered-radar goal navigation (product)
+## Place-label navigation (product — no seed cosmetics)
 
-CS2 HUD keeps the **player icon at the radar center** (map scrolls/rotates under it).
-Absolute blob XY away from center is map chrome — chasing it caused spin+W with a
-frozen pose at ~(0.68,0.68).
+Gate 0 on farm HUD: **centered rotating radar** (player icon fixed at disk
+center). `radar.png` template match is **not** reliable (domain gap).
 
-Product behavior now:
+Product perception that **does** work objectively:
 
-1. **Center-only icon lock** — peripheral cyan blobs are rejected
-2. **World pose = spawn seed + dead reckoning** — map landmarks/entries as life-start
-   priors; commanded yaw + W / radar-flow integrate map `(x, y, yaw)`
-3. **Classic goal-follow** to pack points (`mid`, `bombsite_a`, entries)
-4. **Radar ring flow** — confirms walk progress / stuck; brief sector fail-soft only
-   if world seed is missing
-5. Debug: `mode=world`, shrinking `dist`, `yaw_err` toward the active goal
+1. **Auto Hough circle** — live radar disk (large HUD ~r108 vs old calib ~r83)
+2. **Yellow (T) + cyan (CT) center icon** — never lock chrome at 0.68
+3. **CS2 location-name strip** under the radar → `PlaceLocalizer` → landmark `(x,y)`
+4. **Waypoint graph** in pack — path hops (turn to next node before walls)
+5. **Honest stuck** — no radar-flow while W held → escape (not virtual dist)
+6. **No place read** → `wait_place` (no invented GPS / sector chaos)
 
 Expect:
 
 ```
-nav: world-pose seed t_spawn … -> mid
-nav: goal-seek mode — world pose from seed+DR …
-nav: state=seek_goal … mode=world dist=0.2x yaw_err=.. fwd=1 goal=mid …
+nav: place localizer loaded 9 templates map=de_dust2
+nav: place-localized goal-seek …
+nav: path tunnel>mid …
+mode=world pose=(0.22,0.28) path=tunnel>mid fwd=1
 ```
 
-Not: endless sector chaos; not frozen pose at 0.68 chasing chrome.
+`resources/nav/maps/*/hud_ref/` is **calibration**, never YOLO train (`never_train`).
 
 ## Product locomotion (walk-to-goal)
 

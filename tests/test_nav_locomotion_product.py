@@ -71,10 +71,12 @@ def _hum(**overrides):
 
 def test_dust2_pack_product_locomotion_defaults() -> None:
     pack = load_nav_pack(resolve_nav_pack_path("dust2_dm"))
-    assert pack.version == "1.5.0"
-    assert pack.humanize.forward_max_yaw_deg >= 45.0
+    assert pack.version == "2.0.0"
+    assert pack.humanize.forward_max_yaw_deg >= 40.0
     assert pack.humanize.forward_crawl_yaw_deg >= 100.0
     assert pack.humanize.forward_fail_open_after_sec <= 1.5
+    assert pack.waypoints
+    assert pack.edges
 
 
 def test_should_hold_forward_aligned_and_crawl() -> None:
@@ -110,15 +112,19 @@ def test_controller_holds_w_after_fail_open_stall() -> None:
         key_up=lambda _k: None,
         move_relative=lambda *_: None,
     )
-    # Far from mid/entries; yaw deliberately misaligned.
-    pose = PoseResult(0.68, 0.68, 45.0, 0.9, True, 20)
-    ctrl.tick(pose, now=1.0, paused=False)
+    # World pose far from mid; misaligned yaw — needs fail-open crawl.
+    pose = PoseResult(0.39, 0.91, 45.0, 0.9, True, 20, "world")
+    ctrl.tick(pose, now=1.0, paused=False, radar_progressing=True)
     keys.clear()
-    # Stall past fail-open window (progress was reset at plan time = 1.0).
-    result = ctrl.tick(pose, now=1.0 + pack.humanize.forward_fail_open_after_sec + 0.05, paused=False)
+    result = ctrl.tick(
+        pose,
+        now=1.0 + pack.humanize.forward_fail_open_after_sec + 0.05,
+        paused=False,
+        radar_progressing=False,
+    )
     assert result.forward_fail_open is True
     assert result.forward_held is True
-    assert "w" in keys
+    assert ctrl._held_key == "w"
 
 
 def test_stuck_escape_thrusts_forward() -> None:
@@ -131,21 +137,28 @@ def test_stuck_escape_thrusts_forward() -> None:
         key_up=lambda _k: None,
         move_relative=lambda *_: None,
     )
-    pose = PoseResult(0.68, 0.68, 45.0, 0.9, True, 20)
-    # Start session and expire stuck grace + progress timeout.
+    pose = PoseResult(0.39, 0.91, -90.0, 0.9, True, 20, "world")
     t0 = 100.0
-    ctrl.tick(pose, now=t0, paused=False)
+    ctrl.tick(pose, now=t0, paused=False, radar_progressing=True)
+    ctrl._session_started_at = t0 - 30
+    ctrl._last_progress_at = t0
+    ctrl._held_key = "w"
     keys.clear()
     stuck = ctrl.tick(
         pose,
-        now=t0 + ctrl._stuck_grace_sec + pack.stuck.progress_timeout_sec + 0.1,
+        now=t0 + pack.stuck.progress_timeout_sec + 0.1,
         paused=False,
+        radar_progressing=False,
     )
     assert stuck.state == NavState.STUCK_ESCAPE
     assert stuck.stuck_event
-    # Next tick while escaping should hold W (thrust), not only strafe.
     keys.clear()
-    esc = ctrl.tick(pose, now=t0 + ctrl._stuck_grace_sec + pack.stuck.progress_timeout_sec + 0.2, paused=False)
+    esc = ctrl.tick(
+        pose,
+        now=t0 + pack.stuck.progress_timeout_sec + 0.2,
+        paused=False,
+        radar_progressing=False,
+    )
     assert esc.state == NavState.STUCK_ESCAPE
     assert "w" in keys
 

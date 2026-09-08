@@ -434,6 +434,7 @@ def detection_process(
     nav_reader = None
     nav_pose_filter = None
     nav_radar_flow = None
+    nav_perception = None
     nav_pack = None
     active_nav_pack_id = ""
     nav_controller = None
@@ -572,8 +573,11 @@ def detection_process(
             from nav.minimap_reader import MinimapReader
             from nav.pack import load_nav_pack
             from nav.paths import resolve_calibration_path, resolve_nav_pack_path
+            from nav.perception import NavPerception
+            from nav.place_localizer import PlaceLocalizer
             from nav.pose_filter import PoseFilter
             from nav.radar_flow import RadarFlowSensor
+            from nav.world_pose import YawTracker
 
             nav_cal_path = resolve_calibration_path(config.nav.calibration_path)
             nav_cal = load_calibration(nav_cal_path)
@@ -582,6 +586,9 @@ def detection_process(
             nav_reader = MinimapReader(nav_cal)
             nav_pose_filter = PoseFilter(nav_cal.pose)
             nav_radar_flow = RadarFlowSensor()
+            nav_yaw = YawTracker()
+            nav_place = PlaceLocalizer(nav_pack.map_id)
+            nav_perception = NavPerception(nav_reader, nav_place, nav_yaw)
             if not config.nav.read_only:
                 if patrol_key_down is None or patrol_key_up is None:
                     raise RuntimeError(
@@ -595,20 +602,20 @@ def detection_process(
                     move_relative=mouse.move_relative,
                     logger=logger,
                     pose_lost_sec=config.nav.pose_lost_fallback_sec,
+                    yaw_tracker=nav_yaw,
                 )
                 nav_metrics = NavMetrics(
                     log_interval_sec=config.nav.metrics_log_interval_sec,
                 )
                 nav_metrics.set_pack_id(nav_pack.pack_id)
                 goal_ids = ", ".join(g.id for g in nav_pack.goals)
-                entry_ids = ", ".join(e.id for e in nav_pack.entries) or "none"
                 logger.info(
                     "nav: movement enabled pack=%s strategy=%s goals=[%s] "
-                    "entries=[%s] radar=goal-seek(seed+DR)",
+                    "place_templates=%d radar=place-label+path",
                     nav_pack.pack_id,
                     nav_pack.strategy,
                     goal_ids,
-                    entry_ids,
+                    nav_place.template_count,
                 )
             else:
                 logger.info(
@@ -920,7 +927,14 @@ def detection_process(
                 and nav_pose_filter is not None
                 and activated.is_set()
             ):
-                raw_pose = nav_reader.read(img)
+                face_x, face_y = 0.52, 0.48
+                if nav_controller is not None:
+                    face_x, face_y = nav_controller.face_target()
+                if nav_perception is not None:
+                    perc = nav_perception.update(img, face_x=face_x, face_y=face_y)
+                    raw_pose = perc.pose
+                else:
+                    raw_pose = nav_reader.read(img)
                 nav_pose = nav_pose_filter.update(raw_pose, now=now)
 
             use_nav_movement = (
@@ -1141,7 +1155,7 @@ def detection_process(
                     logger.info(
                         "nav: state=%s phase=%s pose=(%.2f,%.2f) yaw=%.0f conf=%.2f "
                         "valid=%s mode=%s dist=%.3f yaw_err=%.0f fwd=%s fail_open=%s "
-                        "goal=%s target=%s%s",
+                        "goal=%s target=%s path=%s%s",
                         state_label,
                         phase_label,
                         log_pose.x_norm,
@@ -1160,6 +1174,11 @@ def detection_process(
                         fail_open,
                         goal_label,
                         target_label,
+                        (
+                            nav_tick_result.path
+                            if nav_tick_result is not None and nav_tick_result.path
+                            else "-"
+                        ),
                         pause_reason,
                     )
                     last_nav_debug_log = now

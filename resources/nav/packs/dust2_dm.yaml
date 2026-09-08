@@ -2,7 +2,7 @@ meta:
   pack_id: dust2_dm
   map_id: de_dust2
   mode: deathmatch
-  version: "1.5.0"
+  version: "2.0.0"
 
 strategy: route_cycle
 
@@ -10,39 +10,47 @@ goal:
   id: mid
   x: 0.52
   y: 0.48
-  arrive_radius: 0.06
+  arrive_radius: 0.07
 
 goals:
   - id: mid
     x: 0.52
     y: 0.48
-    arrive_radius: 0.06
+    arrive_radius: 0.07
   - id: bombsite_a
     x: 0.80
     y: 0.16
-    arrive_radius: 0.06
+    arrive_radius: 0.07
+
+# Corridor graph — think ahead, do not walk through walls.
+waypoints:
+  - { id: t_spawn, x: 0.39, y: 0.91, arrive_radius: 0.06 }
+  - { id: long, x: 0.25, y: 0.58, arrive_radius: 0.06 }
+  - { id: mid, x: 0.52, y: 0.48, arrive_radius: 0.07 }
+  - { id: short, x: 0.55, y: 0.28, arrive_radius: 0.06 }
+  - { id: tunnel, x: 0.22, y: 0.28, arrive_radius: 0.06 }
+  - { id: bombsite_b, x: 0.21, y: 0.12, arrive_radius: 0.07 }
+  - { id: bombsite_a, x: 0.80, y: 0.16, arrive_radius: 0.07 }
+  - { id: ct_spawn, x: 0.62, y: 0.21, arrive_radius: 0.06 }
+
+edges:
+  - [t_spawn, long]
+  - [t_spawn, mid]
+  - [long, mid]
+  - [mid, short]
+  - [mid, tunnel]
+  - [tunnel, bombsite_b]
+  - [short, bombsite_a]
+  - [short, ct_spawn]
+  - [ct_spawn, bombsite_a]
+  - [bombsite_b, tunnel]
 
 routing:
   mode: cycle
-  dwell_at_goal_sec: 35.0
-  direct_goal_dist: 0.12
+  dwell_at_goal_sec: 25.0
+  direct_goal_dist: 0.10
 
-entries:
-  - id: t_lower
-    x: 0.39
-    y: 0.78
-    arrive_radius: 0.05
-    team: any
-  - id: long_doors
-    x: 0.25
-    y: 0.58
-    arrive_radius: 0.05
-    team: any
-  - id: catwalk
-    x: 0.48
-    y: 0.32
-    arrive_radius: 0.05
-    team: any
+entries: []
 
 at_goal:
   mode: wander
@@ -52,29 +60,30 @@ at_goal:
 
 humanize:
   speed_jitter: 0.12
-  micro_pause_chance: 0.012
+  micro_pause_chance: 0.010
   micro_pause_sec_min: 0.08
   micro_pause_sec_max: 0.22
   micro_pause_min_interval_sec: 2.5
-  turn_rate_deg_per_sec: 100.0
-  path_wobble_deg: 3.0
-  forward_max_yaw_deg: 48.0
-  forward_crawl_yaw_deg: 125.0
-  forward_fail_open_after_sec: 0.9
+  turn_rate_deg_per_sec: 110.0
+  path_wobble_deg: 2.5
+  forward_max_yaw_deg: 42.0
+  forward_crawl_yaw_deg: 110.0
+  forward_fail_open_after_sec: 1.2
   turn_smooth_alpha: 0.42
   wobble_refresh_sec: 0.85
-  forward_jitter_chance: 0.02
+  forward_jitter_chance: 0.015
   forward_jitter_sec_min: 0.05
   forward_jitter_sec_max: 0.12
   look_yield_turn: true
 
 fallback:
   macro_script: generic_dm
-  macro_sec: 60.0
+  macro_sec: 45.0
   retry_nav_after_macro: true
 
 stuck:
-  progress_timeout_sec: 4.5
+  # Honest stuck: no radar-flow while holding W
+  progress_timeout_sec: 3.0
   min_progress_norm: 0.008
-  escape_duration_sec: 0.55
-  escape_angles_deg: [30, -30, 60, -60, 90, -90]
+  escape_duration_sec: 0.85
+  escape_angles_deg: [45, -45, 90, -90, 120, -120]

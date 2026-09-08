@@ -164,34 +164,22 @@ class StuckConfig:
 
 
 @dataclass(frozen=True)
-
 class NavPack:
-
     pack_id: str
-
     map_id: str
-
     mode: str
-
     version: str
-
     strategy: str
-
     goal: NavGoal
-
     goals: tuple[NavGoal, ...]
-
     entries: tuple[NavEntry, ...]
-
     route: RouteConfig
-
     at_goal: AtGoalConfig
-
     humanize: HumanizeConfig
-
     fallback: FallbackConfig
-
     stuck: StuckConfig
+    waypoints: tuple[dict[str, Any], ...] = ()
+    edges: tuple[tuple[str, str], ...] = ()
 
 
 
@@ -376,47 +364,38 @@ def parse_nav_pack_data(data: dict[str, Any]) -> NavPack:
     angles_raw = stuck_raw.get("escape_angles_deg") or [30, -30, 60, -60, 90, -90]
 
     stuck = StuckConfig(
-
         progress_timeout_sec=float(stuck_raw.get("progress_timeout_sec", 3.0)),
-
         min_progress_norm=float(stuck_raw.get("min_progress_norm", 0.008)),
-
         escape_angles_deg=tuple(float(a) for a in angles_raw),
-
         escape_duration_sec=float(stuck_raw.get("escape_duration_sec", 0.45)),
-
     )
 
-
+    waypoints_raw = data.get("waypoints") or []
+    waypoints: tuple[dict[str, Any], ...] = tuple(
+        item for item in waypoints_raw if isinstance(item, dict)
+    )
+    edges_raw = data.get("edges") or []
+    edges: list[tuple[str, str]] = []
+    for item in edges_raw:
+        if isinstance(item, (list, tuple)) and len(item) >= 2:
+            edges.append((str(item[0]), str(item[1])))
 
     return NavPack(
-
         pack_id=pack_id,
-
         map_id=map_id,
-
         mode=str(meta.get("mode", "deathmatch")),
-
         version=str(meta.get("version", "1.0.0")),
-
         strategy=str(data.get("strategy", "single_goal")),
-
         goal=goal,
-
         goals=goals,
-
         entries=entries,
-
         route=route,
-
         at_goal=at_goal,
-
         humanize=humanize,
-
         fallback=fallback,
-
         stuck=stuck,
-
+        waypoints=waypoints,
+        edges=tuple(edges),
     )
 
 

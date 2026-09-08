@@ -37,12 +37,33 @@ class PoseFilter:
                     confidence=raw.confidence * 0.5,
                     valid=True,
                     blob_area_px=raw.blob_area_px,
-                    radar_mode=getattr(self, "_radar_mode", "centered"),
+                    radar_mode=self._radar_mode,
                 )
             return PoseResult.invalid()
 
-        alpha = self._cfg.smooth_alpha
         self._radar_mode = raw.radar_mode or "centered"
+        # World place snaps: do not smear landmark jumps toward 0.5.
+        if raw.radar_mode == "world":
+            self._x = raw.x_norm
+            self._y = raw.y_norm
+            if self._yaw is None:
+                self._yaw = raw.yaw_deg
+            else:
+                yaw_delta = normalize_angle_deg(raw.yaw_deg - self._yaw)
+                alpha = self._cfg.smooth_alpha
+                self._yaw = normalize_angle_deg(self._yaw + alpha * yaw_delta)
+            self._last_valid_at = ts
+            return PoseResult(
+                x_norm=self._x,
+                y_norm=self._y,
+                yaw_deg=self._yaw or 0.0,
+                confidence=raw.confidence,
+                valid=True,
+                blob_area_px=raw.blob_area_px,
+                radar_mode="world",
+            )
+
+        alpha = self._cfg.smooth_alpha
         if self._x is None:
             self._x = raw.x_norm
             self._y = raw.y_norm
