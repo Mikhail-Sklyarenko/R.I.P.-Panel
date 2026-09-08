@@ -43,24 +43,17 @@ def test_hud_ref_manifest_exists() -> None:
 def test_place_localizer_ids_all_labeled_frames() -> None:
     loc = PlaceLocalizer("de_dust2")
     assert loc.ready
-    assert loc.template_count >= 8
+    assert loc.template_count >= 20
     ref = resolve_nav_root() / "maps" / "de_dust2" / "hud_ref"
-    frames = {
-        "t_spawn_frame.jpg": "t_spawn",
-        "mid_frame.jpg": "mid",
-        "long_frame.jpg": "long",
-        "short_frame.jpg": "short",
-        "bombsite_a_frame.jpg": "bombsite_a",
-        "bombsite_b_frame.jpg": "bombsite_b",
-        "tunnel_frame.jpg": "tunnel",
-        "ct_spawn_ct_frame.jpg": "ct_spawn",
-    }
+    frames = sorted(ref.glob("*_frame.jpg"))
+    assert len(frames) >= 20
     ok = 0
-    for fname, expect in frames.items():
-        img = np.asarray(Image.open(ref / fname).convert("RGB"))
+    for path in frames:
+        expect = path.name.replace("_frame.jpg", "")
+        img = np.asarray(Image.open(path).convert("RGB"))
         hit = loc.localize(img)
-        assert hit is not None, fname
-        assert hit.place_id == expect, (fname, hit.place_id, hit.score, hit.margin)
+        assert hit is not None, path.name
+        assert hit.place_id == expect, (path.name, hit.place_id, hit.score, hit.margin)
         assert hit.score >= 0.55
         assert hit.margin >= 0.20
         ok += 1
@@ -92,7 +85,7 @@ def test_perception_produces_world_pose() -> None:
     assert out.place.place_id == "tunnel"
     assert out.pose.radar_mode == "world"
     assert abs(out.pose.x_norm - 0.22) < 0.02
-    assert abs(out.pose.y_norm - 0.28) < 0.02
+    assert abs(out.pose.y_norm - 0.30) < 0.02
 
 
 def test_planner_tunnel_to_mid_uses_corridor() -> None:
@@ -149,3 +142,4 @@ def test_controller_follows_path_with_world_pose() -> None:
     assert r.path
     assert r.forward_held is True or abs(r.yaw_error_deg) > 5
     assert pack.version.startswith("2.")
+    assert len(pack.waypoints) >= 20

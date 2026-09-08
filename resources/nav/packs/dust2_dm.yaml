@@ -2,7 +2,7 @@ meta:
   pack_id: dust2_dm
   map_id: de_dust2
   mode: deathmatch
-  version: "2.0.0"
+  version: "2.1.0"
 
 strategy: route_cycle
 
@@ -22,28 +22,67 @@ goals:
     y: 0.16
     arrive_radius: 0.07
 
-# Corridor graph — think ahead, do not walk through walls.
+# Dense corridor graph — one node per CS2 place-label (RU hud_ref).
 waypoints:
   - { id: t_spawn, x: 0.39, y: 0.91, arrive_radius: 0.06 }
-  - { id: long, x: 0.25, y: 0.58, arrive_radius: 0.06 }
+  - { id: t_ramp, x: 0.42, y: 0.75, arrive_radius: 0.05 }
+  - { id: long, x: 0.30, y: 0.70, arrive_radius: 0.06 }
+  - { id: long_doors, x: 0.28, y: 0.55, arrive_radius: 0.05 }
+  - { id: pit, x: 0.45, y: 0.55, arrive_radius: 0.05 }
+  - { id: mid_doors, x: 0.48, y: 0.52, arrive_radius: 0.05 }
   - { id: mid, x: 0.52, y: 0.48, arrive_radius: 0.07 }
-  - { id: short, x: 0.55, y: 0.28, arrive_radius: 0.06 }
-  - { id: tunnel, x: 0.22, y: 0.28, arrive_radius: 0.06 }
+  - { id: mid_upper, x: 0.52, y: 0.38, arrive_radius: 0.05 }
+  - { id: outside_tunnel, x: 0.28, y: 0.35, arrive_radius: 0.05 }
+  - { id: tunnel, x: 0.22, y: 0.30, arrive_radius: 0.06 }
+  - { id: tunnel_stairs, x: 0.20, y: 0.25, arrive_radius: 0.05 }
+  - { id: tunnel_upper, x: 0.20, y: 0.22, arrive_radius: 0.05 }
+  - { id: b_doors, x: 0.18, y: 0.18, arrive_radius: 0.05 }
   - { id: bombsite_b, x: 0.21, y: 0.12, arrive_radius: 0.07 }
+  - { id: short, x: 0.55, y: 0.28, arrive_radius: 0.06 }
+  - { id: ledge, x: 0.58, y: 0.32, arrive_radius: 0.05 }
+  - { id: under_a, x: 0.78, y: 0.28, arrive_radius: 0.05 }
+  - { id: a_ramp, x: 0.72, y: 0.25, arrive_radius: 0.05 }
+  - { id: long_a, x: 0.72, y: 0.35, arrive_radius: 0.05 }
+  - { id: near_a, x: 0.75, y: 0.20, arrive_radius: 0.05 }
   - { id: bombsite_a, x: 0.80, y: 0.16, arrive_radius: 0.07 }
   - { id: ct_spawn, x: 0.62, y: 0.21, arrive_radius: 0.06 }
 
 edges:
-  - [t_spawn, long]
-  - [t_spawn, mid]
-  - [long, mid]
+  # T spawn → mid / long
+  - [t_spawn, t_ramp]
+  - [t_ramp, long]
+  - [t_ramp, mid]
+  - [long, long_doors]
+  - [long_doors, pit]
+  - [long_doors, mid]
+  - [pit, mid]
+  - [pit, mid_doors]
+  - [mid_doors, mid]
+  - [mid, mid_upper]
   - [mid, short]
-  - [mid, tunnel]
+  - [mid, outside_tunnel]
+  - [mid_upper, short]
+  - [mid_upper, ledge]
+  # B tunnels
+  - [outside_tunnel, tunnel]
+  - [tunnel, tunnel_stairs]
+  - [tunnel_stairs, tunnel_upper]
+  - [tunnel_upper, b_doors]
+  - [b_doors, bombsite_b]
   - [tunnel, bombsite_b]
-  - [short, bombsite_a]
+  # A / short / CT
+  - [short, ledge]
+  - [short, a_ramp]
   - [short, ct_spawn]
+  - [ledge, ct_spawn]
+  - [a_ramp, near_a]
+  - [a_ramp, under_a]
+  - [under_a, long_a]
+  - [long_a, near_a]
+  - [near_a, bombsite_a]
+  - [a_ramp, bombsite_a]
   - [ct_spawn, bombsite_a]
-  - [bombsite_b, tunnel]
+  - [ct_spawn, near_a]
 
 routing:
   mode: cycle

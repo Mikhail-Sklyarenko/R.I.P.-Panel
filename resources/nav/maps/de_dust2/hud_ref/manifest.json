@@ -1,8 +1,36 @@
 {
   "map_id": "de_dust2",
   "never_train": true,
-  "note": "HUD location-name templates for PlaceLocalizer. Not YOLO train data.",
+  "note": "HUD location-name templates (RU). Title-bar cropped → 1280x720. Not YOLO train data.",
+  "source_folder": "Desktop/Новая папка 2",
+  "title_bar_crop_px": 29,
+  "client_size": [
+    1280,
+    720
+  ],
   "refs": [
+    {
+      "id": "long_a",
+      "landmark": "long_a",
+      "x": 0.72,
+      "y": 0.35,
+      "team": "t",
+      "frame": "long_a_frame.jpg",
+      "ring": "long_a_ring.png",
+      "label_ru": "\"Длина\" точки А",
+      "source": "\"Длина\" точки А.jpg"
+    },
+    {
+      "id": "ct_spawn",
+      "landmark": "ct_spawn",
+      "x": 0.62,
+      "y": 0.21,
+      "team": "ct",
+      "frame": "ct_spawn_frame.jpg",
+      "ring": "ct_spawn_ring.png",
+      "label_ru": "База спецназа",
+      "source": "База спецназа .jpg"
+    },
     {
       "id": "t_spawn",
       "landmark": "t_spawn",
@@ -10,25 +38,64 @@
       "y": 0.91,
       "team": "t",
       "frame": "t_spawn_frame.jpg",
-      "ring": "t_spawn_ring.png"
+      "ring": "t_spawn_ring.png",
+      "label_ru": "База террористов",
+      "source": "База террористов.jpg"
     },
     {
-      "id": "mid",
-      "landmark": "mid",
+      "id": "tunnel_upper",
+      "landmark": "tunnel_upper",
+      "x": 0.2,
+      "y": 0.22,
+      "team": "t",
+      "frame": "tunnel_upper_frame.jpg",
+      "ring": "tunnel_upper_ring.png",
+      "label_ru": "Верхний туннель",
+      "source": "Верхний туннель.jpg"
+    },
+    {
+      "id": "mid_upper",
+      "landmark": "mid_upper",
       "x": 0.52,
-      "y": 0.48,
+      "y": 0.38,
       "team": "t",
-      "frame": "mid_frame.jpg",
-      "ring": "mid_ring.png"
+      "frame": "mid_upper_frame.jpg",
+      "ring": "mid_upper_ring.png",
+      "label_ru": "Верхняя часть центра",
+      "source": "Верхняя часть центра.jpg"
     },
     {
-      "id": "long",
-      "landmark": "long",
-      "x": 0.25,
-      "y": 0.58,
+      "id": "long_doors",
+      "landmark": "long_doors",
+      "x": 0.28,
+      "y": 0.55,
       "team": "t",
-      "frame": "long_frame.jpg",
-      "ring": "long_ring.png"
+      "frame": "long_doors_frame.jpg",
+      "ring": "long_doors_ring.png",
+      "label_ru": "Двери \"длины\"",
+      "source": "Двери \"длины\".jpg"
+    },
+    {
+      "id": "mid_doors",
+      "landmark": "mid_doors",
+      "x": 0.48,
+      "y": 0.52,
+      "team": "t",
+      "frame": "mid_doors_frame.jpg",
+      "ring": "mid_doors_ring.png",
+      "label_ru": "Двери в центре",
+      "source": "Двери в центре.jpg"
+    },
+    {
+      "id": "b_doors",
+      "landmark": "b_doors",
+      "x": 0.18,
+      "y": 0.18,
+      "team": "t",
+      "frame": "b_doors_frame.jpg",
+      "ring": "b_doors_ring.png",
+      "label_ru": "Двери точки В",
+      "source": "Двери точки В.jpg"
     },
     {
       "id": "short",
@@ -37,7 +104,97 @@
       "y": 0.28,
       "team": "t",
       "frame": "short_frame.jpg",
-      "ring": "short_ring.png"
+      "ring": "short_ring.png",
+      "label_ru": "Короткий подъём",
+      "source": "Короткий подъём.jpg"
+    },
+    {
+      "id": "tunnel",
+      "landmark": "tunnel",
+      "x": 0.22,
+      "y": 0.3,
+      "team": "t",
+      "frame": "tunnel_frame.jpg",
+      "ring": "tunnel_ring.png",
+      "label_ru": "Нижний туннель",
+      "source": "Нижний туннель.jpg"
+    },
+    {
+      "id": "under_a",
+      "landmark": "under_a",
+      "x": 0.78,
+      "y": 0.28,
+      "team": "t",
+      "frame": "under_a_frame.jpg",
+      "ring": "under_a_ring.png",
+      "label_ru": "Под точкой А",
+      "source": "Под точкой А.jpg"
+    },
+    {
+      "id": "long",
+      "landmark": "long",
+      "x": 0.3,
+      "y": 0.7,
+      "team": "t",
+      "frame": "long_frame.jpg",
+      "ring": "long_ring.png",
+      "label_ru": "Проход на \"длину\"",
+      "source": "Проход на \"длину\".jpg"
+    },
+    {
+      "id": "t_ramp",
+      "landmark": "t_ramp",
+      "x": 0.42,
+      "y": 0.75,
+      "team": "t",
+      "frame": "t_ramp_frame.jpg",
+      "ring": "t_ramp_ring.png",
+      "label_ru": "Рампа террористов",
+      "source": "Рампа террористов.jpg"
+    },
+    {
+      "id": "a_ramp",
+      "landmark": "a_ramp",
+      "x": 0.72,
+      "y": 0.25,
+      "team": "t",
+      "frame": "a_ramp_frame.jpg",
+      "ring": "a_ramp_ring.png",
+      "label_ru": "Рампа точки А",
+      "source": "Рампа точки А.jpg"
+    },
+    {
+      "id": "near_a",
+      "landmark": "near_a",
+      "x": 0.75,
+      "y": 0.2,
+      "team": "t",
+      "frame": "near_a_frame.jpg",
+      "ring": "near_a_ring.png",
+      "label_ru": "Рядом с точкой А",
+      "source": "Рядом с точкой А.jpg"
+    },
+    {
+      "id": "outside_tunnel",
+      "landmark": "outside_tunnel",
+      "x": 0.28,
+      "y": 0.35,
+      "team": "t",
+      "frame": "outside_tunnel_frame.jpg",
+      "ring": "outside_tunnel_ring.png",
+      "label_ru": "Снаружи туннеля",
+      "source": "Снаружи туннеля.jpg"
+    },
+    {
+      "id": "tunnel_stairs",
+      "landmark": "tunnel_stairs",
+      "x": 0.2,
+      "y": 0.25,
+      "team": "t",
+      "frame": "tunnel_stairs_frame.jpg",
+      "ring": "tunnel_stairs_ring.png",
+      "label_ru": "Ступени в тунелле",
+      "source": "Ступени в тунелле .jpg"
     },
     {
       "id": "bombsite_a",
@@ -46,7 +203,9 @@
       "y": 0.16,
       "team": "t",
       "frame": "bombsite_a_frame.jpg",
-      "ring": "bombsite_a_ring.png"
+      "ring": "bombsite_a_ring.png",
+      "label_ru": "Точка закладки А",
+      "source": "Точка закладки А.jpg"
     },
     {
       "id": "bombsite_b",
@@ -55,34 +214,42 @@
       "y": 0.12,
       "team": "t",
       "frame": "bombsite_b_frame.jpg",
-      "ring": "bombsite_b_ring.png"
+      "ring": "bombsite_b_ring.png",
+      "label_ru": "Точка закладки В",
+      "source": "Точка закладки В.jpg"
     },
     {
-      "id": "tunnel",
-      "landmark": "tunnel",
-      "x": 0.22,
-      "y": 0.28,
+      "id": "ledge",
+      "landmark": "ledge",
+      "x": 0.58,
+      "y": 0.32,
       "team": "t",
-      "frame": "tunnel_frame.jpg",
-      "ring": "tunnel_ring.png"
+      "frame": "ledge_frame.jpg",
+      "ring": "ledge_ring.png",
+      "label_ru": "Уступ",
+      "source": "Уступ.jpg"
     },
     {
-      "id": "ct_spawn",
-      "landmark": "ct_spawn",
-      "x": 0.62,
-      "y": 0.21,
-      "team": "ct",
-      "frame": "ct_spawn_ct_frame.jpg",
-      "ring": "ct_spawn_ct_ring.png"
+      "id": "mid",
+      "landmark": "mid",
+      "x": 0.52,
+      "y": 0.48,
+      "team": "t",
+      "frame": "mid_frame.jpg",
+      "ring": "mid_ring.png",
+      "label_ru": "Центр",
+      "source": "Центр.jpg"
     },
     {
-      "id": "bombsite_b_ct",
-      "landmark": "bombsite_b",
-      "x": 0.21,
-      "y": 0.12,
-      "team": "ct",
-      "frame": "bombsite_b_ct_frame.jpg",
-      "ring": "bombsite_b_ct_ring.png"
+      "id": "pit",
+      "landmark": "pit",
+      "x": 0.45,
+      "y": 0.55,
+      "team": "t",
+      "frame": "pit_frame.jpg",
+      "ring": "pit_ring.png",
+      "label_ru": "Яма",
+      "source": "Яма.jpg"
     }
   ]
 }

@@ -27,6 +27,9 @@ mode=world pose=(0.22,0.28) path=tunnel>mid fwd=1
 
 `resources/nav/maps/*/hud_ref/` is **calibration**, never YOLO train (`never_train`).
 
+Dust2 RU catalog (22 place labels, title-bar cropped → 1280×720) drives
+`dust2_dm` v2.1.0 dense waypoint graph. Expect `place_templates=22`.
+
 ## Product locomotion (walk-to-goal)
 
 Root cause of “spin then stand still” (Sep 8 farm soak `c5c8ad629481`):

@@ -1,8 +1,8 @@
 {
-  "pack_version": "2.0.0",
+  "pack_version": "2.1.0",
   "calibration_profile": "armoryfarm_1280x720",
   "maps": ["de_dust2", "de_mirage", "generic_dm"],
   "packs": ["dust2_dm", "mirage_dm", "generic_dm"],
   "never_train": true,
-  "note": "Nav config only. Product: CS2 location-label place ID + waypoint path. hud_ref is calibration, not YOLO train."
+  "note": "Nav config only. Product: CS2 location-label place ID + waypoint path. Dust2 RU hud_ref 22 places (title-bar cropped). Not YOLO train."
 }
