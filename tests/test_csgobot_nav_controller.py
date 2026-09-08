@@ -147,7 +147,10 @@ def test_nav_controller_seek_entry_when_far() -> None:
     assert result.state == NavState.SEEK_ENTRY
     assert result.target_id == "long_doors"
     assert result.entry_pick_event
+    for i in range(12):
+        ctrl.tick(pose, now=1.0 + i * 0.05, paused=False)
     assert moves or keys_down
+    assert ctrl.is_locomoting
 
 
 def test_nav_controller_seek_goal_when_near() -> None:
@@ -193,6 +196,7 @@ def test_nav_controller_pose_lost_triggers_macro_fallback() -> None:
 
 def test_nav_controller_stuck_triggers_escape() -> None:
     ctrl, _, _, _ = _controller()
+    ctrl._stuck_grace_sec = 0.0
     pack = _pack()
     pose = _pose(0.44, 0.54, -37.0)
     now = 0.0
@@ -206,6 +210,18 @@ def test_nav_controller_stuck_triggers_escape() -> None:
     assert result.state == NavState.STUCK_ESCAPE
     assert result.stuck_event
     assert result.dist_to_goal > pack.goal.arrive_radius
+
+
+def test_nav_controller_stuck_grace_suppresses_early_escape() -> None:
+    ctrl, _, _, _ = _controller()
+    ctrl._stuck_grace_sec = 5.0
+    pose = _pose(0.44, 0.54, -37.0)
+    now = 0.0
+    for _ in range(60):
+        now += 0.05
+        result = ctrl.tick(pose, now=now, paused=False)
+        assert result.state != NavState.STUCK_ESCAPE
+    assert ctrl.is_locomoting
 
 
 def test_nav_controller_release_keys() -> None:

@@ -69,7 +69,7 @@ set CSGOBOT_NAV_PACK=auto
 .\venv\Scripts\python tools\nav_preflight.py
 ```
 
-Expected auto: `"ok": true`, `"packs_ok": ["dust2_dm", "mirage_dm"]`. Panel startup log shows `csgobot nav: auto preflight ok (dust2_dm v1.2.0, mirage_dm v1.0.0)`.
+Expected auto: `"ok": true`, `"packs_ok": ["dust2_dm", "mirage_dm", "generic_dm"]`. Panel startup log shows `csgobot nav: auto preflight ok (dust2_dm …)`. On Dust2 farm expect `nav: movement enabled pack=dust2_dm` (not `generic_dm`).
 
 **Mirage soak (PR-N6):** 30+ min Mirage DM with `csgobot_nav_pack=auto` — log `nav: auto pack mirage_dm` and `nav_metrics` every 30s (`pose_valid_pct` ≥ 80%). See `docs/NAV_IMPLEMENTATION.md`.
 

@@ -31,12 +31,66 @@ def test_resolve_initial_nav_pack_id() -> None:
         )
         == "mirage_dm"
     )
+    # Product: generic_dm is placeholder → start on dust2_dm
     assert (
         pack_resolve.resolve_initial_nav_pack_id(
             explicit_pack="auto",
             patrol_script="generic_dm",
         )
-        == "generic_dm"
+        == "dust2_dm"
+    )
+    assert (
+        pack_resolve.resolve_initial_nav_pack_id(
+            explicit_pack="auto",
+            patrol_script="dust2",
+        )
+        == "dust2_dm"
+    )
+    assert (
+        pack_resolve.resolve_initial_nav_pack_id(
+            explicit_pack="mirage_dm",
+            patrol_script="generic_dm",
+        )
+        == "mirage_dm"
+    )
+
+
+def test_should_fail_open_to_default() -> None:
+    assert (
+        pack_resolve.should_fail_open_to_default(
+            explicit_pack="auto",
+            active_pack_id="generic_dm",
+            confirmed_script="generic_dm",
+            map_locked=False,
+        )
+        is True
+    )
+    assert (
+        pack_resolve.should_fail_open_to_default(
+            explicit_pack="auto",
+            active_pack_id="dust2_dm",
+            confirmed_script="generic_dm",
+            map_locked=False,
+        )
+        is False
+    )
+    assert (
+        pack_resolve.should_fail_open_to_default(
+            explicit_pack="auto",
+            active_pack_id="generic_dm",
+            confirmed_script="dust2",
+            map_locked=True,
+        )
+        is False
+    )
+    assert (
+        pack_resolve.should_fail_open_to_default(
+            explicit_pack="dust2_dm",
+            active_pack_id="generic_dm",
+            confirmed_script="generic_dm",
+            map_locked=False,
+        )
+        is False
     )
 
 

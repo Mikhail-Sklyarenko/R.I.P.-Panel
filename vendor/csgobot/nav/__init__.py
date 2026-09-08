@@ -23,9 +23,12 @@ from nav.paths import (
     resolve_nav_pack_path,
 )
 from nav.pack_resolve import (
+    PRODUCT_DEFAULT_PACK,
     is_auto_pack,
+    is_placeholder_script,
     nav_pack_for_script,
     resolve_initial_nav_pack_id,
+    should_fail_open_to_default,
 )
 from nav.pose import PoseResult
 from nav.pose_filter import PoseFilter
@@ -59,7 +62,10 @@ __all__ = [
     "resolve_nav_pack_path",
     "run_nav_preflight",
     "is_auto_pack",
+    "is_placeholder_script",
     "nav_pack_for_script",
+    "PRODUCT_DEFAULT_PACK",
     "resolve_initial_nav_pack_id",
+    "should_fail_open_to_default",
     "should_use_entry",
 ]

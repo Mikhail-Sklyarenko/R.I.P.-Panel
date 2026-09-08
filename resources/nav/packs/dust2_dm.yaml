@@ -2,7 +2,7 @@ meta:
   pack_id: dust2_dm
   map_id: de_dust2
   mode: deathmatch
-  version: "1.2.0"
+  version: "1.2.1"
 
 strategy: route_cycle
 
@@ -71,7 +71,7 @@ fallback:
   retry_nav_after_macro: true
 
 stuck:
-  progress_timeout_sec: 3.0
+  progress_timeout_sec: 4.5
   min_progress_norm: 0.008
   escape_duration_sec: 0.45
   escape_angles_deg: [30, -30, 60, -60, 90, -90]

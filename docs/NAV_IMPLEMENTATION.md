@@ -2,6 +2,25 @@
 
 Goal-based navigation for CS2 DM farm bots. **Not a YOLO dataset** — config + code only.
 
+## Product nav hardening (post farm soak)
+
+Root-cause fix after Sep 1 Dust2 soak (`generic_dm` + Look fight):
+
+1. **Auto start pack** = `dust2_dm` when patrol is still `generic_dm` (placeholder)
+2. **Fail-open** after 8s if still on `generic_dm` without map lock
+3. **map_detect status** logged every 5s (`map: detect=…`)
+4. **Combat > Nav > Look** — Look suppressed while seeking / stuck_escape
+5. **Stuck grace** 10s after start/reload; pack stuck timeout 4.5s
+
+Expect in stderr on Dust2 farm:
+
+```
+nav: movement enabled pack=dust2_dm …
+map: detect=… script=…
+```
+
+Not: endless `stuck escape` in the first 10s, not `pack=generic_dm` on Dust2.
+
 ## PR-N9 (radar overlay editor + HTTP fleet collector)
 
 ### Visual radar editor

@@ -41,7 +41,7 @@ from aiming.aim_pipeline import AimPipelineState, process_aim_frame
 from aiming.fire_actions import apply_fire_action
 from aiming.fire_controller import FireAction, FireController
 from aiming.combat_aim import maybe_switch_to_body
-from aim_tuning import aim_debug_enabled, team_debug_enabled, map_debug_enabled
+from aim_tuning import aim_debug_enabled, team_debug_enabled
 from team.hud_team_detect import (
     TeamDetectState,
     detect_team_hud,
@@ -426,6 +426,8 @@ def detection_process(
     last_map_debug_log = 0.0
     last_nav_debug_log = 0.0
     last_nav_metrics_at = 0.0
+    nav_movement_started_at = 0.0
+    nav_fail_open_done = False
     nav_reader = None
     nav_pose_filter = None
     nav_pack = None
@@ -708,7 +710,8 @@ def detection_process(
                                 )
                     except Exception as exc:
                         logger.error("map: patrol reload failed (%s)", exc)
-                if map_debug_enabled() and now - last_map_debug_log >= 3.0:
+                # Product: always log map_detect status (farm observability).
+                if now - last_map_debug_log >= 5.0:
                     logger.info(
                         "map: detect=%s source=%s pending=%d/%d script=%s locked=%s",
                         detected or "none",
@@ -879,6 +882,60 @@ def detection_process(
                 and nav_controller is not None
                 and activated.is_set()
             )
+            if use_nav_movement and nav_movement_started_at <= 0.0:
+                nav_movement_started_at = now
+
+            # Product fail-open: never stay on generic_dm when auto + map unknown.
+            if (
+                use_nav_movement
+                and not nav_fail_open_done
+                and nav_controller is not None
+                and nav_pack is not None
+                and nav_movement_started_at > 0.0
+                and now - nav_movement_started_at >= 8.0
+            ):
+                from nav.pack_resolve import (
+                    PRODUCT_DEFAULT_PACK,
+                    should_fail_open_to_default,
+                )
+
+                confirmed = (
+                    map_detect_state.confirmed_script
+                    if map_detect_state is not None
+                    else "generic_dm"
+                )
+                locked = bool(map_detect_state.locked) if map_detect_state else False
+                if should_fail_open_to_default(
+                    explicit_pack=config.nav.pack_id,
+                    active_pack_id=nav_pack.pack_id,
+                    confirmed_script=confirmed,
+                    map_locked=locked,
+                ):
+                    try:
+                        from nav.pack import load_nav_pack
+                        from nav.paths import resolve_nav_pack_path
+
+                        new_pack = load_nav_pack(
+                            resolve_nav_pack_path(PRODUCT_DEFAULT_PACK)
+                        )
+                        nav_controller.reload_pack(new_pack)
+                        nav_pack = new_pack
+                        active_nav_pack_id = PRODUCT_DEFAULT_PACK
+                        if nav_metrics is not None:
+                            nav_metrics = NavMetrics(
+                                log_interval_sec=config.nav.metrics_log_interval_sec,
+                            )
+                            nav_metrics.set_pack_id(new_pack.pack_id)
+                            nav_metrics.start(now)
+                        logger.warning(
+                            "nav: fail-open pack %s (map_detect silent; "
+                            "was generic_dm)",
+                            PRODUCT_DEFAULT_PACK,
+                        )
+                    except Exception as exc:
+                        logger.error("nav: fail-open failed (%s)", exc)
+                nav_fail_open_done = True
+
             nav_tick_result = None
 
             if not activated.is_set():
@@ -909,10 +966,18 @@ def detection_process(
                     if look_controller is not None:
                         look_controller.abort(now=now)
 
+                # Combat > Nav > Look: never freeze Nav for Look while locomoting.
+                nav_locomoting = bool(
+                    nav_controller is not None and nav_controller.is_locomoting
+                )
+                if nav_locomoting and look_controller is not None:
+                    look_controller.abort(now=now)
+
                 look_hold_movement = (
                     look_controller is not None
                     and config.look.pause_movement
                     and look_controller.is_sweeping
+                    and not nav_locomoting
                 )
                 nav_paused = (
                     in_combat
@@ -926,6 +991,7 @@ def detection_process(
                     look_sweeping = (
                         look_controller is not None
                         and look_controller.is_sweeping
+                        and not nav_locomoting
                     )
                     nav_tick_result = nav_controller.tick(
                         nav_pose,
@@ -1135,6 +1201,19 @@ def detection_process(
                     and not in_combat
                     and not patrol_buy_freeze
                 )
+                # Product: Look only when Nav is idle at goal / macro — never while seeking.
+                nav_allows_look = True
+                if use_nav_movement and nav_controller is not None:
+                    from nav.controller import NavState as _NavState
+
+                    nav_allows_look = nav_controller.state in (
+                        _NavState.AT_GOAL,
+                        _NavState.MACRO_FALLBACK,
+                        _NavState.PAUSED,
+                    ) or (
+                        nav_tick_result is not None
+                        and nav_tick_result.use_macro_patrol
+                    )
                 look_patrol_tick = nav_locomotion or should_patrol_tick(
                     patrol_enabled=config.patrol.enabled,
                     activated=activated.is_set(),
@@ -1146,6 +1225,7 @@ def detection_process(
                     or in_combat
                     or patrol_buy_freeze
                     or unstuck_running
+                    or not nav_allows_look
                     or (
                         not nav_locomotion
                         and (
@@ -1168,6 +1248,7 @@ def detection_process(
                     and look_patrol_tick
                     and not patrol_buy_freeze
                     and not unstuck_running
+                    and nav_allows_look
                     and (
                         nav_locomotion
                         or (
@@ -1186,7 +1267,11 @@ def detection_process(
                 if look_active and config.look.pause_movement and look_controller.is_sweeping:
                     if patrol_runner is not None:
                         patrol_runner.release_all_keys()
-                    if nav_controller is not None:
+                    # Do not release Nav keys while locomoting (Combat > Nav > Look).
+                    if (
+                        nav_controller is not None
+                        and not nav_controller.is_locomoting
+                    ):
                         nav_controller.release_keys()
 
             if activated.is_set() and enemy_target is not None:

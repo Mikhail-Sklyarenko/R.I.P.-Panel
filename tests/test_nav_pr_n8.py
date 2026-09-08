@@ -30,11 +30,16 @@ def test_collect_fleet_rows_merges_inbox(tmp_path, monkeypatch) -> None:
     monkeypatch.setenv("FARM_PANEL_DATA_DIR", str(tmp_path))
     local = tmp_path / "logs" / "nav_metrics.jsonl"
     inbox = tmp_path / "fleet_inbox" / "pc2.jsonl"
+    from datetime import datetime, timedelta, timezone
+
+    now = datetime.now(timezone.utc)
+    ts1 = (now - timedelta(hours=1)).isoformat()
+    ts2 = (now - timedelta(minutes=30)).isoformat()
     _write_jsonl(
         local,
         [
             {
-                "ts": "2026-09-01T12:00:00+00:00",
+                "ts": ts1,
                 "host": "pc1",
                 "login": "a1",
                 "session_id": "s1",
@@ -46,7 +51,7 @@ def test_collect_fleet_rows_merges_inbox(tmp_path, monkeypatch) -> None:
         inbox,
         [
             {
-                "ts": "2026-09-01T12:01:00+00:00",
+                "ts": ts2,
                 "host": "pc2",
                 "login": "a2",
                 "session_id": "s2",
@@ -84,7 +89,11 @@ def test_import_fleet_inbox_archives(tmp_path, monkeypatch) -> None:
 
 
 def test_nav_pack_override_roundtrip(tmp_path, monkeypatch) -> None:
+    from config.paths import get_app_root
+
+    get_app_root.cache_clear()
     monkeypatch.setenv("FARM_PANEL_APP_ROOT", str(tmp_path))
+    get_app_root.cache_clear()
     bundled = tmp_path / "resources" / "nav" / "packs"
     bundled.mkdir(parents=True)
     pack = {
@@ -125,6 +134,9 @@ def test_nav_pack_override_roundtrip(tmp_path, monkeypatch) -> None:
     assert reset_pack_override("dust2_dm")
     view3 = load_pack_view("dust2_dm")
     assert view3.source == "bundled"
+    get_app_root.cache_clear()
+    monkeypatch.delenv("FARM_PANEL_APP_ROOT", raising=False)
+    get_app_root.cache_clear()
 
 
 def test_csgobot_resolve_pack_override(tmp_path, monkeypatch, csgobot_path) -> None:

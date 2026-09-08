@@ -212,6 +212,11 @@ class NavController:
 
         self._planned = False
 
+        # Product: ignore stuck escapes during first seconds after start/reload.
+        self._session_started_at: Optional[float] = None
+
+        self._stuck_grace_sec = 10.0
+
 
 
     @property
@@ -219,6 +224,24 @@ class NavController:
     def state(self) -> NavState:
 
         return self._state
+
+
+
+    @property
+
+    def is_locomoting(self) -> bool:
+
+        """True while Nav owns movement (Combat > Nav > Look)."""
+
+        return self._state in (
+
+            NavState.SEEK_ENTRY,
+
+            NavState.SEEK_GOAL,
+
+            NavState.STUCK_ESCAPE,
+
+        )
 
 
 
@@ -291,6 +314,8 @@ class NavController:
         self._at_goal_since = None
 
         self._planned = False
+
+        self._session_started_at = None
 
     def _set_move_key(self, key: Optional[str]) -> None:
 
@@ -626,6 +651,11 @@ class NavController:
             self._best_dist = dist_target
             self._last_progress_at = now
             return None
+        if (
+            self._session_started_at is not None
+            and now - self._session_started_at < self._stuck_grace_sec
+        ):
+            return None
         if now - self._last_progress_at >= self._pack.stuck.progress_timeout_sec:
             self._start_escape(now)
             return self._make_result(
@@ -669,6 +699,10 @@ class NavController:
             dt = max(1.0 / 240.0, min(0.1, now - self._last_tick_at))
 
         self._last_tick_at = now
+
+        if self._session_started_at is None and not paused:
+
+            self._session_started_at = now
 
 
 
