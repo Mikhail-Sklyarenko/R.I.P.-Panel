@@ -29,6 +29,29 @@ class GoalFollowOutput:
     dist_to_goal: float
 
 
+def should_hold_forward(
+    yaw_error_deg: float,
+    humanize: HumanizeConfig,
+    *,
+    force_crawl: bool = False,
+    force_walk: bool = False,
+) -> bool:
+    """Product locomotion gate: walk while turning; never freeze forever on yaw noise.
+
+    - aligned (|err| <= forward_max_yaw_deg): always W
+    - crawl (force_crawl, |err| <= forward_crawl_yaw_deg): W while correcting
+    - force_walk: hard fail-open up to ~150° so pose can progress even if yaw is wrong
+    """
+    err = abs(float(yaw_error_deg))
+    if err <= humanize.forward_max_yaw_deg:
+        return True
+    if force_crawl and err <= humanize.forward_crawl_yaw_deg:
+        return True
+    if force_walk and err <= 150.0:
+        return True
+    return False
+
+
 def compute_follow_plan(
     pose: PoseResult,
     goal: NavGoal,
@@ -38,6 +61,8 @@ def compute_follow_plan(
     wobble_bias_deg: float = 0.0,
     allow_forward: bool = True,
     turn_rate_deg_per_sec: float | None = None,
+    force_crawl: bool = False,
+    force_walk: bool = False,
 ) -> FollowPlan:
     dist = dist_norm(pose.x_norm, pose.y_norm, goal.x, goal.y)
     target_bearing = bearing_deg(
@@ -52,9 +77,11 @@ def compute_follow_plan(
     )
     max_turn = rate * max(dt_sec, 1.0 / 120.0)
     turn_step = max(-max_turn, min(max_turn, yaw_error))
-    forward = (
-        allow_forward
-        and abs(yaw_error) <= humanize.forward_max_yaw_deg
+    forward = allow_forward and should_hold_forward(
+        yaw_error,
+        humanize,
+        force_crawl=force_crawl,
+        force_walk=force_walk,
     )
 
     return FollowPlan(
@@ -74,6 +101,8 @@ def compute_goal_follow(
     dt_sec: float,
     wobble_bias_deg: float = 0.0,
     allow_forward: bool = True,
+    force_crawl: bool = False,
+    force_walk: bool = False,
 ) -> GoalFollowOutput:
     plan = compute_follow_plan(
         pose,
@@ -82,6 +111,8 @@ def compute_goal_follow(
         dt_sec=dt_sec,
         wobble_bias_deg=wobble_bias_deg,
         allow_forward=allow_forward,
+        force_crawl=force_crawl,
+        force_walk=force_walk,
     )
     mouse_dx, mouse_dy = fov_mouse.angle_to_mouse(plan.turn_step_deg, 0.0)
     return GoalFollowOutput(

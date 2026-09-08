@@ -1,4 +1,4 @@
-"""Read player pose from the HUD minimap (color blob + PCA yaw)."""
+"""Read player pose from the HUD minimap (color blob + arrow-tip yaw)."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from typing import Optional
 
 import numpy as np
 
-from nav.calibration import MinimapCalibration, NavCalibration
+from nav.calibration import NavCalibration
 from nav.coords import normalize_angle_deg, pixel_to_norm
 from nav.pose import PoseResult
 
@@ -42,6 +42,70 @@ def _label_components(mask: np.ndarray) -> list[tuple[int, int, float, float]]:
     return components
 
 
+def _component_mask(
+    mask: np.ndarray,
+    *,
+    seed_x: float,
+    seed_y: float,
+) -> np.ndarray:
+    """Flood-fill the connected component nearest to (seed_x, seed_y)."""
+    h, w = mask.shape
+    ys, xs = np.where(mask)
+    out = np.zeros_like(mask, dtype=bool)
+    if len(xs) == 0:
+        return out
+    d2 = (xs.astype(np.float64) - seed_x) ** 2 + (ys.astype(np.float64) - seed_y) ** 2
+    i = int(np.argmin(d2))
+    sx, sy = int(xs[i]), int(ys[i])
+    stack = [(sy, sx)]
+    out[sy, sx] = True
+    while stack:
+        cy, cx = stack.pop()
+        for ny, nx in ((cy - 1, cx), (cy + 1, cx), (cy, cx - 1), (cy, cx + 1)):
+            if 0 <= ny < h and 0 <= nx < w and mask[ny, nx] and not out[ny, nx]:
+                out[ny, nx] = True
+                stack.append((ny, nx))
+    return out
+
+
+def _yaw_from_arrow_tip(
+    crop: np.ndarray,
+    component: np.ndarray,
+) -> float:
+    """Heading from blob centroid toward arrow tip (same frame as bearing_deg).
+
+    PCA axis alone is ±90° ambiguous and fails on near-round HUD icons.
+    Tip-of-mask points along the CS2 player chevron.
+    """
+    ys, xs = np.where(component)
+    if len(xs) < 4:
+        return 0.0
+
+    xs_f = xs.astype(np.float64)
+    ys_f = ys.astype(np.float64)
+    cx = float(np.mean(xs_f))
+    cy = float(np.mean(ys_f))
+    dx = xs_f - cx
+    dy = ys_f - cy
+    dist2 = dx * dx + dy * dy
+    if float(np.max(dist2)) < 1e-6:
+        return 0.0
+
+    # Prefer the farthest bright pixels (arrow tip is usually lighter cyan).
+    order = np.argsort(dist2)
+    tail_n = max(3, len(order) // 5)
+    candidates = order[-tail_n:]
+    samples = crop[ys[candidates], xs[candidates]].astype(np.float64)
+    brightness = samples.mean(axis=1) if samples.ndim == 2 else samples
+    # Rank: distance first, brightness breaks ties among the outer ring.
+    score = dist2[candidates] + 0.15 * brightness
+    best = int(candidates[int(np.argmax(score))])
+    tip_dx = float(xs_f[best] - cx)
+    tip_dy = float(ys_f[best] - cy)
+    # Image coords: 0° = east, 90° = south — matches nav.coords.bearing_deg.
+    return normalize_angle_deg(math.degrees(math.atan2(tip_dy, tip_dx)))
+
+
 def _yaw_from_blob(
     crop: np.ndarray,
     mask: np.ndarray,
@@ -49,19 +113,9 @@ def _yaw_from_blob(
     local_cx: float,
     local_cy: float,
 ) -> float:
-    ys, xs = np.where(mask)
-    if len(xs) < 4:
-        return 0.0
-    xs_f = xs.astype(np.float64) - local_cx
-    ys_f = ys.astype(np.float64) - local_cy
-    cov_xx = float(np.mean(xs_f * xs_f))
-    cov_yy = float(np.mean(ys_f * ys_f))
-    cov_xy = float(np.mean(xs_f * ys_f))
-    if cov_xx + cov_yy < 1e-6:
-        return 0.0
-    angle_rad = 0.5 * math.atan2(2.0 * cov_xy, cov_xx - cov_yy)
-    yaw = math.degrees(angle_rad)
-    return normalize_angle_deg(yaw)
+    """Public helper used by tests — tip yaw on the seeded component."""
+    component = _component_mask(mask, seed_x=local_cx, seed_y=local_cy)
+    return _yaw_from_arrow_tip(crop, component)
 
 
 class MinimapReader:
@@ -147,7 +201,8 @@ class MinimapReader:
             rect_w=rect.w,
             rect_h=rect.h,
         )
-        yaw_deg = _yaw_from_blob(crop, mask, local_cx=local_cx, local_cy=local_cy)
+        component = _component_mask(mask, seed_x=local_cx, seed_y=local_cy)
+        yaw_deg = _yaw_from_arrow_tip(crop, component)
 
         icon = self._mm.player_icon
         center_dist = math.hypot(

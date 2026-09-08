@@ -27,6 +27,10 @@ class NavMetrics:
     _micro_pauses: int = 0
     _look_yields: int = 0
     _forward_jitters: int = 0
+    _forward_held_ticks: int = 0
+    _forward_fail_open_ticks: int = 0
+    _yaw_err_sum: float = 0.0
+    _yaw_err_samples: int = 0
     _pose_valid_ticks: int = 0
     _pose_total_ticks: int = 0
     _dist_sum: float = 0.0
@@ -82,6 +86,17 @@ class NavMetrics:
             self._look_yields += 1
         if result.humanize_forward_jitter:
             self._forward_jitters += 1
+        if result.forward_held:
+            self._forward_held_ticks += 1
+        if result.forward_fail_open:
+            self._forward_fail_open_ticks += 1
+        if result.pose_valid and result.state in (
+            NavState.SEEK_ENTRY,
+            NavState.SEEK_GOAL,
+            NavState.STUCK_ESCAPE,
+        ):
+            self._yaw_err_sum += abs(float(result.yaw_error_deg))
+            self._yaw_err_samples += 1
 
         if goal_id:
             self._last_goal_id = goal_id
@@ -108,6 +123,20 @@ class NavMetrics:
             100.0 * at_goal_sec / nav_active_sec if nav_active_sec > 0.0 else 0.0
         )
 
+        avg_yaw_err = (
+            self._yaw_err_sum / self._yaw_err_samples if self._yaw_err_samples else 0.0
+        )
+        forward_held_pct = (
+            100.0 * self._forward_held_ticks / self._pose_total_ticks
+            if self._pose_total_ticks
+            else 0.0
+        )
+        fail_open_pct = (
+            100.0 * self._forward_fail_open_ticks / self._pose_total_ticks
+            if self._pose_total_ticks
+            else 0.0
+        )
+
         pose_xy = None
         if self._last_pose is not None and self._last_pose.valid:
             pose_xy = [round(self._last_pose.x_norm, 3), round(self._last_pose.y_norm, 3)]
@@ -131,6 +160,9 @@ class NavMetrics:
             "micro_pauses": self._micro_pauses,
             "look_yields": self._look_yields,
             "forward_jitters": self._forward_jitters,
+            "forward_held_pct": round(forward_held_pct, 1),
+            "fail_open_pct": round(fail_open_pct, 1),
+            "avg_yaw_err_deg": round(avg_yaw_err, 1),
         }
 
     def maybe_log(

@@ -39,6 +39,7 @@ class NavHumanizer:
         self._wobble_bias = 0.0
         self._wobble_refresh_at = 0.0
         self._micro_pause_until = 0.0
+        self._next_micro_pause_eligible_at = 0.0
         self._forward_jitter_until = 0.0
 
     def reset(self) -> None:
@@ -46,6 +47,7 @@ class NavHumanizer:
         self._wobble_bias = 0.0
         self._wobble_refresh_at = 0.0
         self._micro_pause_until = 0.0
+        self._next_micro_pause_eligible_at = 0.0
         self._forward_jitter_until = 0.0
 
     def _refresh_wobble(self, now: float) -> None:
@@ -71,6 +73,8 @@ class NavHumanizer:
         now: float,
         look_sweeping: bool = False,
         allow_forward: bool = True,
+        force_crawl: bool = False,
+        force_walk: bool = False,
     ) -> HumanizedMotion:
         if now < self._micro_pause_until:
             return HumanizedMotion(
@@ -83,15 +87,19 @@ class NavHumanizer:
                 micro_pause=True,
             )
 
+        # Product: rate-limit micro-pauses so 60 Hz ticks cannot freeze locomotion.
         if (
-            self._rng.random() < self._cfg.micro_pause_chance
-            and now >= self._micro_pause_until
+            now >= self._next_micro_pause_eligible_at
+            and self._rng.random() < self._cfg.micro_pause_chance
         ):
             pause = self._rng.uniform(
                 self._cfg.micro_pause_sec_min,
                 self._cfg.micro_pause_sec_max,
             )
             self._micro_pause_until = now + pause
+            self._next_micro_pause_eligible_at = (
+                now + pause + self._cfg.micro_pause_min_interval_sec
+            )
             return HumanizedMotion(
                 mouse_dx=0,
                 mouse_dy=0,
@@ -111,6 +119,8 @@ class NavHumanizer:
             wobble_bias_deg=self._wobble_bias,
             allow_forward=allow_forward,
             turn_rate_deg_per_sec=self._jittered_turn_rate(),
+            force_crawl=force_crawl,
+            force_walk=force_walk,
         )
 
         alpha = self._cfg.turn_smooth_alpha
@@ -129,17 +139,19 @@ class NavHumanizer:
 
         forward = plan.forward
         forward_jitter = False
-        if forward and now < self._forward_jitter_until:
-            forward = False
-            forward_jitter = True
-        elif forward and self._rng.random() < self._cfg.forward_jitter_chance:
-            jitter = self._rng.uniform(
-                self._cfg.forward_jitter_sec_min,
-                self._cfg.forward_jitter_sec_max,
-            )
-            self._forward_jitter_until = now + jitter
-            forward = False
-            forward_jitter = True
+        # Never jitter-cancel W during fail-open crawl — that recreated "stand still".
+        if forward and not force_crawl and not force_walk:
+            if now < self._forward_jitter_until:
+                forward = False
+                forward_jitter = True
+            elif self._rng.random() < self._cfg.forward_jitter_chance:
+                jitter = self._rng.uniform(
+                    self._cfg.forward_jitter_sec_min,
+                    self._cfg.forward_jitter_sec_max,
+                )
+                self._forward_jitter_until = now + jitter
+                forward = False
+                forward_jitter = True
 
         return HumanizedMotion(
             mouse_dx=mouse_dx,

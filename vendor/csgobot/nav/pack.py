@@ -122,6 +122,13 @@ class HumanizeConfig:
 
     look_yield_turn: bool
 
+    # Product locomotion: walk while turning; fail-open if pose freezes.
+    forward_crawl_yaw_deg: float = 125.0
+
+    forward_fail_open_after_sec: float = 0.9
+
+    micro_pause_min_interval_sec: float = 2.5
+
 
 
 
@@ -312,29 +319,39 @@ def parse_nav_pack_data(data: dict[str, Any]) -> NavPack:
 
         speed_jitter=float(hum_raw.get("speed_jitter", 0.12)),
 
-        micro_pause_chance=float(hum_raw.get("micro_pause_chance", 0.03)),
+        micro_pause_chance=float(hum_raw.get("micro_pause_chance", 0.012)),
 
-        micro_pause_sec_min=float(hum_raw.get("micro_pause_sec_min", 0.1)),
+        micro_pause_sec_min=float(hum_raw.get("micro_pause_sec_min", 0.08)),
 
-        micro_pause_sec_max=float(hum_raw.get("micro_pause_sec_max", 0.35)),
+        micro_pause_sec_max=float(hum_raw.get("micro_pause_sec_max", 0.22)),
 
         turn_rate_deg_per_sec=float(hum_raw.get("turn_rate_deg_per_sec", 90.0)),
 
         path_wobble_deg=float(hum_raw.get("path_wobble_deg", 4.0)),
 
-        forward_max_yaw_deg=float(hum_raw.get("forward_max_yaw_deg", 22.0)),
+        forward_max_yaw_deg=float(hum_raw.get("forward_max_yaw_deg", 48.0)),
 
         turn_smooth_alpha=float(hum_raw.get("turn_smooth_alpha", 0.42)),
 
         wobble_refresh_sec=float(hum_raw.get("wobble_refresh_sec", 0.85)),
 
-        forward_jitter_chance=float(hum_raw.get("forward_jitter_chance", 0.04)),
+        forward_jitter_chance=float(hum_raw.get("forward_jitter_chance", 0.02)),
 
         forward_jitter_sec_min=float(hum_raw.get("forward_jitter_sec_min", 0.05)),
 
-        forward_jitter_sec_max=float(hum_raw.get("forward_jitter_sec_max", 0.14)),
+        forward_jitter_sec_max=float(hum_raw.get("forward_jitter_sec_max", 0.12)),
 
         look_yield_turn=bool(hum_raw.get("look_yield_turn", True)),
+
+        forward_crawl_yaw_deg=float(hum_raw.get("forward_crawl_yaw_deg", 125.0)),
+
+        forward_fail_open_after_sec=float(
+            hum_raw.get("forward_fail_open_after_sec", 0.9)
+        ),
+
+        micro_pause_min_interval_sec=float(
+            hum_raw.get("micro_pause_min_interval_sec", 2.5)
+        ),
 
     )
 

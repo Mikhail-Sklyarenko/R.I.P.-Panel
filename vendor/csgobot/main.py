@@ -876,6 +876,17 @@ def detection_process(
             if in_combat:
                 last_enemy_seen = now
 
+            # Product DM: pause Nav only for close engage or active fire.
+            # Distant detections must not freeze locomotion (farm soak root cause).
+            NAV_COMBAT_ENGAGE_PX = 220.0
+            nav_combat_hold = bool(
+                enemy_target is not None
+                and (
+                    fire_controller.is_holding
+                    or float(enemy_target.distance) <= NAV_COMBAT_ENGAGE_PX
+                )
+            )
+
             if not activated.is_set() and aim_mouse is not None:
                 aim_mouse.clear()
 
@@ -992,7 +1003,7 @@ def detection_process(
                     last_enemy_seen=last_enemy_seen,
                     combat_clear_sec=config.patrol.combat_clear_sec,
                 )
-                if in_combat:
+                if nav_combat_hold:
                     if nav_controller is not None:
                         nav_controller.release_keys()
                     if look_controller is not None:
@@ -1013,7 +1024,7 @@ def detection_process(
                 )
                 # Pause nav during match-ready / map change (avoid wrong-pack walks).
                 nav_paused = (
-                    in_combat
+                    nav_combat_hold
                     or patrol_buy_freeze
                     or look_hold_movement
                     or map_transition_active
@@ -1085,9 +1096,35 @@ def detection_process(
                         if nav_tick_result is not None
                         else "paused"
                     )
+                    pause_reason = ""
+                    if nav_tick_result is None:
+                        if nav_combat_hold:
+                            pause_reason = " combat_engage"
+                        elif patrol_buy_freeze:
+                            pause_reason = " buy_freeze"
+                        elif map_transition_active:
+                            pause_reason = " map_transition"
+                        elif look_hold_movement:
+                            pause_reason = " look"
+                    yaw_err = (
+                        nav_tick_result.yaw_error_deg
+                        if nav_tick_result is not None
+                        else 0.0
+                    )
+                    fwd = (
+                        "1"
+                        if nav_tick_result is not None and nav_tick_result.forward_held
+                        else "0"
+                    )
+                    fail_open = (
+                        "1"
+                        if nav_tick_result is not None and nav_tick_result.forward_fail_open
+                        else "0"
+                    )
                     logger.info(
                         "nav: state=%s phase=%s pose=(%.2f,%.2f) yaw=%.0f conf=%.2f "
-                        "valid=%s dist=%.3f goal=%s target=%s",
+                        "valid=%s dist=%.3f yaw_err=%.0f fwd=%s fail_open=%s "
+                        "goal=%s target=%s%s",
                         state_label,
                         phase_label,
                         nav_pose.x_norm,
@@ -1096,8 +1133,12 @@ def detection_process(
                         nav_pose.confidence,
                         nav_pose.valid,
                         nav_tick_result.dist_to_goal if nav_tick_result else 0.0,
+                        yaw_err,
+                        fwd,
+                        fail_open,
                         goal_label,
                         target_label,
+                        pause_reason,
                     )
                     last_nav_debug_log = now
             elif config.patrol.enabled and patrol_runner is not None:

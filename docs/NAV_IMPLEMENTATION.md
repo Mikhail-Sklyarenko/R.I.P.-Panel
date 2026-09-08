@@ -2,6 +2,30 @@
 
 Goal-based navigation for CS2 DM farm bots. **Not a YOLO dataset** — config + code only.
 
+## Product locomotion (walk-to-goal)
+
+Root cause of “spin then stand still” (Sep 8 farm soak `c5c8ad629481`):
+
+1. **PCA yaw** on the player blob never matched `bearing_deg` → `|yaw_err|` ≫ 22° → **W never held**
+2. **Combat pause** froze Nav on *any* distant detection (~50% of ticks in DM)
+3. **Stuck escape** only strafed/rotated → more spinning, no progress
+
+Product behavior now:
+
+1. **Arrow-tip yaw** (centroid → bright tip) in the same frame as `bearing_deg`
+2. **Crawl + fail-open**: after ~0.9s without pose progress, hold W while turning (hard walk by ~1.8s)
+3. **Stuck escape = thrust + rotate** (W held during escape)
+4. **DM combat gate**: pause Nav only for close engage (≤220px) or active fire — not every detection
+5. Metrics: `forward_held_pct`, `fail_open_pct`, `avg_yaw_err_deg`; debug log includes `yaw_err` / `fwd` / pause reason
+
+Expect in stderr while seeking:
+
+```
+nav: state=seek_entry … yaw_err=.. fwd=1 fail_open=0 …
+```
+
+Not: endless `stuck escape` with frozen pose and `fwd=0`.
+
 ## Product map re-detect (Dust2 ↔ Mirage mid-session)
 
 Root cause of “map changed but nav stayed old”: soft-lock after first confirm

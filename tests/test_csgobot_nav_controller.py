@@ -124,7 +124,33 @@ def test_compute_goal_follow_turns_toward_goal() -> None:
     )
     assert out.dist_to_goal > pack.goal.arrive_radius
     assert out.mouse_dx != 0 or out.mouse_dy != 0
+    # Product: |yaw_err|≈45° is inside forward_max (48°) → crawl while turning.
+    assert abs(out.yaw_error_deg) == pytest.approx(45.0, abs=0.1)
+    assert out.forward
+
+
+def test_compute_goal_follow_holds_turn_when_facing_away() -> None:
+    pack = _pack()
+    # Face opposite of goal bearing so |yaw_err| stays above crawl unless fail-open.
+    pose = _pose(0.2, 0.8, 180.0)
+    out = compute_goal_follow(
+        pose,
+        pack.goal,
+        pack.humanize,
+        _fov_mouse(),
+        dt_sec=1.0 / 60.0,
+    )
+    assert abs(out.yaw_error_deg) > pack.humanize.forward_crawl_yaw_deg
     assert not out.forward
+    opened = compute_goal_follow(
+        pose,
+        pack.goal,
+        pack.humanize,
+        _fov_mouse(),
+        dt_sec=1.0 / 60.0,
+        force_walk=True,
+    )
+    assert opened.forward
 
 
 def test_compute_goal_follow_moves_forward_when_aligned() -> None:

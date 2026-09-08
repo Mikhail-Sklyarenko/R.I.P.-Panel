@@ -2,7 +2,7 @@ meta:
   pack_id: dust2_dm
   map_id: de_dust2
   mode: deathmatch
-  version: "1.2.1"
+  version: "1.3.0"
 
 strategy: route_cycle
 
@@ -52,17 +52,20 @@ at_goal:
 
 humanize:
   speed_jitter: 0.12
-  micro_pause_chance: 0.03
-  micro_pause_sec_min: 0.1
-  micro_pause_sec_max: 0.35
-  turn_rate_deg_per_sec: 90.0
-  path_wobble_deg: 4.0
-  forward_max_yaw_deg: 22.0
+  micro_pause_chance: 0.012
+  micro_pause_sec_min: 0.08
+  micro_pause_sec_max: 0.22
+  micro_pause_min_interval_sec: 2.5
+  turn_rate_deg_per_sec: 100.0
+  path_wobble_deg: 3.0
+  forward_max_yaw_deg: 48.0
+  forward_crawl_yaw_deg: 125.0
+  forward_fail_open_after_sec: 0.9
   turn_smooth_alpha: 0.42
   wobble_refresh_sec: 0.85
-  forward_jitter_chance: 0.04
+  forward_jitter_chance: 0.02
   forward_jitter_sec_min: 0.05
-  forward_jitter_sec_max: 0.14
+  forward_jitter_sec_max: 0.12
   look_yield_turn: true
 
 fallback:
@@ -73,5 +76,5 @@ fallback:
 stuck:
   progress_timeout_sec: 4.5
   min_progress_norm: 0.008
-  escape_duration_sec: 0.45
+  escape_duration_sec: 0.55
   escape_angles_deg: [30, -30, 60, -60, 90, -90]
