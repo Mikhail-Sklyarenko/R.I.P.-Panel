@@ -432,7 +432,7 @@ def detection_process(
     nav_movement_started_at = 0.0
     nav_fail_open_done = False
     map_transition_active = False
-    match_ready_latch = MatchReadyLatch(confirm_frames=12)
+    match_ready_latch = MatchReadyLatch(confirm_frames=20)
     nav_reader = None
     nav_pose_filter = None
     nav_radar_flow = None
@@ -580,6 +580,7 @@ def detection_process(
             from nav.pose_filter import PoseFilter
             from nav.radar_flow import RadarFlowSensor
             from nav.world_pose import YawTracker
+            from nav.corridor import build_edge_neighbors
             from nav.config_resolve import (
                 resolve_nav_allow_macro,
                 resolve_nav_place_hold_sec,
@@ -590,19 +591,21 @@ def detection_process(
             nav_cal = load_calibration(nav_cal_path)
             nav_pack_path = resolve_nav_pack_path(active_nav_pack_id)
             nav_pack = load_nav_pack(nav_pack_path)
-            place_hold = resolve_nav_place_hold_sec(4.0)
+            place_hold = resolve_nav_place_hold_sec(2.5)
             nav_reader = MinimapReader(nav_cal)
             nav_pose_filter = PoseFilter(nav_cal.pose, world_hold_sec=place_hold)
             nav_radar_flow = RadarFlowSensor()
             nav_yaw = YawTracker()
             nav_place = PlaceLocalizer(nav_pack.map_id)
             dump_dir = resolve_place_dump_dir()
+            nav_neighbors = build_edge_neighbors(tuple(nav_pack.edges))
             nav_perception = NavPerception(
                 nav_reader,
                 nav_place,
                 nav_yaw,
                 hold_sec=place_hold,
                 dump_dir=dump_dir,
+                neighbors=nav_neighbors,
             )
             if dump_dir is not None:
                 logger.info("nav: place miss dumps → %s", dump_dir)
@@ -631,7 +634,8 @@ def detection_process(
                 goal_ids = ", ".join(g.id for g in nav_pack.goals)
                 logger.info(
                     "nav: movement enabled pack=%s strategy=%s goals=[%s] "
-                    "place_templates=%d hold=%.1fs macro=%s radar=place-label+path",
+                    "place_templates=%d hold=%.1fs macro=%s "
+                    "locomotion=corridor+Safe-W",
                     nav_pack.pack_id,
                     nav_pack.strategy,
                     goal_ids,

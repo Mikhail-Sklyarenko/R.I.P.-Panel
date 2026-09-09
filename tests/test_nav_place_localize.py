@@ -134,18 +134,18 @@ def test_controller_follows_path_with_world_pose() -> None:
         key_up=lambda _k: None,
         move_relative=lambda *_: None,
     )
-    # Start at tunnel, seek mid
-    world = PoseResult(0.22, 0.28, -90.0, 0.9, True, 40, "world")
+    # Start at tunnel with place lock — corridor script + Safe-W with flow
+    world = PoseResult(0.22, 0.28, -90.0, 0.9, True, 40, "world", place_id="tunnel")
     r = ctrl.tick(world, now=1.0, paused=False, radar_progressing=True)
     assert r.pose_mode == "world"
     assert r.state == NavState.SEEK_GOAL
     assert r.path
-    assert "tunnel" in r.path or "mid" in r.path
+    assert "tunnel" in r.path or "corridor" in r.path or "mid" in r.path
     assert pack.version.startswith("2.")
     assert len(pack.waypoints) >= 20
     assert ctrl.suppresses_look is True
-    # Facing hop or walking — either is valid product seek.
-    assert r.forward_held is True or abs(r.yaw_error_deg) < 45.0
+    # With radar flow, Safe-W may walk or turn toward face landmark.
+    assert r.forward_held is True or abs(r.yaw_error_deg) < 90.0
 
 def test_perception_holds_world_across_place_flicker() -> None:
     cal = load_calibration(resolve_calibration_path())
@@ -216,21 +216,71 @@ def test_perception_rejects_weak_teleport() -> None:
     perc._last_hit = under
     perc._last_hit_at = 10.0
     # Weak teleport candidate — keep under_a
-    kept = perc._resolve_place(tunnel)
+    kept = perc._resolve_place(tunnel, now=10.0)
     assert kept is not None and kept.place_id == "under_a"
     # Even after several frames without override score
-    for _ in range(5):
-        kept = perc._resolve_place(tunnel)
+    for i in range(5):
+        kept = perc._resolve_place(tunnel, now=10.1 + i * 0.1)
     assert kept is not None and kept.place_id == "under_a"
     # Strong override after confirm frames (update() would commit last_hit)
     strong = PlaceHit("tunnel_stairs", 0.20, 0.25, 0.70, 0.30)
     accepted = None
-    for _ in range(6):
-        accepted = perc._resolve_place(strong)
+    for i in range(6):
+        accepted = perc._resolve_place(strong, now=11.0 + i * 0.05)
         if accepted is not None and accepted.place_id == "tunnel_stairs":
             perc._last_hit = accepted
             break
     assert accepted is not None and accepted.place_id == "tunnel_stairs"
+
+
+def test_perception_clears_lock_after_reject_streak() -> None:
+    from nav.place_localizer import PlaceHit
+
+    cal = load_calibration(resolve_calibration_path())
+    reader = MinimapReader(cal)
+    loc = PlaceLocalizer("de_dust2")
+    perc = NavPerception(reader, loc, hold_sec=2.5, switch_confirm=3)
+    under = PlaceHit("ct_spawn", 0.62, 0.21, 0.55, 0.28)
+    tunnel = PlaceHit("tunnel_upper", 0.20, 0.22, 0.58, 0.30)
+    perc._last_hit = under
+    perc._last_hit_at = 1.0
+    out = None
+    for i in range(8):
+        out = perc._resolve_place(tunnel, now=1.0 + i * 0.4)
+    # After ~2.5s of rejects, lock clears (None) — no eternal ct_spawn
+    assert out is None
+    assert perc._last_hit is None
+
+
+def test_controller_corridor_ct_spawn_and_safe_w() -> None:
+    pack = load_nav_pack(resolve_nav_pack_path("dust2_dm"))
+    keys: list[str] = []
+    ups: list[str] = []
+    ctrl = NavController(
+        pack,
+        FOVMouseMovement(
+            screen=CaptureRegion(width=1280, height=720),
+            fov=FOVConfig(horizontal=106.26, vertical=73.74, x360=16364),
+        ),
+        key_down=keys.append,
+        key_up=ups.append,
+        move_relative=lambda *_: None,
+    )
+    world = PoseResult(0.62, 0.21, 0.0, 0.9, True, 40, "world", place_id="ct_spawn")
+    r0 = ctrl.tick(world, now=1.0, paused=False, radar_progressing=True)
+    assert "ct_spawn_to_mid" in r0.path or r0.target_id == "short"
+    # No flow and burst expired → Safe-W must release W (not wall-run)
+    ctrl._walk_burst_until = 0.0
+    ctrl._held_key = "w"
+    keys.clear()
+    r1 = ctrl.tick(world, now=5.0, paused=False, radar_progressing=False)
+    assert r1.forward_held is False
+    # Hold W with no flow → wall-stop (rotate, no thrust)
+    ctrl._held_key = "w"
+    ctrl._no_flow_while_w_since = 5.0
+    stuck = ctrl.tick(world, now=6.3, paused=False, radar_progressing=False)
+    assert stuck.state == NavState.STUCK_ESCAPE
+    assert stuck.forward_held is False
 
 
 def test_controller_hop_by_place_lock() -> None:

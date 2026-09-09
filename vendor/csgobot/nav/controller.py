@@ -1,4 +1,11 @@
-"""Minimap goal navigation — place-localized path follow (no seed GPS)."""
+"""Product locomotion: corridor scripts + Safe-W (no blind wall running).
+
+Contract:
+- Place label picks a corridor script (face landmark → short W burst).
+- W only with radar flow, fresh place, or an armed walk burst — never fail-open
+  crawl into walls.
+- Hard wall-stop: no flow while W → release W and turn (no thrust into wall).
+"""
 
 from __future__ import annotations
 
@@ -10,6 +17,12 @@ from typing import Callable, Optional
 
 from aiming.fov_mouse import FOVMouseMovement
 from nav.coords import bearing_deg, dist_norm
+from nav.corridor import (
+    CorridorScript,
+    CorridorStep,
+    build_edge_neighbors,
+    pick_corridor,
+)
 from nav.humanize import NavHumanizer
 from nav.pack import NavGoal, NavPack
 from nav.planner import NavWaypoint, plan_path
@@ -19,6 +32,12 @@ from nav.world_pose import YawTracker
 KeyDownFn = Callable[[str], None]
 KeyUpFn = Callable[[str], None]
 MoveFn = Callable[[int, int], None]
+
+# Product Safe-W / wall-stop (FermK: blind W = run into wall).
+_WALK_BURST_SEC = 1.35
+_WALL_NO_FLOW_SEC = 1.15
+_WALL_COOLDOWN_SEC = 0.85
+_WALL_TURN_DEG = 95.0
 
 
 class NavState(str, Enum):
@@ -64,7 +83,7 @@ def _is_map_pose(pose: PoseResult) -> bool:
 
 
 class NavController:
-    """Seek pack goals using map-frame pose from place localization + path graph."""
+    """Corridor-script seek with Safe-W — standing > running into walls."""
 
     def __init__(
         self,
@@ -116,14 +135,24 @@ class NavController:
         self._last_pose: Optional[PoseResult] = None
         self._planned = False
         self._session_started_at: Optional[float] = None
-        self._stuck_grace_sec = 6.0
+        self._stuck_grace_sec = 4.0
         self._last_fail_open_log_at = 0.0
         self._flow_progress_until = 0.0
         self._announced = False
         self._place_wait_since: Optional[float] = None
         self._locked_place_id: Optional[str] = None
         self._place_unchanged_since: Optional[float] = None
+        self._script: Optional[CorridorScript] = None
+        self._step_index = 0
+        self._step_started_at = 0.0
+        self._walk_burst_until = 0.0
+        self._wall_cooldown_until = 0.0
+        self._no_flow_while_w_since: Optional[float] = None
+        self._step_saw_flow = False
+        self._last_safe_log_at = 0.0
         self._wps = self._load_waypoints()
+        self._wp_by_id = {wp.id: wp for wp in self._wps}
+        self._neighbors = build_edge_neighbors(tuple(pack.edges))
 
     def _load_waypoints(self) -> tuple[NavWaypoint, ...]:
         out: list[NavWaypoint] = []
@@ -152,7 +181,6 @@ class NavController:
 
     @property
     def suppresses_look(self) -> bool:
-        """Product: Look must not steal the mouse while we seek, wait, or briefly pause."""
         return self._state in (
             NavState.SEEK_ENTRY,
             NavState.SEEK_GOAL,
@@ -178,6 +206,10 @@ class NavController:
     def yaw_tracker(self) -> YawTracker:
         return self._yaw
 
+    @property
+    def edge_neighbors(self) -> dict[str, set[str]]:
+        return self._neighbors
+
     def face_target(self) -> tuple[float, float]:
         return self._target.x, self._target.y
 
@@ -195,6 +227,8 @@ class NavController:
         self._pack = pack
         self._humanizer = NavHumanizer(pack.humanize)
         self._wps = self._load_waypoints()
+        self._wp_by_id = {wp.id: wp for wp in self._wps}
+        self._neighbors = build_edge_neighbors(tuple(pack.edges))
         self._yaw.reset()
         self._state = NavState.SEEK_GOAL
         self._phase = NavPhase.GOAL
@@ -216,6 +250,13 @@ class NavController:
         self._place_wait_since = None
         self._locked_place_id = None
         self._place_unchanged_since = None
+        self._script = None
+        self._step_index = 0
+        self._step_started_at = 0.0
+        self._walk_burst_until = 0.0
+        self._wall_cooldown_until = 0.0
+        self._no_flow_while_w_since = None
+        self._step_saw_flow = False
 
     def _set_move_key(self, key: Optional[str]) -> None:
         if key == self._held_key:
@@ -240,89 +281,21 @@ class NavController:
         prev = self._route_goal.id
         self._route_index = (self._route_index + 1) % len(goals)
         self._route_goal = self._current_route_goal()
+        self._script = None
+        self._planned = False
         self._log.info("nav: route cycle %s -> %s", prev, self._route_goal.id)
         return True
 
-    def _rebuild_path(self, pose: PoseResult) -> None:
-        plan = plan_path(
-            pose.x_norm,
-            pose.y_norm,
-            self._route_goal,
-            self._wps,
-            self._pack.edges,
-        )
-        self._path_ids = plan.waypoint_ids
-        self._path_goals = plan.goals
-        self._path_index = 0
-        self._target = self._path_goals[0] if self._path_goals else self._route_goal
-        self._phase = NavPhase.GOAL
-        self._state = NavState.SEEK_GOAL
-        path_s = ">".join(self._path_ids) or self._route_goal.id
-        self._log.info(
-            "nav: path %s (from %.2f,%.2f -> %s)",
-            path_s,
-            pose.x_norm,
-            pose.y_norm,
-            self._route_goal.id,
-        )
-        # Face next hop
-        self._yaw.on_place(
-            f"path:{path_s}",
-            pose.x_norm,
-            pose.y_norm,
-            self._target.x,
-            self._target.y,
-        )
-
-    def _sync_place_id(self, pose: PoseResult, *, now: float) -> None:
-        pid = (pose.place_id or "").strip() or None
-        if pid != self._locked_place_id:
-            prev = self._locked_place_id
-            self._locked_place_id = pid
-            self._place_unchanged_since = now
-            if pid:
-                self._last_progress_at = now
-                # Off-path landmark → replan from new place (anti-teleport already gated).
-                if (
-                    self._planned
-                    and self._path_ids
-                    and pid not in self._path_ids
-                    and prev is not None
-                ):
-                    self._planned = False
-                    self._log.info(
-                        "nav: place off-path %s (was path %s) — replan",
-                        pid,
-                        ">".join(self._path_ids),
-                    )
-        elif self._place_unchanged_since is None:
-            self._place_unchanged_since = now
-
-    def _advance_path_by_place(self, pose: PoseResult, *, now: float) -> bool:
-        """Discrete GPS: if CS2 place label matches a later hop, advance index."""
-        pid = (pose.place_id or "").strip()
-        if not pid or not self._path_ids:
-            return False
-        try:
-            idx = self._path_ids.index(pid)
-        except ValueError:
-            return False
-        if idx <= self._path_index:
-            return False
-        self._path_index = idx
-        self._target = self._path_goals[self._path_index]
-        self._log.info("nav: hop -> %s (place lock)", self._target.id)
-        self._yaw.on_place(
-            f"hop:{self._target.id}",
-            pose.x_norm,
-            pose.y_norm,
-            self._target.x,
-            self._target.y,
-        )
-        self._last_progress_at = now
-        return True
+    def _goal_from_wp(self, wp_id: str) -> NavGoal:
+        wp = self._wp_by_id.get(wp_id)
+        if wp is None:
+            return self._route_goal
+        return NavGoal(wp.id, wp.x, wp.y, wp.arrive_radius)
 
     def _path_label(self) -> str:
+        if self._script is not None:
+            faces = [s.face_id for s in self._script.steps]
+            return f"{self._script.id}:{'/'.join(faces)}"
         return ">".join(self._path_ids) if self._path_ids else self._route_goal.id
 
     def _make_result(
@@ -359,47 +332,146 @@ class NavController:
             humanize_forward_jitter=humanize_forward_jitter,
             forward_held=forward_held,
             forward_fail_open=forward_fail_open,
-            pose_mode=pose.radar_mode if pose.valid else "none",
+            pose_mode=pose.radar_mode if pose.valid else "",
             path=self._path_label(),
         )
 
     def _enter_fallback(self, now: float) -> bool:
-        """Enter macro fallback if allowed. Returns True when entered."""
         if not self._allow_macro:
-            self.release_keys()
             self._state = NavState.WAIT_PLACE
-            self._log.info(
-                "nav: place lost — holding wait (macro fallback disabled)"
-            )
+            self.release_keys()
             return False
-        self.release_keys()
         self._state = NavState.MACRO_FALLBACK
-        self._fallback_until = now + self._pack.fallback.macro_sec
-        self._log.warning(
-            "nav: macro fallback for %.0fs (script=%s)",
-            self._pack.fallback.macro_sec,
+        self._fallback_until = now + max(2.0, float(self._pack.fallback.macro_sec))
+        self.release_keys()
+        self._log.info(
+            "nav: macro_fallback %s for %.1fs",
             self._pack.fallback.macro_script,
+            self._fallback_until - now,
         )
         return True
 
     def _abort_fallback_for_world(self, now: float) -> None:
-        self._fallback_until = 0.0
-        self._place_wait_since = None
-        self._pose_lost_since = None
-        self._planned = False
         self._state = NavState.SEEK_GOAL
-        self._humanizer.reset()
-        self._log.info("nav: world pose — abort macro, resume path seek")
+        self._fallback_until = 0.0
+        self._planned = False
+        self._place_wait_since = None
+        self._log.info("nav: world pose — abort macro, resume corridor seek")
 
-    def _start_escape(self, now: float) -> None:
-        angles = self._pack.stuck.escape_angles_deg
-        angle = angles[self._escape_index % len(angles)]
-        self._escape_index += 1
-        self._escape_turn_remaining = angle
-        self._escape_until = now + max(0.85, self._pack.stuck.escape_duration_sec)
-        self._state = NavState.STUCK_ESCAPE
+    def _arm_walk_burst(self, now: float) -> None:
+        self._walk_burst_until = now + _WALK_BURST_SEC
+
+    def _safe_w_allowed(self, *, now: float, flow: bool) -> bool:
+        """Product Safe-W: never hold W without evidence of motion or a short burst."""
+        if now < self._wall_cooldown_until:
+            return False
+        if flow:
+            return True
+        if now < self._walk_burst_until:
+            return True
+        return False
+
+    def _start_wall_stop(self, now: float) -> None:
+        """Hard wall-stop: release W, turn, cooldown — do not thrust into wall."""
         self.release_keys()
-        self._log.info("nav: stuck escape thrust+rotate %.0f° (no radar flow)", angle)
+        self._no_flow_while_w_since = None
+        self._walk_burst_until = 0.0
+        self._wall_cooldown_until = now + _WALL_COOLDOWN_SEC
+        self._state = NavState.STUCK_ESCAPE
+        self._escape_until = now + max(0.55, _WALL_COOLDOWN_SEC * 0.7)
+        sign = -1.0 if self._escape_index % 2 else 1.0
+        self._escape_index += 1
+        self._escape_turn_remaining = sign * _WALL_TURN_DEG
+        self._log.info(
+            "nav: wall-stop turn %.0f° (no radar flow while W)",
+            self._escape_turn_remaining,
+        )
+
+    def _current_step(self) -> Optional[CorridorStep]:
+        if self._script is None:
+            return None
+        if self._step_index >= len(self._script.steps):
+            return None
+        return self._script.steps[self._step_index]
+
+    def _start_script(self, script: CorridorScript, place_id: str, now: float) -> None:
+        self._script = script
+        self._step_index = 0
+        self._step_started_at = now
+        self._step_saw_flow = False
+        self._planned = True
+        self._arm_walk_burst(now)
+        step = script.steps[0]
+        self._target = self._goal_from_wp(step.face_id)
+        self._path_ids = tuple(s.face_id for s in script.steps) + (script.goal_id,)
+        self._log.info(
+            "nav: corridor %s place=%s → %s (steps=%d)",
+            script.id,
+            place_id,
+            script.goal_id,
+            len(script.steps),
+        )
+        self._yaw.on_place(
+            f"corridor:{script.id}",
+            self._last_pose.x_norm if self._last_pose else 0.5,
+            self._last_pose.y_norm if self._last_pose else 0.5,
+            self._target.x,
+            self._target.y,
+        )
+
+    def _sync_corridor(self, pose: PoseResult, *, now: float) -> None:
+        pid = (pose.place_id or "").strip() or None
+        place_changed = pid != self._locked_place_id
+        if place_changed:
+            self._locked_place_id = pid
+            self._place_unchanged_since = now
+            if pid:
+                self._last_progress_at = now
+                self._arm_walk_burst(now)
+        elif self._place_unchanged_since is None:
+            self._place_unchanged_since = now
+
+        if not pid:
+            return
+
+        if pid == self._route_goal.id:
+            return
+
+        script = pick_corridor(pid, self._route_goal.id)
+        if script is None:
+            return
+
+        if self._script is None or self._script.id != script.id:
+            self._start_script(script, pid, now)
+            return
+
+        step = self._current_step()
+        if step is None:
+            return
+        if pid in step.advance_places:
+            if self._step_index < len(self._script.steps) - 1:
+                self._step_index += 1
+                self._step_started_at = now
+                self._step_saw_flow = False
+                self._arm_walk_burst(now)
+                nxt = self._script.steps[self._step_index]
+                self._target = self._goal_from_wp(nxt.face_id)
+                self._log.info(
+                    "nav: corridor hop -> %s (place=%s)",
+                    nxt.face_id,
+                    pid,
+                )
+                self._yaw.on_place(
+                    f"hop:{nxt.face_id}",
+                    pose.x_norm,
+                    pose.y_norm,
+                    self._target.x,
+                    self._target.y,
+                )
+            else:
+                # Last step place reached toward goal
+                if pid == self._script.goal_id or pid in step.advance_places:
+                    pass
 
     def tick(
         self,
@@ -439,10 +511,11 @@ class NavController:
         if radar_progressing:
             self._last_progress_at = now
             self._flow_progress_until = now + 0.7
+            self._step_saw_flow = True
+            self._no_flow_while_w_since = None
         flow_now = radar_progressing or now < self._flow_progress_until
 
         if self._state == NavState.MACRO_FALLBACK:
-            # Product: real place lock beats cosmetic macro immediately.
             if pose.valid and _is_map_pose(pose):
                 self._abort_fallback_for_world(now)
             elif now >= self._fallback_until:
@@ -479,7 +552,6 @@ class NavController:
 
         self._pose_lost_since = None
 
-        # Honest gate: need world place pose — no seed cosmetics.
         if not _is_map_pose(pose):
             self._place_wait_since = self._place_wait_since or now
             self.release_keys()
@@ -502,56 +574,40 @@ class NavController:
             return result
 
         self._place_wait_since = None
-        self._sync_place_id(pose, now=now)
         if not self._announced:
             self._log.info(
-                "nav: place-localized goal-seek (goal=%s) — reading map labels",
+                "nav: place-localized corridor seek (goal=%s)",
                 self._route_goal.id,
             )
             self._announced = True
 
-        if not self._planned:
-            self._route_goal = self._current_route_goal()
-            self._rebuild_path(pose)
-            self._planned = True
-            self._last_progress_at = now
-            self._at_goal_since = None
-            self._humanizer.reset()
+        self._last_pose = pose
+        self._sync_corridor(pose, now=now)
 
-        # Advance along path hops (XY arrive OR discrete place lock on later hop)
-        advanced_place = self._advance_path_by_place(pose, now=now)
-        while (
-            self._path_goals
-            and self._path_index < len(self._path_goals) - 1
-            and dist_norm(
-                pose.x_norm, pose.y_norm,
-                self._path_goals[self._path_index].x,
-                self._path_goals[self._path_index].y,
-            )
-            <= self._path_goals[self._path_index].arrive_radius
-        ):
-            self._path_index += 1
-            self._target = self._path_goals[self._path_index]
-            self._log.info("nav: hop -> %s", self._target.id)
-            self._yaw.on_place(
-                f"hop:{self._target.id}",
+        if self._script is None:
+            # Fallback geometric plan only for face target; Safe-W still applies.
+            plan = plan_path(
                 pose.x_norm,
                 pose.y_norm,
-                self._target.x,
-                self._target.y,
+                self._route_goal,
+                self._wps,
+                self._pack.edges,
             )
-            self._last_progress_at = now
-        if advanced_place:
-            pass  # progress already stamped
+            self._path_ids = plan.waypoint_ids
+            self._path_goals = plan.goals
+            self._path_index = 0
+            self._target = self._path_goals[0] if self._path_goals else self._route_goal
+            self._planned = True
+            self._arm_walk_burst(now)
+            self._log.info(
+                "nav: corridor miss — face path %s",
+                ">".join(self._path_ids) or self._route_goal.id,
+            )
 
         dist_goal = dist_norm(
             pose.x_norm, pose.y_norm, self._route_goal.x, self._route_goal.y,
         )
-        dist_target = dist_norm(
-            pose.x_norm, pose.y_norm, self._target.x, self._target.y,
-        )
 
-        # Refresh live pose yaw from tracker after face snaps
         if self._yaw.yaw_deg is not None:
             pose = PoseResult(
                 x_norm=pose.x_norm,
@@ -564,39 +620,54 @@ class NavController:
                 place_id=pose.place_id,
             )
 
+        # Hard wall-stop while holding W without flow
+        if self._held_key == "w" and not flow_now:
+            if self._no_flow_while_w_since is None:
+                self._no_flow_while_w_since = now
+            elif now - self._no_flow_while_w_since >= _WALL_NO_FLOW_SEC:
+                self._start_wall_stop(now)
+        elif flow_now or self._held_key != "w":
+            if flow_now:
+                self._no_flow_while_w_since = None
+
         if self._state == NavState.STUCK_ESCAPE:
-            result = self._tick_escape(pose, now=now, dt=dt, dist_goal=dist_goal, flow=flow_now)
+            result = self._tick_escape(pose, now=now, dt=dt, dist_goal=dist_goal)
             self._last_pose = pose
             return result
 
-        # Honest stuck: holding W but radar not scrolling.
-        # Discrete place pose does not move XY — allow longer timeout while label frozen.
-        grace = (
-            self._session_started_at is not None
-            and now - self._session_started_at < self._stuck_grace_sec
+        # Step timeout advance (only if we saw some flow this step — real motion)
+        step = self._current_step()
+        if (
+            self._script is not None
+            and step is not None
+            and now - self._step_started_at >= step.walk_sec
+        ):
+            if self._step_saw_flow and self._step_index < len(self._script.steps) - 1:
+                self._step_index += 1
+                self._step_started_at = now
+                self._step_saw_flow = False
+                self._arm_walk_burst(now)
+                nxt = self._script.steps[self._step_index]
+                self._target = self._goal_from_wp(nxt.face_id)
+                self._log.info("nav: corridor hop -> %s (timeout+flow)", nxt.face_id)
+            elif not self._step_saw_flow and now - self._step_started_at >= step.walk_sec:
+                # Walked with no flow — wall-stop rather than push harder
+                if self._held_key == "w" or now >= self._walk_burst_until:
+                    self._start_wall_stop(now)
+                    result = self._make_result(
+                        state=NavState.STUCK_ESCAPE,
+                        pose=pose,
+                        dist=dist_goal,
+                        stuck_event=True,
+                    )
+                    self._last_pose = pose
+                    return result
+
+        at_goal = (
+            (pose.place_id and pose.place_id == self._route_goal.id)
+            or dist_goal <= self._route_goal.arrive_radius
         )
-        stuck_timeout = self._pack.stuck.progress_timeout_sec
-        if (
-            pose.place_id
-            and self._place_unchanged_since is not None
-            and now - self._place_unchanged_since >= 1.5
-        ):
-            stuck_timeout = max(stuck_timeout * 2.2, stuck_timeout + 2.5)
-        if (
-            not grace
-            and self._held_key == "w"
-            and not flow_now
-            and now - self._last_progress_at >= stuck_timeout
-        ):
-            self._start_escape(now)
-            result = self._make_result(
-                state=NavState.STUCK_ESCAPE, pose=pose, dist=dist_goal, stuck_event=True,
-            )
-            self._last_pose = pose
-            return result
-
-        at_goal = dist_goal <= self._route_goal.arrive_radius
-        if at_goal or (pose.place_id and pose.place_id == self._route_goal.id):
+        if at_goal:
             self._state = NavState.AT_GOAL
             if self._at_goal_since is None:
                 self._at_goal_since = now
@@ -611,14 +682,11 @@ class NavController:
                 and now - self._at_goal_since >= self._pack.route.dwell_at_goal_sec
             ):
                 if self._advance_route_goal(now=now):
-                    self._planned = False
                     self._at_goal_since = None
             self._last_pose = pose
             return result
 
-        result = self._drive_toward_target(
-            pose, now=now, dt=dt, dist=dist_goal, flow=flow_now,
-        )
+        result = self._drive_corridor(pose, now=now, dt=dt, dist=dist_goal, flow=flow_now)
         self._last_pose = pose
         return result
 
@@ -629,8 +697,8 @@ class NavController:
         now: float,
         dt: float,
         dist_goal: float,
-        flow: bool,
     ) -> NavTickResult:
+        """Wall-stop escape: rotate only — never W into the same wall."""
         yaw_delta = 0.0
         if now < self._escape_until:
             step = max(
@@ -643,19 +711,23 @@ class NavController:
                     self._move(mx, 0)
                 self._escape_turn_remaining -= step
                 yaw_delta = step
-            self._set_move_key("w")
+            self.release_keys()
             self._yaw.integrate(yaw_delta)
             return self._make_result(
-                state=self._state, pose=pose, dist=dist_goal,
-                yaw_error=self._escape_turn_remaining, forward_held=True,
+                state=self._state,
+                pose=pose,
+                dist=dist_goal,
+                yaw_error=self._escape_turn_remaining,
+                forward_held=False,
+                stuck_event=False,
             )
         self._state = NavState.SEEK_GOAL
         self._last_progress_at = now
+        self._arm_walk_burst(now)
         self.release_keys()
-        # Keep current path — full replan after escape caused FermK route thrash.
         return self._make_result(state=self._state, pose=pose, dist=dist_goal)
 
-    def _drive_toward_target(
+    def _drive_corridor(
         self,
         pose: PoseResult,
         *,
@@ -664,12 +736,11 @@ class NavController:
         dist: float,
         flow: bool,
     ) -> NavTickResult:
-        stalled = max(0.0, now - self._last_progress_at) if self._last_progress_at else 0.0
-        force_crawl = stalled >= self._pack.humanize.forward_fail_open_after_sec
-        if force_crawl and now - self._last_fail_open_log_at >= 5.0:
-            self._log.info("nav: forward crawl fail-open stall=%.1fs", stalled)
-            self._last_fail_open_log_at = now
+        step = self._current_step()
+        if step is not None:
+            self._target = self._goal_from_wp(step.face_id)
 
+        # Turn toward face landmark — never force_crawl W without Safe-W.
         motion = self._humanizer.compute(
             pose,
             self._target,
@@ -677,34 +748,48 @@ class NavController:
             dt_sec=dt,
             now=now,
             look_sweeping=self._look_sweeping,
-            force_crawl=force_crawl,
+            force_crawl=False,
             force_walk=False,
         )
         self._state = NavState.SEEK_GOAL
         if motion.paused:
             self.release_keys()
             return self._make_result(
-                state=self._state, pose=pose, dist=dist,
+                state=self._state,
+                pose=pose,
+                dist=dist,
                 yaw_error=motion.yaw_error_deg,
                 humanize_micro_pause=motion.micro_pause,
-                forward_fail_open=force_crawl,
             )
         if motion.mouse_dx or motion.mouse_dy:
             self._move(motion.mouse_dx, motion.mouse_dy)
-        if motion.forward:
+
+        want_forward = bool(motion.forward)
+        allowed = self._safe_w_allowed(now=now, flow=flow)
+        if want_forward and allowed:
             self._set_move_key("w")
+            forward = True
         else:
             self.release_keys()
+            forward = False
+            if want_forward and not allowed and now - self._last_safe_log_at >= 3.0:
+                self._last_safe_log_at = now
+                self._log.info(
+                    "nav: Safe-W hold (no flow/burst) face=%s place=%s",
+                    self._target.id,
+                    pose.place_id or "?",
+                )
+
         self._yaw.integrate(float(motion.turn_step_deg))
         return self._make_result(
             state=self._state,
             pose=pose,
-            dist=motion.dist_to_goal or dist,
+            dist=dist,
             yaw_error=motion.yaw_error_deg,
             humanize_look_yield=motion.look_yield,
             humanize_forward_jitter=motion.forward_jitter,
-            forward_held=bool(motion.forward),
-            forward_fail_open=force_crawl,
+            forward_held=forward,
+            forward_fail_open=False,
         )
 
     def _tick_at_goal(
@@ -719,12 +804,12 @@ class NavController:
         yaw_delta = 0.0
         forward = False
         if now >= self._wander_until:
-            self._wander_forward = random.random() > 0.4
+            self._wander_forward = random.random() > 0.55
             span = self._pack.at_goal.wander_sec_max - self._pack.at_goal.wander_sec_min
             self._wander_until = (
                 now + self._pack.at_goal.wander_sec_min + random.random() * span
             )
-        if self._wander_forward:
+        if self._wander_forward and self._safe_w_allowed(now=now, flow=flow):
             motion = self._humanizer.compute(
                 pose, self._route_goal, self._fov, dt_sec=dt, now=now,
                 look_sweeping=self._look_sweeping, allow_forward=True,
@@ -732,7 +817,7 @@ class NavController:
             if not motion.look_yield and motion.mouse_dx:
                 self._move(motion.mouse_dx, 0)
             yaw_delta = float(motion.turn_step_deg)
-            if motion.forward and not motion.paused:
+            if motion.forward and not motion.paused and flow:
                 self._set_move_key("w")
                 forward = True
             else:
@@ -746,4 +831,6 @@ class NavController:
                 yaw_delta = turn
             self.release_keys()
         self._yaw.integrate(yaw_delta)
-        return self._make_result(state=NavState.AT_GOAL, pose=pose, dist=dist, forward_held=forward)
+        return self._make_result(
+            state=NavState.AT_GOAL, pose=pose, dist=dist, forward_held=forward,
+        )

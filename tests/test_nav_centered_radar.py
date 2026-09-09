@@ -115,21 +115,20 @@ def test_stuck_without_flow_while_holding_w() -> None:
         pack, _fov(), key_down=keys.append, key_up=lambda _k: None,
         move_relative=lambda *_: None,
     )
-    world = PoseResult(0.39, 0.91, bearing := -90.0, 0.9, True, 40, "world")
     from nav.coords import bearing_deg
-    # Face mid so W engages
     yaw = bearing_deg(0.39, 0.91, 0.52, 0.48)
-    world = PoseResult(0.39, 0.91, yaw, 0.9, True, 40, "world")
+    world = PoseResult(0.39, 0.91, yaw, 0.9, True, 40, "world", place_id="t_spawn")
     t0 = 20.0
     ctrl.tick(world, now=t0, paused=False, radar_progressing=True)
     ctrl._session_started_at = t0 - 30
-    ctrl._last_progress_at = t0
+    ctrl._walk_burst_until = 0.0
     ctrl._held_key = "w"
+    ctrl._no_flow_while_w_since = t0
     stuck = ctrl.tick(
         world,
-        now=t0 + pack.stuck.progress_timeout_sec + 0.2,
+        now=t0 + 1.25,
         paused=False,
         radar_progressing=False,
     )
     assert stuck.state == NavState.STUCK_ESCAPE
-    assert stuck.stuck_event
+    assert stuck.forward_held is False

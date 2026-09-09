@@ -2,7 +2,7 @@ meta:
   pack_id: dust2_dm
   map_id: de_dust2
   mode: deathmatch
-  version: "2.2.0"
+  version: "2.3.0"
 
 strategy: route_cycle
 

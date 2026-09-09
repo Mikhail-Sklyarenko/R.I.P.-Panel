@@ -23,11 +23,13 @@ from nav.world_pose import YawTracker
 
 logger = logging.getLogger("CS2Bot.nav")
 
-# FermK soak: A↔tunnel jumps Δmap≈0.52 with weak scores — reject by default.
+# FermK: block A↔tunnel lies, but never eternal lock on ct_spawn.
 _TELEPORT_MAX = 0.28
 _TELEPORT_OVERRIDE_SCORE = 0.62
 _TELEPORT_OVERRIDE_MARGIN = 0.22
 _TELEPORT_CONFIRM = 4
+_REJECT_STREAK_CLEAR_SEC = 2.5
+_HOLD_SEC_DEFAULT = 2.5
 
 
 @dataclass(frozen=True)
@@ -43,7 +45,7 @@ def _map_dist(ax: float, ay: float, bx: float, by: float) -> float:
 
 
 class NavPerception:
-    """Product perception: place-label → world pose, hold + anti-teleport."""
+    """Product perception: place-label → world pose, neighbor-aware anti-teleport."""
 
     def __init__(
         self,
@@ -51,12 +53,13 @@ class NavPerception:
         localizer: PlaceLocalizer,
         yaw: Optional[YawTracker] = None,
         *,
-        hold_sec: float = 4.0,
+        hold_sec: float = _HOLD_SEC_DEFAULT,
         log_interval_sec: float = 2.0,
         switch_confirm: int = 3,
         dump_dir: Optional[Path] = None,
         dump_interval_sec: float = 8.0,
         teleport_max: float = _TELEPORT_MAX,
+        neighbors: Optional[dict[str, set[str]]] = None,
     ) -> None:
         self.reader = reader
         self.localizer = localizer
@@ -67,14 +70,19 @@ class NavPerception:
         self._dump_dir = dump_dir
         self._dump_interval = max(3.0, float(dump_interval_sec))
         self._teleport_max = max(0.1, float(teleport_max))
+        self._neighbors = neighbors or {}
         self._last_hit: Optional[PlaceHit] = None
         self._last_hit_at: float = 0.0
         self._last_log_at: float = 0.0
         self._last_dump_at: float = 0.0
         self._last_reject_log_at: float = 0.0
+        self._reject_streak_started: Optional[float] = None
         self._pending_id: Optional[str] = None
         self._pending_count: int = 0
         self._pending_hit: Optional[PlaceHit] = None
+
+    def set_neighbors(self, neighbors: dict[str, set[str]]) -> None:
+        self._neighbors = neighbors
 
     def reset(self) -> None:
         self.yaw.reset()
@@ -83,10 +91,17 @@ class NavPerception:
         self._pending_id = None
         self._pending_count = 0
         self._pending_hit = None
+        self._reject_streak_started = None
         self.localizer.set_sticky(None)
+
+    def _is_neighbor(self, a: str, b: str) -> bool:
+        return b in self._neighbors.get(a, set())
 
     def _is_teleport(self, candidate: PlaceHit) -> bool:
         if self._last_hit is None:
+            return False
+        # Graph neighbors are never teleports (ct_spawn→short OK even if Δ noisy).
+        if self._is_neighbor(self._last_hit.place_id, candidate.place_id):
             return False
         return (
             _map_dist(
@@ -102,8 +117,25 @@ class NavPerception:
             and self._pending_count >= _TELEPORT_CONFIRM
         )
 
-    def _resolve_place(self, raw: Optional[PlaceHit]) -> Optional[PlaceHit]:
-        """Hysteresis + anti-teleport before accepting a place switch."""
+    def _clear_lock(self, reason: str) -> None:
+        if self._last_hit is not None:
+            logger.info(
+                "nav: place-lock clear (%s) was=%s",
+                reason,
+                self._last_hit.place_id,
+            )
+        self._last_hit = None
+        self._last_hit_at = 0.0
+        self._pending_id = None
+        self._pending_count = 0
+        self._pending_hit = None
+        self._reject_streak_started = None
+        self.localizer.set_sticky(None)
+
+    def _resolve_place(
+        self, raw: Optional[PlaceHit], *, now: float
+    ) -> Optional[PlaceHit]:
+        """Hysteresis + neighbor-aware anti-teleport; clear eternal false locks."""
         if raw is None:
             self._pending_id = None
             self._pending_count = 0
@@ -113,9 +145,9 @@ class NavPerception:
             self._pending_id = None
             self._pending_count = 0
             self._pending_hit = None
+            self._reject_streak_started = None
             return raw
 
-        # Candidate switch
         if raw.place_id == self._pending_id:
             self._pending_count += 1
             self._pending_hit = raw
@@ -129,13 +161,18 @@ class NavPerception:
         if teleport:
             need = max(need, _TELEPORT_CONFIRM)
             if not self._teleport_override_ok(raw):
-                now = time.monotonic()
+                if self._reject_streak_started is None:
+                    self._reject_streak_started = now
+                top = ""
+                dbg = self.localizer.last_debug
+                if dbg is not None and dbg.top:
+                    top = " top=[" + ", ".join(f"{i}:{s:.2f}" for i, s in dbg.top[:3]) + "]"
                 if now - self._last_reject_log_at >= 2.0:
                     self._last_reject_log_at = now
                     assert self._last_hit is not None
                     logger.info(
                         "nav: place-reject teleport from=%s to=%s Δ=%.2f "
-                        "score=%.3f margin=%.3f pending=%d/%d",
+                        "score=%.3f margin=%.3f pending=%d/%d%s",
                         self._last_hit.place_id,
                         raw.place_id,
                         _map_dist(
@@ -148,15 +185,20 @@ class NavPerception:
                         raw.margin,
                         self._pending_count,
                         need,
+                        top,
                     )
+                # Product: do not hold ct_spawn forever while only lies arrive.
+                if now - self._reject_streak_started >= _REJECT_STREAK_CLEAR_SEC:
+                    self._clear_lock("reject-streak")
+                    return None
                 return self._last_hit
 
+        self._reject_streak_started = None
         if self._pending_count >= need:
             self._pending_id = None
             self._pending_count = 0
             self._pending_hit = None
             return raw
-        # Keep previous place id coords until confirmed
         return self._last_hit
 
     def update(
@@ -178,10 +220,9 @@ class NavPerception:
         if not icon.valid:
             return PerceptionResult(icon=icon, place=raw_place, pose=PoseResult.invalid())
 
-        place = self._resolve_place(raw_place)
+        place = self._resolve_place(raw_place, now=ts)
 
         if place is not None and raw_place is not None:
-            # Only refresh hold clock on a fresh accepted localize (not hysteresis echo).
             if raw_place.place_id == place.place_id:
                 self._last_hit = place
                 self._last_hit_at = ts
@@ -208,7 +249,6 @@ class NavPerception:
             )
             return PerceptionResult(icon=icon, place=place, pose=world, place_held=False)
 
-        # Product hold: brief label flicker must not drop to centered cosmetics.
         if (
             self._last_hit is not None
             and (ts - self._last_hit_at) <= self._hold_sec
@@ -226,7 +266,6 @@ class NavPerception:
                 icon=icon, place=hit, pose=world, place_held=True
             )
 
-        # Fail dump for FermK calibration (rate-limited).
         if (
             self._dump_dir is not None
             and ts - self._last_dump_at >= self._dump_interval

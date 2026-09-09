@@ -2,6 +2,31 @@
 
 Goal-based navigation for CS2 DM farm bots. **Not a YOLO dataset** — config + code only.
 
+## Product locomotion contract (corridor + Safe-W)
+
+FermK visual failure (“runs into a wall forever”) came from **blind W** toward
+map-norm hops while place XY was frozen/wrong.
+
+Product contract now:
+
+1. **Corridor scripts** — place label picks face→walk stages (`ct_spawn→short→mid`, …)
+2. **Safe-W** — hold W only with radar flow or a short armed burst after place/step change
+3. **Wall-stop** — no flow while W → release W + turn (never thrust into the same wall)
+4. **Place lock clear** — reject-streak ~2.5s clears eternal `ct_spawn` hold
+5. Graph **neighbors** are never treated as teleports
+
+Expect:
+
+```
+nav: locomotion=corridor+Safe-W
+nav: corridor ct_spawn_to_mid place=ct_spawn → mid
+nav: Safe-W hold (no flow/burst) …
+nav: wall-stop turn 95° (no radar flow while W)
+nav: place-lock clear (reject-streak) was=ct_spawn
+```
+
+Not: minutes of `fwd=1` into one wall with frozen pose.
+
 ## Place-label navigation (product — no seed cosmetics)
 
 Gate 0 on farm HUD: **centered rotating radar** (player icon fixed at disk
@@ -28,7 +53,7 @@ mode=world pose=(0.22,0.28) path=tunnel>mid fwd=1
 `resources/nav/maps/*/hud_ref/` is **calibration**, never YOLO train (`never_train`).
 
 Dust2 RU catalog (22 place labels, title-bar cropped → 1280×720) drives
-`dust2_dm` v2.2.0 dense waypoint graph. Expect `place_templates=22`.
+`dust2_dm` v2.3.0 dense waypoint graph + corridor scripts. Expect `place_templates=22`.
 
 Product locomotion unlock (post FermK soak):
 

@@ -102,7 +102,8 @@ def test_follow_plan_fail_open_walks_with_large_yaw_error() -> None:
     assert hot.forward is True
 
 
-def test_controller_holds_w_after_fail_open_stall() -> None:
+def test_controller_safe_w_blocks_blind_crawl() -> None:
+    """Product: without radar flow / burst, do NOT hold W into walls."""
     pack = load_nav_pack(resolve_nav_pack_path("dust2_dm"))
     keys: list[str] = []
     ctrl = NavController(
@@ -112,9 +113,9 @@ def test_controller_holds_w_after_fail_open_stall() -> None:
         key_up=lambda _k: None,
         move_relative=lambda *_: None,
     )
-    # World pose far from mid; misaligned yaw — needs fail-open crawl.
-    pose = PoseResult(0.39, 0.91, 45.0, 0.9, True, 20, "world")
+    pose = PoseResult(0.39, 0.91, 45.0, 0.9, True, 20, "world", place_id="t_spawn")
     ctrl.tick(pose, now=1.0, paused=False, radar_progressing=True)
+    ctrl._walk_burst_until = 0.0
     keys.clear()
     result = ctrl.tick(
         pose,
@@ -122,12 +123,11 @@ def test_controller_holds_w_after_fail_open_stall() -> None:
         paused=False,
         radar_progressing=False,
     )
-    assert result.forward_fail_open is True
-    assert result.forward_held is True
-    assert ctrl._held_key == "w"
+    assert result.forward_held is False
+    assert result.forward_fail_open is False
 
 
-def test_stuck_escape_thrusts_forward() -> None:
+def test_wall_stop_rotates_without_thrust() -> None:
     pack = load_nav_pack(resolve_nav_pack_path("dust2_dm"))
     keys: list[str] = []
     ctrl = NavController(
@@ -137,30 +137,31 @@ def test_stuck_escape_thrusts_forward() -> None:
         key_up=lambda _k: None,
         move_relative=lambda *_: None,
     )
-    pose = PoseResult(0.39, 0.91, -90.0, 0.9, True, 20, "world")
+    pose = PoseResult(0.39, 0.91, -90.0, 0.9, True, 20, "world", place_id="t_spawn")
     t0 = 100.0
     ctrl.tick(pose, now=t0, paused=False, radar_progressing=True)
     ctrl._session_started_at = t0 - 30
-    ctrl._last_progress_at = t0
+    ctrl._walk_burst_until = 0.0
     ctrl._held_key = "w"
+    ctrl._no_flow_while_w_since = t0
     keys.clear()
     stuck = ctrl.tick(
         pose,
-        now=t0 + pack.stuck.progress_timeout_sec + 0.1,
+        now=t0 + 1.2,
         paused=False,
         radar_progressing=False,
     )
     assert stuck.state == NavState.STUCK_ESCAPE
-    assert stuck.stuck_event
+    assert stuck.forward_held is False
     keys.clear()
     esc = ctrl.tick(
         pose,
-        now=t0 + pack.stuck.progress_timeout_sec + 0.2,
+        now=t0 + 1.3,
         paused=False,
         radar_progressing=False,
     )
-    assert esc.state == NavState.STUCK_ESCAPE
-    assert "w" in keys
+    assert "w" not in keys
+    assert esc.forward_held is False
 
 
 def test_arrow_tip_yaw_matches_bearing_convention() -> None:
