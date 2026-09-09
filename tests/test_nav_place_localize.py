@@ -173,6 +173,35 @@ def test_perception_holds_world_across_place_flicker() -> None:
     assert abs(held.pose.x_norm - hit.pose.x_norm) < 0.02
 
 
+def test_place_localizer_multi_offset_still_ids_all() -> None:
+    loc = PlaceLocalizer("de_dust2")
+    ref = resolve_nav_root() / "maps" / "de_dust2" / "hud_ref"
+    for path in sorted(ref.glob("*_frame.jpg")):
+        expect = path.name.replace("_frame.jpg", "")
+        img = np.asarray(Image.open(path).convert("RGB"))
+        dbg = loc.match_debug(img)
+        assert dbg.accepted, (path.name, dbg.top)
+        assert dbg.best is not None
+        assert dbg.best.place_id == expect
+
+
+def test_perception_switch_hysteresis() -> None:
+    cal = load_calibration(resolve_calibration_path())
+    reader = MinimapReader(cal)
+    loc = PlaceLocalizer("de_dust2")
+    perc = NavPerception(reader, loc, hold_sec=4.0, switch_confirm=2)
+    ref = resolve_nav_root() / "maps" / "de_dust2" / "hud_ref"
+    mid = np.asarray(Image.open(ref / "mid_frame.jpg").convert("RGB"))
+    short = np.asarray(Image.open(ref / "short_frame.jpg").convert("RGB"))
+    a = perc.update(mid, face_x=0.5, face_y=0.5, now=1.0)
+    assert a.place is not None and a.place.place_id == "mid"
+    # One frame of short is not enough to switch
+    b = perc.update(short, face_x=0.5, face_y=0.5, now=1.1)
+    assert b.place is not None and b.place.place_id == "mid"
+    c = perc.update(short, face_x=0.5, face_y=0.5, now=1.2)
+    assert c.place is not None and c.place.place_id == "short"
+
+
 def test_controller_aborts_macro_when_world_returns() -> None:
     pack = load_nav_pack(resolve_nav_pack_path("dust2_dm"))
     keys: list[str] = []

@@ -37,6 +37,8 @@ Product locomotion unlock (post FermK soak):
 3. **Macro off by default** — `CSGOBOT_NAV_ALLOW_MACRO=1` to re-enable short 8s safety
 4. **Look muted** while `seek` / `wait_place`
 5. Log: `nav: place=<id> score=… margin=…`
+6. **Multi-offset strip** + sticky bias + **2-frame switch hysteresis**
+7. Optional dumps: `CSGOBOT_NAV_DUMP_PLACE=1` → `vendor/csgobot/data/nav_place_dumps/`
 
 Expect:
 

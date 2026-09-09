@@ -573,7 +573,7 @@ def detection_process(
             from nav.minimap_reader import MinimapReader
             from nav.pack import load_nav_pack
             from nav.paths import resolve_calibration_path, resolve_nav_pack_path
-            from nav.perception import NavPerception
+            from nav.perception import NavPerception, resolve_place_dump_dir
             from nav.place_localizer import PlaceLocalizer
             from nav.pose_filter import PoseFilter
             from nav.radar_flow import RadarFlowSensor
@@ -594,9 +594,16 @@ def detection_process(
             nav_radar_flow = RadarFlowSensor()
             nav_yaw = YawTracker()
             nav_place = PlaceLocalizer(nav_pack.map_id)
+            dump_dir = resolve_place_dump_dir()
             nav_perception = NavPerception(
-                nav_reader, nav_place, nav_yaw, hold_sec=place_hold
+                nav_reader,
+                nav_place,
+                nav_yaw,
+                hold_sec=place_hold,
+                dump_dir=dump_dir,
             )
+            if dump_dir is not None:
+                logger.info("nav: place miss dumps → %s", dump_dir)
             if not config.nav.read_only:
                 if patrol_key_down is None or patrol_key_up is None:
                     raise RuntimeError(

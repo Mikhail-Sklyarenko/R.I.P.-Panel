@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
@@ -28,6 +29,9 @@ from nav.paths import resolve_map_meta_path, resolve_nav_root
 from nav.radar_geom import RadarCircle, detect_radar_circle
 
 logger = logging.getLogger("CS2Bot.nav")
+
+# Vertical offsets under the radar ring — OBS/HUD scale variance.
+_STRIP_Y_OFFSETS = (0, 2, 4, 6, 8, -2)
 
 
 @dataclass(frozen=True)
@@ -50,6 +54,16 @@ class PlaceTemplate:
     source: str
 
 
+@dataclass(frozen=True)
+class PlaceMatchDebug:
+    """Top candidates even when below accept threshold (for dumps / soak)."""
+
+    best: Optional[PlaceHit]
+    accepted: bool
+    top: tuple[tuple[str, float], ...]
+    strip: Optional[np.ndarray] = None
+
+
 def _ncc(a: np.ndarray, b: np.ndarray) -> float:
     aa = a.astype(np.float32).ravel()
     bb = b.astype(np.float32).ravel()
@@ -66,11 +80,12 @@ def extract_location_strip(
     *,
     width: int = 180,
     height: int = 24,
+    y_offset: int = 2,
 ) -> Optional[np.ndarray]:
     if cv2 is None or frame is None:
         return None
     h, w = frame.shape[:2]
-    y1 = int(circle.cy + circle.radius + 2)
+    y1 = int(circle.cy + circle.radius + y_offset)
     y2 = min(h, y1 + 28)
     x1 = max(0, int(circle.cx - 110))
     x2 = min(w, int(circle.cx + 110))
@@ -98,11 +113,16 @@ class PlaceLocalizer:
         *,
         min_score: float = 0.50,
         min_margin: float = 0.15,
+        sticky_id: Optional[str] = None,
+        sticky_slack: float = 0.06,
     ) -> None:
         self._map_id = map_id
         self._min_score = min_score
         self._min_margin = min_margin
+        self._sticky_id = sticky_id
+        self._sticky_slack = sticky_slack
         self._templates: list[PlaceTemplate] = []
+        self._last_debug: Optional[PlaceMatchDebug] = None
         self._load()
 
     @property
@@ -112,6 +132,14 @@ class PlaceLocalizer:
     @property
     def template_count(self) -> int:
         return len(self._templates)
+
+    @property
+    def last_debug(self) -> Optional[PlaceMatchDebug]:
+        return self._last_debug
+
+    def set_sticky(self, place_id: Optional[str]) -> None:
+        """Bias match toward the currently held place (anti-flicker)."""
+        self._sticky_id = place_id
 
     def _load(self) -> None:
         if cv2 is None:
@@ -127,12 +155,14 @@ class PlaceLocalizer:
             logger.warning("nav: place localizer manifest error: %s", exc)
             return
 
-        # Optional landmark overrides from map meta
         meta_landmarks: dict = {}
         meta_path = resolve_map_meta_path(self._map_id)
         if meta_path.is_file():
             try:
-                meta_landmarks = (json.loads(meta_path.read_text(encoding="utf-8")).get("landmarks") or {})
+                meta_landmarks = (
+                    json.loads(meta_path.read_text(encoding="utf-8")).get("landmarks")
+                    or {}
+                )
             except (OSError, json.JSONDecodeError):
                 meta_landmarks = {}
 
@@ -151,7 +181,7 @@ class PlaceLocalizer:
             circle = detect_radar_circle(rgb)
             if circle is None:
                 continue
-            strip = extract_location_strip(rgb, circle)
+            strip = extract_location_strip(rgb, circle, y_offset=2)
             if strip is None:
                 continue
             lm = meta_landmarks.get(place_id) if isinstance(meta_landmarks, dict) else None
@@ -159,7 +189,6 @@ class PlaceLocalizer:
                 x, y = float(lm["x"]), float(lm["y"])
             else:
                 x, y = float(item.get("x", 0.5)), float(item.get("y", 0.5))
-            # Extra landmarks not in meta (tunnel/long/short) keep manifest coords.
             self._templates.append(
                 PlaceTemplate(
                     place_id=place_id,
@@ -176,35 +205,128 @@ class PlaceLocalizer:
             self._map_id,
         )
 
+    def _score_strip(self, strip: np.ndarray) -> list[tuple[float, PlaceTemplate]]:
+        scored: list[tuple[float, PlaceTemplate]] = []
+        for tmpl in self._templates:
+            sc = _ncc(strip, tmpl.strip)
+            if self._sticky_id and tmpl.place_id == self._sticky_id:
+                sc += self._sticky_slack
+            scored.append((sc, tmpl))
+        scored.sort(key=lambda t: t[0], reverse=True)
+        return scored
+
+    def match_debug(
+        self,
+        frame: np.ndarray,
+        circle: Optional[RadarCircle] = None,
+    ) -> PlaceMatchDebug:
+        """Best multi-offset match + top-3 (accepted or not)."""
+        empty = PlaceMatchDebug(best=None, accepted=False, top=(), strip=None)
+        if not self.ready or cv2 is None or frame is None:
+            self._last_debug = empty
+            return empty
+        circ = circle or detect_radar_circle(frame)
+        if circ is None:
+            self._last_debug = empty
+            return empty
+
+        best_overall: Optional[tuple[float, float, PlaceTemplate, np.ndarray]] = None
+        # (score, margin, tmpl, strip)
+        for y_off in _STRIP_Y_OFFSETS:
+            strip = extract_location_strip(frame, circ, y_offset=y_off)
+            if strip is None:
+                continue
+            scored = self._score_strip(strip)
+            if not scored:
+                continue
+            best_sc, best = scored[0]
+            second_sc = scored[1][0] if len(scored) > 1 else -1.0
+            margin = best_sc - second_sc
+            if best_overall is None or best_sc > best_overall[0]:
+                best_overall = (best_sc, margin, best, strip)
+
+        if best_overall is None:
+            self._last_debug = empty
+            return empty
+
+        best_sc, margin, best, strip = best_overall
+        # Recompute top-3 on winning strip without sticky for honest log names.
+        top_scored = self._score_strip(strip)[:3]
+        top = tuple((t.place_id, float(sc)) for sc, t in top_scored)
+        # Undo sticky boost for accept threshold on the sticky candidate.
+        accept_score = best_sc
+        if self._sticky_id and best.place_id == self._sticky_id:
+            accept_score = best_sc - self._sticky_slack
+        hit = PlaceHit(
+            place_id=best.place_id,
+            x=best.x,
+            y=best.y,
+            score=float(accept_score),
+            margin=float(margin),
+            team=best.team,
+        )
+        # Sticky: keep place with slightly softer gate.
+        min_score = self._min_score
+        min_margin = self._min_margin
+        if self._sticky_id and best.place_id == self._sticky_id:
+            min_score = max(0.42, self._min_score - 0.06)
+            min_margin = max(0.08, self._min_margin - 0.05)
+        accepted = accept_score >= min_score and margin >= min_margin
+        dbg = PlaceMatchDebug(
+            best=hit if accepted else hit,
+            accepted=accepted,
+            top=top,
+            strip=strip,
+        )
+        if not accepted:
+            dbg = PlaceMatchDebug(
+                best=None, accepted=False, top=top, strip=strip
+            )
+        self._last_debug = dbg
+        return dbg
+
     def localize(
         self,
         frame: np.ndarray,
         circle: Optional[RadarCircle] = None,
     ) -> Optional[PlaceHit]:
-        if not self.ready or cv2 is None or frame is None:
-            return None
-        circ = circle or detect_radar_circle(frame)
-        if circ is None:
-            return None
-        strip = extract_location_strip(frame, circ)
-        if strip is None:
-            return None
-        scored: list[tuple[float, PlaceTemplate]] = []
-        for tmpl in self._templates:
-            scored.append((_ncc(strip, tmpl.strip), tmpl))
-        scored.sort(key=lambda t: t[0], reverse=True)
-        if not scored:
-            return None
-        best_sc, best = scored[0]
-        second_sc = scored[1][0] if len(scored) > 1 else -1.0
-        margin = best_sc - second_sc
-        if best_sc < self._min_score or margin < self._min_margin:
-            return None
-        return PlaceHit(
-            place_id=best.place_id,
-            x=best.x,
-            y=best.y,
-            score=best_sc,
-            margin=margin,
-            team=best.team,
+        dbg = self.match_debug(frame, circle)
+        return dbg.best if dbg.accepted else None
+
+
+def dump_place_fail(
+    frame: np.ndarray,
+    debug: PlaceMatchDebug,
+    *,
+    out_dir: Path,
+    tag: str = "fail",
+) -> Optional[Path]:
+    """Write live frame + strip + top scores for FermK calibration."""
+    if cv2 is None:
+        return None
+    try:
+        out_dir.mkdir(parents=True, exist_ok=True)
+        ts = time.strftime("%Y%m%d_%H%M%S")
+        base = out_dir / f"place_{tag}_{ts}"
+        bgr = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+        cv2.imwrite(str(base.with_suffix(".jpg")), bgr)
+        if debug.strip is not None:
+            cv2.imwrite(str(base.with_name(base.name + "_strip.png")), debug.strip)
+        meta = {
+            "accepted": debug.accepted,
+            "top": [{"id": i, "score": s} for i, s in debug.top],
+            "best": None
+            if debug.best is None
+            else {
+                "id": debug.best.place_id,
+                "score": debug.best.score,
+                "margin": debug.best.margin,
+            },
+        }
+        base.with_suffix(".json").write_text(
+            json.dumps(meta, indent=2), encoding="utf-8"
         )
+        return base.with_suffix(".jpg")
+    except OSError as exc:
+        logger.warning("nav: place dump failed: %s", exc)
+        return None

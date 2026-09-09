@@ -3,14 +3,20 @@
 from __future__ import annotations
 
 import logging
+import os
 import time
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Optional
 
 import numpy as np
 
 from nav.minimap_reader import MinimapReader
-from nav.place_localizer import PlaceHit, PlaceLocalizer
+from nav.place_localizer import (
+    PlaceHit,
+    PlaceLocalizer,
+    dump_place_fail,
+)
 from nav.pose import PoseResult
 from nav.world_pose import YawTracker
 
@@ -26,7 +32,7 @@ class PerceptionResult:
 
 
 class NavPerception:
-    """Product perception: place-label → world pose, with short hold on flicker."""
+    """Product perception: place-label → world pose, hold + switch hysteresis."""
 
     def __init__(
         self,
@@ -36,20 +42,55 @@ class NavPerception:
         *,
         hold_sec: float = 4.0,
         log_interval_sec: float = 2.0,
+        switch_confirm: int = 2,
+        dump_dir: Optional[Path] = None,
+        dump_interval_sec: float = 8.0,
     ) -> None:
         self.reader = reader
         self.localizer = localizer
         self.yaw = yaw or YawTracker()
         self._hold_sec = max(0.5, float(hold_sec))
         self._log_interval = max(0.5, float(log_interval_sec))
+        self._switch_confirm = max(1, int(switch_confirm))
+        self._dump_dir = dump_dir
+        self._dump_interval = max(3.0, float(dump_interval_sec))
         self._last_hit: Optional[PlaceHit] = None
         self._last_hit_at: float = 0.0
         self._last_log_at: float = 0.0
+        self._last_dump_at: float = 0.0
+        self._pending_id: Optional[str] = None
+        self._pending_count: int = 0
 
     def reset(self) -> None:
         self.yaw.reset()
         self._last_hit = None
         self._last_hit_at = 0.0
+        self._pending_id = None
+        self._pending_count = 0
+        self.localizer.set_sticky(None)
+
+    def _resolve_place(self, raw: Optional[PlaceHit]) -> Optional[PlaceHit]:
+        """Hysteresis: require N consecutive reads to switch place_id."""
+        if raw is None:
+            self._pending_id = None
+            self._pending_count = 0
+            return None
+        if self._last_hit is None or raw.place_id == self._last_hit.place_id:
+            self._pending_id = None
+            self._pending_count = 0
+            return raw
+        # Candidate switch
+        if raw.place_id == self._pending_id:
+            self._pending_count += 1
+        else:
+            self._pending_id = raw.place_id
+            self._pending_count = 1
+        if self._pending_count >= self._switch_confirm:
+            self._pending_id = None
+            self._pending_count = 0
+            return raw
+        # Keep previous place id coords until confirmed
+        return self._last_hit
 
     def update(
         self,
@@ -61,25 +102,32 @@ class NavPerception:
     ) -> PerceptionResult:
         ts = time.monotonic() if now is None else now
         icon = self.reader.read(frame)
-        place = None
+        raw_place = None
         if icon.valid and self.localizer.ready:
-            place = self.localizer.localize(frame, self.reader.last_circle)
+            if self._last_hit is not None:
+                self.localizer.set_sticky(self._last_hit.place_id)
+            raw_place = self.localizer.localize(frame, self.reader.last_circle)
 
         if not icon.valid:
-            return PerceptionResult(icon=icon, place=place, pose=PoseResult.invalid())
+            return PerceptionResult(icon=icon, place=raw_place, pose=PoseResult.invalid())
 
-        if place is not None:
-            self._last_hit = place
-            self._last_hit_at = ts
+        place = self._resolve_place(raw_place)
+
+        if place is not None and raw_place is not None:
+            # Only refresh hold clock on a fresh accepted localize (not hysteresis echo).
+            if raw_place.place_id == place.place_id:
+                self._last_hit = place
+                self._last_hit_at = ts
             if ts - self._last_log_at >= self._log_interval:
                 self._last_log_at = ts
                 logger.info(
-                    "nav: place=%s score=%.3f margin=%.3f map=(%.2f,%.2f)",
+                    "nav: place=%s score=%.3f margin=%.3f map=(%.2f,%.2f)%s",
                     place.place_id,
                     place.score,
                     place.margin,
                     place.x,
                     place.y,
+                    " (held-id)" if place is self._last_hit and raw_place.place_id != place.place_id else "",
                 )
             self.yaw.on_place(place.place_id, place.x, place.y, face_x, face_y)
             world = self.yaw.to_world_pose(
@@ -109,4 +157,31 @@ class NavPerception:
                 icon=icon, place=hit, pose=world, place_held=True
             )
 
+        # Fail dump for FermK calibration (rate-limited).
+        if (
+            self._dump_dir is not None
+            and ts - self._last_dump_at >= self._dump_interval
+        ):
+            dbg = self.localizer.last_debug or self.localizer.match_debug(
+                frame, self.reader.last_circle
+            )
+            path = dump_place_fail(frame, dbg, out_dir=self._dump_dir, tag="miss")
+            self._last_dump_at = ts
+            if path is not None:
+                top_s = ", ".join(f"{i}:{s:.2f}" for i, s in dbg.top[:3])
+                logger.info("nav: place miss dump=%s top=[%s]", path.name, top_s)
+
         return PerceptionResult(icon=icon, place=None, pose=icon, place_held=False)
+
+
+def resolve_place_dump_dir() -> Optional[Path]:
+    """CSGOBOT_NAV_DUMP_PLACE=1 → vendor/csgobot/data/nav_place_dumps (gitignored)."""
+    raw = os.environ.get("CSGOBOT_NAV_DUMP_PLACE", "").strip().lower()
+    if raw not in ("1", "true", "yes", "on"):
+        return None
+    custom = os.environ.get("CSGOBOT_NAV_DUMP_DIR", "").strip()
+    if custom:
+        return Path(custom)
+    # nav/perception.py → vendor/csgobot/
+    root = Path(__file__).resolve().parents[1]
+    return root / "data" / "nav_place_dumps"
