@@ -29,6 +29,27 @@ def nav_debug_enabled() -> bool:
     return os.environ.get("CSGOBOT_NAV_DEBUG", "").lower() in ("1", "true", "yes")
 
 
+def resolve_nav_place_hold_sec(default: float = 4.0) -> float:
+    val = _env_float("CSGOBOT_NAV_PLACE_HOLD_SEC")
+    return default if val is None else max(0.5, val)
+
+
+def resolve_nav_place_wait_sec(default: float = 12.0) -> float:
+    val = _env_float("CSGOBOT_NAV_PLACE_WAIT_SEC")
+    return default if val is None else max(2.0, val)
+
+
+def resolve_nav_allow_macro(default: bool = True) -> bool:
+    """CSGOBOT_NAV_NO_MACRO=1 disables generic_dm fallback (stand/wait only)."""
+    no_macro = _env_bool("CSGOBOT_NAV_NO_MACRO")
+    if no_macro is True:
+        return False
+    allow = _env_bool("CSGOBOT_NAV_ALLOW_MACRO")
+    if allow is None:
+        return default
+    return allow
+
+
 def resolve_nav_enabled(default: bool) -> bool:
     val = _env_bool("CSGOBOT_NAV")
     return default if val is None else val

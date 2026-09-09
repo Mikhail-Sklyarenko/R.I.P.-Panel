@@ -2,7 +2,7 @@ meta:
   pack_id: dust2_dm
   map_id: de_dust2
   mode: deathmatch
-  version: "2.1.0"
+  version: "2.2.0"
 
 strategy: route_cycle
 
@@ -117,7 +117,8 @@ humanize:
 
 fallback:
   macro_script: generic_dm
-  macro_sec: 45.0
+  # Short safety only — place hold + abort-on-world own the product path.
+  macro_sec: 8.0
   retry_nav_after_macro: true
 
 stuck:

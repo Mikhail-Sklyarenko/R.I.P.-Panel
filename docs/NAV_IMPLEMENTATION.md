@@ -28,7 +28,27 @@ mode=world pose=(0.22,0.28) path=tunnel>mid fwd=1
 `resources/nav/maps/*/hud_ref/` is **calibration**, never YOLO train (`never_train`).
 
 Dust2 RU catalog (22 place labels, title-bar cropped → 1280×720) drives
-`dust2_dm` v2.1.0 dense waypoint graph. Expect `place_templates=22`.
+`dust2_dm` v2.2.0 dense waypoint graph. Expect `place_templates=22`.
+
+Product locomotion unlock (post FermK soak):
+
+1. **Place hold 4s** — label flicker keeps `mode=world` (perception + pose filter)
+2. **Abort macro on world** — never stay in `generic_dm` after a place hit
+3. **Macro off by default** — `CSGOBOT_NAV_ALLOW_MACRO=1` to re-enable short 8s safety
+4. **Look muted** while `seek` / `wait_place`
+5. Log: `nav: place=<id> score=… margin=…`
+
+Expect:
+
+```
+nav: place=mid score=0.81 margin=0.40 …
+nav: place-localized goal-seek …
+nav: path a_ramp>short>mid …
+mode=world … fwd=1
+nav: world pose — abort macro, resume path seek   # if macro was on
+```
+
+Not: long `macro_fallback` with `fwd=0` while place occasionally flashes world.
 
 ## Product locomotion (walk-to-goal)
 

@@ -96,8 +96,8 @@ class PlaceLocalizer:
         self,
         map_id: str,
         *,
-        min_score: float = 0.55,
-        min_margin: float = 0.20,
+        min_score: float = 0.50,
+        min_margin: float = 0.15,
     ) -> None:
         self._map_id = map_id
         self._min_score = min_score

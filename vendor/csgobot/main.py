@@ -578,22 +578,31 @@ def detection_process(
             from nav.pose_filter import PoseFilter
             from nav.radar_flow import RadarFlowSensor
             from nav.world_pose import YawTracker
+            from nav.config_resolve import (
+                resolve_nav_allow_macro,
+                resolve_nav_place_hold_sec,
+                resolve_nav_place_wait_sec,
+            )
 
             nav_cal_path = resolve_calibration_path(config.nav.calibration_path)
             nav_cal = load_calibration(nav_cal_path)
             nav_pack_path = resolve_nav_pack_path(active_nav_pack_id)
             nav_pack = load_nav_pack(nav_pack_path)
+            place_hold = resolve_nav_place_hold_sec(4.0)
             nav_reader = MinimapReader(nav_cal)
-            nav_pose_filter = PoseFilter(nav_cal.pose)
+            nav_pose_filter = PoseFilter(nav_cal.pose, world_hold_sec=place_hold)
             nav_radar_flow = RadarFlowSensor()
             nav_yaw = YawTracker()
             nav_place = PlaceLocalizer(nav_pack.map_id)
-            nav_perception = NavPerception(nav_reader, nav_place, nav_yaw)
+            nav_perception = NavPerception(
+                nav_reader, nav_place, nav_yaw, hold_sec=place_hold
+            )
             if not config.nav.read_only:
                 if patrol_key_down is None or patrol_key_up is None:
                     raise RuntimeError(
                         "nav movement requires patrol keys (pydirectinput)"
                     )
+                allow_macro = resolve_nav_allow_macro(False)
                 nav_controller = NavController(
                     nav_pack,
                     fov_mouse,
@@ -603,6 +612,8 @@ def detection_process(
                     logger=logger,
                     pose_lost_sec=config.nav.pose_lost_fallback_sec,
                     yaw_tracker=nav_yaw,
+                    place_wait_sec=resolve_nav_place_wait_sec(12.0),
+                    allow_macro_fallback=allow_macro,
                 )
                 nav_metrics = NavMetrics(
                     log_interval_sec=config.nav.metrics_log_interval_sec,
@@ -611,11 +622,13 @@ def detection_process(
                 goal_ids = ", ".join(g.id for g in nav_pack.goals)
                 logger.info(
                     "nav: movement enabled pack=%s strategy=%s goals=[%s] "
-                    "place_templates=%d radar=place-label+path",
+                    "place_templates=%d hold=%.1fs macro=%s radar=place-label+path",
                     nav_pack.pack_id,
                     nav_pack.strategy,
                     goal_ids,
                     nav_place.template_count,
+                    place_hold,
+                    "on" if allow_macro else "off",
                 )
             else:
                 logger.info(
@@ -931,7 +944,9 @@ def detection_process(
                 if nav_controller is not None:
                     face_x, face_y = nav_controller.face_target()
                 if nav_perception is not None:
-                    perc = nav_perception.update(img, face_x=face_x, face_y=face_y)
+                    perc = nav_perception.update(
+                        img, face_x=face_x, face_y=face_y, now=now
+                    )
                     raw_pose = perc.pose
                 else:
                     raw_pose = nav_reader.read(img)
@@ -1027,18 +1042,21 @@ def detection_process(
                     if look_controller is not None:
                         look_controller.abort(now=now)
 
-                # Combat > Nav > Look: never freeze Nav for Look while locomoting.
+                # Combat > Nav > Look: mute Look while seeking / waiting place.
+                nav_blocks_look = bool(
+                    nav_controller is not None and nav_controller.suppresses_look
+                )
                 nav_locomoting = bool(
                     nav_controller is not None and nav_controller.is_locomoting
                 )
-                if nav_locomoting and look_controller is not None:
+                if nav_blocks_look and look_controller is not None:
                     look_controller.abort(now=now)
 
                 look_hold_movement = (
                     look_controller is not None
                     and config.look.pause_movement
                     and look_controller.is_sweeping
-                    and not nav_locomoting
+                    and not nav_blocks_look
                 )
                 # Pause nav during match-ready / map change (avoid wrong-pack walks).
                 nav_paused = (
@@ -1056,7 +1074,7 @@ def detection_process(
                     look_sweeping = (
                         look_controller is not None
                         and look_controller.is_sweeping
-                        and not nav_locomoting
+                        and not nav_blocks_look
                     )
                     radar_progressing = False
                     if nav_radar_flow is not None and nav_reader is not None:
@@ -1319,19 +1337,10 @@ def detection_process(
                     and not in_combat
                     and not patrol_buy_freeze
                 )
-                # Product: Look only when Nav is idle at goal / macro — never while seeking.
+                # Product: Look never while path-seeking / waiting place.
                 nav_allows_look = True
                 if use_nav_movement and nav_controller is not None:
-                    from nav.controller import NavState as _NavState
-
-                    nav_allows_look = nav_controller.state in (
-                        _NavState.AT_GOAL,
-                        _NavState.MACRO_FALLBACK,
-                        _NavState.PAUSED,
-                    ) or (
-                        nav_tick_result is not None
-                        and nav_tick_result.use_macro_patrol
-                    )
+                    nav_allows_look = not nav_controller.suppresses_look
                 look_patrol_tick = nav_locomotion or should_patrol_tick(
                     patrol_enabled=config.patrol.enabled,
                     activated=activated.is_set(),

@@ -78,6 +78,8 @@ class NavController:
         pose_lost_sec: float = 2.5,
         team: str = "any",
         yaw_tracker: Optional[YawTracker] = None,
+        place_wait_sec: float = 12.0,
+        allow_macro_fallback: bool = True,
     ) -> None:
         self._pack = pack
         self._fov = fov_mouse
@@ -86,6 +88,8 @@ class NavController:
         self._move = move_relative
         self._log = logger or logging.getLogger("CS2Bot.nav")
         self._pose_lost_sec = pose_lost_sec
+        self._place_wait_sec = max(2.0, float(place_wait_sec))
+        self._allow_macro = bool(allow_macro_fallback)
         self._team = team.strip().lower() or "any"
         self._yaw = yaw_tracker or YawTracker()
         self._state = NavState.SEEK_GOAL
@@ -142,6 +146,16 @@ class NavController:
             NavState.SEEK_ENTRY,
             NavState.SEEK_GOAL,
             NavState.STUCK_ESCAPE,
+        )
+
+    @property
+    def suppresses_look(self) -> bool:
+        """Product: Look must not steal the mouse while we seek or wait for place."""
+        return self._state in (
+            NavState.SEEK_ENTRY,
+            NavState.SEEK_GOAL,
+            NavState.STUCK_ESCAPE,
+            NavState.WAIT_PLACE,
         )
 
     @property
@@ -291,7 +305,15 @@ class NavController:
             path=self._path_label(),
         )
 
-    def _enter_fallback(self, now: float) -> None:
+    def _enter_fallback(self, now: float) -> bool:
+        """Enter macro fallback if allowed. Returns True when entered."""
+        if not self._allow_macro:
+            self.release_keys()
+            self._state = NavState.WAIT_PLACE
+            self._log.info(
+                "nav: place lost — holding wait (macro fallback disabled)"
+            )
+            return False
         self.release_keys()
         self._state = NavState.MACRO_FALLBACK
         self._fallback_until = now + self._pack.fallback.macro_sec
@@ -300,6 +322,16 @@ class NavController:
             self._pack.fallback.macro_sec,
             self._pack.fallback.macro_script,
         )
+        return True
+
+    def _abort_fallback_for_world(self, now: float) -> None:
+        self._fallback_until = 0.0
+        self._place_wait_since = None
+        self._pose_lost_since = None
+        self._planned = False
+        self._state = NavState.SEEK_GOAL
+        self._humanizer.reset()
+        self._log.info("nav: world pose — abort macro, resume path seek")
 
     def _start_escape(self, now: float) -> None:
         angles = self._pack.stuck.escape_angles_deg
@@ -352,7 +384,10 @@ class NavController:
         flow_now = radar_progressing or now < self._flow_progress_until
 
         if self._state == NavState.MACRO_FALLBACK:
-            if now >= self._fallback_until:
+            # Product: real place lock beats cosmetic macro immediately.
+            if pose.valid and _is_map_pose(pose):
+                self._abort_fallback_for_world(now)
+            elif now >= self._fallback_until:
                 self._state = NavState.SEEK_GOAL
                 self._planned = False
                 self._pose_lost_since = None
@@ -369,13 +404,13 @@ class NavController:
             if self._pose_lost_since is None:
                 self._pose_lost_since = now
             elif now - self._pose_lost_since >= self._pose_lost_sec:
-                self._enter_fallback(now)
+                entered = self._enter_fallback(now)
                 result = self._make_result(
-                    state=NavState.MACRO_FALLBACK,
+                    state=self._state,
                     pose=pose,
                     dist=0.0,
-                    use_macro_patrol=True,
-                    fallback_event=True,
+                    use_macro_patrol=entered,
+                    fallback_event=entered,
                 )
                 self._last_pose = pose
                 return result
@@ -391,16 +426,17 @@ class NavController:
             self._place_wait_since = self._place_wait_since or now
             self.release_keys()
             self._state = NavState.WAIT_PLACE
-            if now - self._place_wait_since >= 8.0:
-                self._enter_fallback(now)
+            if now - self._place_wait_since >= self._place_wait_sec:
+                entered = self._enter_fallback(now)
+                if entered:
+                    self._place_wait_since = None
                 result = self._make_result(
-                    state=NavState.MACRO_FALLBACK,
+                    state=self._state,
                     pose=pose,
                     dist=0.0,
-                    use_macro_patrol=True,
-                    fallback_event=True,
+                    use_macro_patrol=entered,
+                    fallback_event=entered,
                 )
-                self._place_wait_since = None
                 self._last_pose = pose
                 return result
             result = self._make_result(state=NavState.WAIT_PLACE, pose=pose, dist=0.0)
