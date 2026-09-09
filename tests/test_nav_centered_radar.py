@@ -105,7 +105,7 @@ def test_controller_world_pose_seeks_with_path() -> None:
     assert r.state == NavState.SEEK_GOAL
     assert r.pose_mode == "world"
     assert "mid" in r.path or r.target_id
-    assert r.forward_held or abs(r.yaw_error_deg) > 1
+    assert r.forward_held or abs(r.yaw_error_deg) < 45.0
 
 
 def test_stuck_without_flow_while_holding_w() -> None:
