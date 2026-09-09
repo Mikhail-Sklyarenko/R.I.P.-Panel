@@ -14,6 +14,7 @@ if str(_CSGOBOT) not in sys.path:
 
 from map.hud_map_detect import (  # noqa: E402
     MapDetectState,
+    MatchReadyLatch,
     detect_map_hud,
     match_ready_visible,
     unlock_map_detect,
@@ -227,3 +228,14 @@ def test_same_map_while_locked_clears_foreign_pending() -> None:
     assert pending == 0
     assert state.pending_script is None
     assert state.confirmed_script == "dust2"
+
+
+def test_match_ready_latch_requires_consecutive_hits() -> None:
+    latch = MatchReadyLatch(confirm_frames=3)
+    assert latch.update(True) is False
+    assert latch.update(True) is False
+    assert latch.update(True) is True
+    assert latch.update(False) is False
+    assert latch.update(True) is False
+    assert latch.update(True) is False
+    assert latch.update(True) is True

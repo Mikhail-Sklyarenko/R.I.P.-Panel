@@ -2,6 +2,7 @@
 
 from map.hud_map_detect import (
     MapDetectState,
+    MatchReadyLatch,
     detect_map_hud,
     match_ready_visible,
     unlock_map_detect,
@@ -13,6 +14,7 @@ from map.regions import MapRegionSet, load_map_regions
 from map.template_match import MapTemplate, load_map_templates, max_ncc
 
 __all__ = [
+    "MatchReadyLatch",
     "MapDetectState",
     "MapRegionSet",
     "MapScriptId",

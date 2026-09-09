@@ -38,7 +38,7 @@ Product locomotion unlock (post FermK soak):
 4. **Look muted** while `seek` / `wait_place`
 5. Log: `nav: place=<id> score=… margin=…`
 6. **Multi-offset strip** + sticky bias + **2-frame switch hysteresis**
-7. Optional dumps: `CSGOBOT_NAV_DUMP_PLACE=1` → `vendor/csgobot/data/nav_place_dumps/`
+8. **Match-ready latch (12 frames)** — stop false `map_transition` pauses mid-DM
 
 Expect:
 

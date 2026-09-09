@@ -40,6 +40,27 @@ def match_ready_visible(img: np.ndarray, regions: MapRegionSet) -> bool:
     return votes >= regions.match_ready_min_votes
 
 
+@dataclass
+class MatchReadyLatch:
+    """Require N consecutive positive frames before treating match-ready as real.
+
+    Single-frame RGB probe hits were false-pausing Nav mid-DM (FermK soak).
+    """
+
+    confirm_frames: int = 12
+    hits: int = 0
+
+    def update(self, visible: bool) -> bool:
+        if visible:
+            self.hits += 1
+        else:
+            self.hits = 0
+        return self.hits >= max(1, self.confirm_frames)
+
+    def reset(self) -> None:
+        self.hits = 0
+
+
 def detect_map_hud(
     img: np.ndarray,
     regions: MapRegionSet,

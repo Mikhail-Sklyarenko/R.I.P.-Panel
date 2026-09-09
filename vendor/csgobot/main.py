@@ -51,6 +51,7 @@ from team.hud_team_detect import (
 from team.paths import resolve_team_probes_path
 from team.probes import load_team_probes
 from map.hud_map_detect import (
+    MatchReadyLatch,
     MapDetectState,
     detect_map_hud,
     match_ready_visible,
@@ -431,6 +432,7 @@ def detection_process(
     nav_movement_started_at = 0.0
     nav_fail_open_done = False
     map_transition_active = False
+    match_ready_latch = MatchReadyLatch(confirm_frames=12)
     nav_reader = None
     nav_pose_filter = None
     nav_radar_flow = None
@@ -670,8 +672,10 @@ def detection_process(
                 and patrol_key_down is not None
                 and patrol_key_up is not None
             ):
-                # Product: new match popup clears soft-lock so Dust2↔Mirage can hot-swap.
-                map_transition_active = match_ready_visible(img, map_regions)
+                # Product: debounce match-ready — single-frame probe FP paused Nav mid-DM.
+                map_transition_active = match_ready_latch.update(
+                    match_ready_visible(img, map_regions)
+                )
                 if map_transition_active and map_detect_state.locked:
                     prev_script = map_detect_state.confirmed_script
                     if unlock_map_detect(map_detect_state):
@@ -1065,7 +1069,7 @@ def detection_process(
                     and look_controller.is_sweeping
                     and not nav_blocks_look
                 )
-                # Pause nav during match-ready / map change (avoid wrong-pack walks).
+                # Pause nav only on confirmed match-ready (latched), not RGB flicker.
                 nav_paused = (
                     nav_combat_hold
                     or patrol_buy_freeze

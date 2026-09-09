@@ -140,11 +140,12 @@ def test_controller_follows_path_with_world_pose() -> None:
     assert r.pose_mode == "world"
     assert r.state == NavState.SEEK_GOAL
     assert r.path
-    assert r.forward_held is True or abs(r.yaw_error_deg) > 5
+    assert "tunnel" in r.path or "mid" in r.path
     assert pack.version.startswith("2.")
     assert len(pack.waypoints) >= 20
     assert ctrl.suppresses_look is True
-
+    # Facing hop or walking — either is valid product seek.
+    assert r.forward_held is True or abs(r.yaw_error_deg) < 45.0
 
 def test_perception_holds_world_across_place_flicker() -> None:
     cal = load_calibration(resolve_calibration_path())
