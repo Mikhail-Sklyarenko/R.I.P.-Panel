@@ -1,0 +1,373 @@
+{
+  "map_id": "de_dust2",
+  "version": 1,
+  "calibration_method": "multiscale_sift_plus_bidirectional_wall_contours",
+  "references": [
+    {
+      "image": "b_doors_frame.png",
+      "to_map": [
+        [
+          2.80000307939653,
+          -0.022083578785785783,
+          -52.26493192500252
+        ],
+        [
+          0.022083578785785783,
+          2.80000307939653,
+          -82.10744600869936
+        ]
+      ],
+      "source_frame": "b_doors_frame.jpg",
+      "source_sha256": "9be4eaa598a277a95aa05c0d1a4ffe4abba1cd5d1bf0e6116a4db7af0a2046f6",
+      "wall_agreement": 0.8484,
+      "inliers": 8
+    },
+    {
+      "image": "bombsite_b_frame.png",
+      "to_map": [
+        [
+          2.8027738337830117,
+          -0.012725178772317417,
+          -147.079254072762
+        ],
+        [
+          0.012725178772317417,
+          2.8027738337830117,
+          -92.4069920265133
+        ]
+      ],
+      "source_frame": "bombsite_b_frame.jpg",
+      "source_sha256": "a5972925f84ac6c91a80a8fc366f7b20201df0f32945ddc5b6bf46bff4d85935",
+      "wall_agreement": 0.8383,
+      "inliers": 9
+    },
+    {
+      "image": "ct_spawn_frame.png",
+      "to_map": [
+        [
+          2.798251279770806,
+          0.005457853329597623,
+          311.76968099290025
+        ],
+        [
+          -0.005457853329597623,
+          2.798251279770806,
+          -70.63732495613269
+        ]
+      ],
+      "source_frame": "ct_spawn_frame.jpg",
+      "source_sha256": "55c8baf328ebd4edfe887b9923eb125cbd1d400afd1b68243f476ee15e7b08bf",
+      "wall_agreement": 0.8769,
+      "inliers": 6
+    },
+    {
+      "image": "ledge_frame.png",
+      "to_map": [
+        [
+          2.7965982877041897,
+          -0.005950548889404366,
+          256.4948741487659
+        ],
+        [
+          0.005950548889404366,
+          2.7965982877041897,
+          89.33284428147105
+        ]
+      ],
+      "source_frame": "ledge_frame.jpg",
+      "source_sha256": "46e228565683349ab4d903f4891e3e24825dc5b20ebf2c9eb0d39c48db43bf34",
+      "wall_agreement": 0.8567,
+      "inliers": 7
+    },
+    {
+      "image": "long_a_frame.png",
+      "to_map": [
+        [
+          2.8062307559566233,
+          0.04198325697226593,
+          571.9794615092426
+        ],
+        [
+          -0.04198325697226593,
+          2.8062307559566233,
+          125.31244408530124
+        ]
+      ],
+      "source_frame": "long_a_frame.jpg",
+      "source_sha256": "338338751c6cc8267116d0964793e37cd39911b3c6891b40aa6531d93caf6e21",
+      "wall_agreement": 0.8453,
+      "inliers": 10
+    },
+    {
+      "image": "long_doors_frame.png",
+      "to_map": [
+        [
+          2.785585513536594,
+          0.021630406814004646,
+          388.9587328459764
+        ],
+        [
+          -0.021630406814004646,
+          2.785585513536594,
+          333.3453812385392
+        ]
+      ],
+      "source_frame": "long_doors_frame.jpg",
+      "source_sha256": "feae58c53e6fe56e3ca77de34e9d2bd61dd25ea9fac3e16e2c1a89c15dfb51bf",
+      "wall_agreement": 0.9278,
+      "inliers": 10
+    },
+    {
+      "image": "long_frame.png",
+      "to_map": [
+        [
+          2.807953466123976,
+          -0.01692407225701009,
+          316.63094762332827
+        ],
+        [
+          0.01692407225701009,
+          2.807953466123976,
+          505.1912359928583
+        ]
+      ],
+      "source_frame": "long_frame.jpg",
+      "source_sha256": "069bf782e270d207fea665816d918ba615c4b4f0f51ee276c3ac45aa94c845d4",
+      "wall_agreement": 0.8217,
+      "inliers": 11
+    },
+    {
+      "image": "mid_doors_frame.png",
+      "to_map": [
+        [
+          2.8001915614167436,
+          -0.004973275519579456,
+          143.00326478907994
+        ],
+        [
+          0.004973275519579456,
+          2.8001915614167436,
+          -76.70944376327175
+        ]
+      ],
+      "source_frame": "mid_doors_frame.jpg",
+      "source_sha256": "ef5f3cb1a13258acd12d966739086bf1d94837f5d2f099bfd26e85069935b039",
+      "wall_agreement": 0.836,
+      "inliers": 7
+    },
+    {
+      "image": "mid_frame.png",
+      "to_map": [
+        [
+          2.803726456387735,
+          0.0006532365508148927,
+          148.97019623096088
+        ],
+        [
+          -0.0006532365508148927,
+          2.803726456387735,
+          119.7318613628697
+        ]
+      ],
+      "source_frame": "mid_frame.jpg",
+      "source_sha256": "04d705c1476507b333088f3b59790bb7a96d5161d9bc7ec028bc14319905c11d",
+      "wall_agreement": 0.8704,
+      "inliers": 7
+    },
+    {
+      "image": "mid_upper_frame.png",
+      "to_map": [
+        [
+          2.8191968308513893,
+          -0.0181886737006821,
+          148.88515850182705
+        ],
+        [
+          0.0181886737006821,
+          2.8191968308513893,
+          300.8250186974464
+        ]
+      ],
+      "source_frame": "mid_upper_frame.jpg",
+      "source_sha256": "5007baa6b203e4b7852328f2d3c409732e8dfea6cc0c6d291de8f20d0fb97329",
+      "wall_agreement": 0.8955,
+      "inliers": 6
+    },
+    {
+      "image": "outside_tunnel_frame.png",
+      "to_map": [
+        [
+          2.8084308142185774,
+          0.014298012492988177,
+          -130.15224984827722
+        ],
+        [
+          -0.014298012492988177,
+          2.8084308142185774,
+          345.0440960071091
+        ]
+      ],
+      "source_frame": "outside_tunnel_frame.jpg",
+      "source_sha256": "32df8dc5dc9d11ac76e52aa0b4f272d06ce622a0cdff25642458a70b80c6d3c1",
+      "wall_agreement": 0.8568,
+      "inliers": 11
+    },
+    {
+      "image": "pit_frame.png",
+      "to_map": [
+        [
+          2.798055759249389,
+          -0.0016325268170476583,
+          573.8588380088601
+        ],
+        [
+          0.0016325268170476583,
+          2.798055759249389,
+          314.25664031711176
+        ]
+      ],
+      "source_frame": "pit_frame.jpg",
+      "source_sha256": "4b26a2d16a5515df9563f14a0f329921fafe8f40f456fdc3d77889d092e09e67",
+      "wall_agreement": 0.7639,
+      "inliers": 8
+    },
+    {
+      "image": "short_frame.png",
+      "to_map": [
+        [
+          2.7953156859866857,
+          0.0021651063393358402,
+          324.2294896639955
+        ],
+        [
+          -0.0021651063393358402,
+          2.7953156859866857,
+          99.90436790441785
+        ]
+      ],
+      "source_frame": "short_frame.jpg",
+      "source_sha256": "f32cad55c63c8c9dd6aaac29543d8f8ca2b78554a709e5fb5de48714112967d2",
+      "wall_agreement": 0.905,
+      "inliers": 7
+    },
+    {
+      "image": "t_ramp_frame.png",
+      "to_map": [
+        [
+          2.754949993634499,
+          -0.0033708873023593966,
+          -177.1287354724374
+        ],
+        [
+          0.0033708873023593966,
+          2.754949993634499,
+          496.4407020155722
+        ]
+      ],
+      "source_frame": "t_ramp_frame.jpg",
+      "source_sha256": "0cd1f660fa785802865ae6b768586e58f3c46348d138f1e9a6657b2525fee644",
+      "wall_agreement": 0.7929,
+      "inliers": 10
+    },
+    {
+      "image": "t_spawn_frame.png",
+      "to_map": [
+        [
+          2.8101724079260295,
+          0.008956154727588997,
+          -85.68329206119432
+        ],
+        [
+          -0.008956154727588997,
+          2.8101724079260295,
+          528.750377628645
+        ]
+      ],
+      "source_frame": "t_spawn_frame.jpg",
+      "source_sha256": "8b372690971bb26737fb3a63241adf5147e323c28219e072fafc1c1c86d83cb2",
+      "wall_agreement": 0.8453,
+      "inliers": 12
+    },
+    {
+      "image": "tunnel_frame.png",
+      "to_map": [
+        [
+          2.808812824172134,
+          -0.006196777488947413,
+          89.75105048688282
+        ],
+        [
+          0.006196777488947413,
+          2.808812824172134,
+          96.37142041984072
+        ]
+      ],
+      "source_frame": "tunnel_frame.jpg",
+      "source_sha256": "594a17de7d30a0fccd84bde76d8fa16a0ca3e637f4e34812989bb2f39f9276ff",
+      "wall_agreement": 0.8686,
+      "inliers": 8
+    },
+    {
+      "image": "tunnel_stairs_frame.png",
+      "to_map": [
+        [
+          2.793136813330708,
+          -0.023340175869352463,
+          3.929757075173082
+        ],
+        [
+          0.023340175869352463,
+          2.793136813330708,
+          156.6317637638129
+        ]
+      ],
+      "source_frame": "tunnel_stairs_frame.jpg",
+      "source_sha256": "c6aa1287bd4c1a1138e1ce4f5568b37c61824e4ff5d2957582eb3460a857e945",
+      "wall_agreement": 0.8753,
+      "inliers": 14
+    },
+    {
+      "image": "tunnel_upper_frame.png",
+      "to_map": [
+        [
+          2.844256981901819,
+          0.00432147693074552,
+          -101.98783629886216
+        ],
+        [
+          -0.00432147693074552,
+          2.844256981901819,
+          160.1781847368667
+        ]
+      ],
+      "source_frame": "tunnel_upper_frame.jpg",
+      "source_sha256": "680684c99372ce6ee139e4d15c901ed8bdf6b3438fb715d161aa48eab9e2cd65",
+      "wall_agreement": 0.853,
+      "inliers": 11
+    },
+    {
+      "image": "under_a_frame.png",
+      "to_map": [
+        [
+          2.8121365254078836,
+          0.005825131798182343,
+          443.7435797922925
+        ],
+        [
+          -0.005825131798182343,
+          2.8121365254078836,
+          -76.79810601731171
+        ]
+      ],
+      "source_frame": "under_a_frame.jpg",
+      "source_sha256": "d5c8254412005b1688ccdfbd4faad2cd8a2ada89d4dc374e15e2bd0cd126dd89",
+      "wall_agreement": 0.8603,
+      "inliers": 17
+    }
+  ],
+  "rejected_sources": [
+    "a_ramp_frame.jpg",
+    "bombsite_a_frame.jpg",
+    "near_a_frame.jpg"
+  ]
+}

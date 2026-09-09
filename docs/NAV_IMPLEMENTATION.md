@@ -1,5 +1,10 @@
 # Minimap Navigator (PR-N0 – PR-N8)
 
+> Runtime обновлён на измеренную визуальную навигацию. Текущий статус,
+> обязательная подготовка профиля и ограничения описаны в [NAV_VISUAL.md](NAV_VISUAL.md).
+> Ниже сохранена история прежних подходов; её заявления о готовности не являются
+> результатами проверки нового контура в игре.
+
 Goal-based navigation for CS2 DM farm bots. **Not a YOLO dataset** — config + code only.
 
 ## Product locomotion contract (corridor + Safe-W)

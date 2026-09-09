@@ -4,6 +4,7 @@ CS2 Aimbot entry point
 Architecture: [Grab Process] --queue--> [Detection Process] --queue--> [Preview Process]
 """
 
+import json
 import logging
 import multiprocessing
 import random
@@ -262,6 +263,7 @@ def grab_process(
 
     while not stop_event.is_set():
         try:
+            captured_at = time.monotonic()
             img = grabber.get_image(grab_area)
             if img is None:
                 continue
@@ -273,7 +275,7 @@ def grab_process(
                 except Exception:
                     break
 
-            queue.put_nowait(img)
+            queue.put_nowait((captured_at, img))
 
         except Exception as e:
             logger.error(f"Capture error: {e}")
@@ -429,13 +431,13 @@ def detection_process(
     last_map_debug_log = 0.0
     last_nav_debug_log = 0.0
     last_nav_metrics_at = 0.0
-    nav_movement_started_at = 0.0
-    nav_fail_open_done = False
+    # Preserve intent through init failures: do not silently substitute blind
+    # patrol/auto_move when measured navigation was requested.
+    nav_requested = config.nav.enabled
     map_transition_active = False
     match_ready_latch = MatchReadyLatch(confirm_frames=20)
     nav_reader = None
     nav_pose_filter = None
-    nav_radar_flow = None
     nav_perception = None
     nav_pack = None
     active_nav_pack_id = ""
@@ -534,7 +536,7 @@ def detection_process(
 
     if config.nav.enabled:
         try:
-            from nav.pack_resolve import resolve_initial_nav_pack_id
+            from nav.pack_resolve import resolve_initial_nav_pack_id, measured_runtime_pack
             from nav.preflight import run_nav_preflight
             from nav.paths import resolve_calibration_path, resolve_nav_pack_path
 
@@ -542,8 +544,9 @@ def detection_process(
                 explicit_pack=config.nav.pack_id,
                 patrol_script=config.patrol.script_name,
             )
+            active_nav_pack_id = measured_runtime_pack(active_nav_pack_id, config.nav.pack_id)
             pf = run_nav_preflight(
-                pack_id=config.nav.pack_id,
+                pack_id=active_nav_pack_id,
                 calibration_path=config.nav.calibration_path,
             )
             for warn in pf.get("warnings", []):
@@ -551,7 +554,7 @@ def detection_process(
             if not pf.get("ok"):
                 for err in pf.get("errors", []):
                     logger.error("nav: preflight — %s", err)
-                logger.error("nav: preflight failed; disabled (macro patrol fallback)")
+                logger.error("nav: preflight failed; navigation input disabled")
                 config.nav.enabled = False
             else:
                 cal_path = resolve_calibration_path(config.nav.calibration_path)
@@ -570,51 +573,29 @@ def detection_process(
     if config.nav.enabled:
         try:
             from nav.calibration import load_calibration
-            from nav.controller import NavController
+            from nav.visual_controller import VisualNavController as NavController
             from nav.metrics import NavMetrics
             from nav.minimap_reader import MinimapReader
             from nav.pack import load_nav_pack
             from nav.paths import resolve_calibration_path, resolve_nav_pack_path
-            from nav.perception import NavPerception, resolve_place_dump_dir
+            from nav.visual_perception import VisualPerception as NavPerception
             from nav.place_localizer import PlaceLocalizer
             from nav.pose_filter import PoseFilter
-            from nav.radar_flow import RadarFlowSensor
-            from nav.world_pose import YawTracker
-            from nav.corridor import build_edge_neighbors
-            from nav.config_resolve import (
-                resolve_nav_allow_macro,
-                resolve_nav_place_hold_sec,
-                resolve_nav_place_wait_sec,
-            )
-
             nav_cal_path = resolve_calibration_path(config.nav.calibration_path)
             nav_cal = load_calibration(nav_cal_path)
             nav_pack_path = resolve_nav_pack_path(active_nav_pack_id)
             nav_pack = load_nav_pack(nav_pack_path)
-            place_hold = resolve_nav_place_hold_sec(2.5)
             nav_reader = MinimapReader(nav_cal)
-            nav_pose_filter = PoseFilter(nav_cal.pose, world_hold_sec=place_hold)
-            nav_radar_flow = RadarFlowSensor()
-            nav_yaw = YawTracker()
+            nav_pose_filter = PoseFilter(nav_cal.pose)
             nav_place = PlaceLocalizer(nav_pack.map_id)
-            dump_dir = resolve_place_dump_dir()
-            nav_neighbors = build_edge_neighbors(tuple(nav_pack.edges))
-            nav_perception = NavPerception(
-                nav_reader,
-                nav_place,
-                nav_yaw,
-                hold_sec=place_hold,
-                dump_dir=dump_dir,
-                neighbors=nav_neighbors,
-            )
-            if dump_dir is not None:
-                logger.info("nav: place miss dumps → %s", dump_dir)
+            nav_perception = NavPerception(nav_reader, nav_place)
+            from nav.release import identity
+            logger.info("nav: runtime_identity %s", json.dumps(identity(nav_pack.map_id), sort_keys=True))
             if not config.nav.read_only:
                 if patrol_key_down is None or patrol_key_up is None:
                     raise RuntimeError(
                         "nav movement requires patrol keys (pydirectinput)"
                     )
-                allow_macro = resolve_nav_allow_macro(False)
                 nav_controller = NavController(
                     nav_pack,
                     fov_mouse,
@@ -622,10 +603,7 @@ def detection_process(
                     key_up=patrol_key_up,
                     move_relative=mouse.move_relative,
                     logger=logger,
-                    pose_lost_sec=config.nav.pose_lost_fallback_sec,
-                    yaw_tracker=nav_yaw,
-                    place_wait_sec=resolve_nav_place_wait_sec(12.0),
-                    allow_macro_fallback=allow_macro,
+                    watchdog=True,
                 )
                 nav_metrics = NavMetrics(
                     log_interval_sec=config.nav.metrics_log_interval_sec,
@@ -634,14 +612,10 @@ def detection_process(
                 goal_ids = ", ".join(g.id for g in nav_pack.goals)
                 logger.info(
                     "nav: movement enabled pack=%s strategy=%s goals=[%s] "
-                    "place_templates=%d hold=%.1fs macro=%s "
-                    "locomotion=corridor+Safe-W",
+                    "locomotion=measured-visual",
                     nav_pack.pack_id,
                     nav_pack.strategy,
                     goal_ids,
-                    nav_place.template_count,
-                    place_hold,
-                    "on" if allow_macro else "off",
                 )
             else:
                 logger.info(
@@ -659,11 +633,21 @@ def detection_process(
     try:
         while not stop_event.is_set():
             try:
-                img = frame_queue.get(timeout=0.01)
+                captured_at, img = frame_queue.get(timeout=0.01)
             except Exception:
+                # A stalled capture must release movement even without another
+                # frame reaching the controller's normal freshness check.
+                if nav_controller is not None:
+                    observed = getattr(nav_controller.last_pose, "observed_at", None)
+                    if observed is None or time.monotonic() - observed > .25:
+                        nav_controller.release_keys()
                 continue
 
             now = time.monotonic()
+            if nav_requested and now - captured_at > .25:
+                if nav_controller is not None:
+                    nav_controller.release_keys()
+                continue
 
             map_transition_active = False
             if (
@@ -687,7 +671,6 @@ def detection_process(
                             "map: unlock (match_ready) was=%s — awaiting reconfirm",
                             prev_script,
                         )
-                        nav_fail_open_done = False
 
                 detected, detect_source = detect_map_hud(
                     img,
@@ -708,7 +691,6 @@ def detection_process(
                             detected,
                             map_detect_state.confirmed_script,
                         )
-                        nav_fail_open_done = False
 
                 map_changed, map_pending = update_map_hysteresis(
                     map_detect_state,
@@ -744,7 +726,6 @@ def detection_process(
                         )
                         if (
                             config.nav.enabled
-                            and nav_controller is not None
                             and nav_pack is not None
                         ):
                             from nav.pack_resolve import nav_pack_for_script
@@ -753,6 +734,8 @@ def detection_process(
                                 map_changed,
                                 config.nav.pack_id,
                             )
+                            if new_pack_id:
+                                new_pack_id = measured_runtime_pack(new_pack_id, config.nav.pack_id)
                             if (
                                 new_pack_id
                                 and new_pack_id != nav_pack.pack_id
@@ -763,10 +746,17 @@ def detection_process(
                                 new_pack = load_nav_pack(
                                     resolve_nav_pack_path(new_pack_id)
                                 )
-                                nav_controller.reload_pack(new_pack)
+                                if nav_controller is not None:
+                                    nav_controller.reload_pack(new_pack)
+                                if nav_perception is not None:
+                                    nav_perception.localizer = PlaceLocalizer(new_pack.map_id)
+                                    nav_perception.reload_map(new_pack.map_id)
+                                else:
+                                    nav_perception = NavPerception(nav_reader, PlaceLocalizer(new_pack.map_id))
+                                if nav_pose_filter is not None:
+                                    nav_pose_filter.reset()
                                 nav_pack = new_pack
                                 active_nav_pack_id = new_pack_id
-                                nav_fail_open_done = True
                                 if nav_metrics is not None:
                                     nav_metrics = NavMetrics(
                                         log_interval_sec=config.nav.metrics_log_interval_sec,
@@ -781,6 +771,13 @@ def detection_process(
                                 )
                     except Exception as exc:
                         logger.error("map: patrol reload failed (%s)", exc)
+                        if nav_controller is not None:
+                            nav_controller.release_keys()
+                        if nav_pose_filter is not None:
+                            nav_pose_filter.reset()
+                        # Never feed the previous map's registered coordinates
+                        # to a controller after a failed map switch.
+                        nav_perception = None
                 # Product: always log map_detect status (farm observability).
                 if now - last_map_debug_log >= 5.0:
                     logger.info(
@@ -955,12 +952,9 @@ def detection_process(
                 and nav_pose_filter is not None
                 and activated.is_set()
             ):
-                face_x, face_y = 0.52, 0.48
-                if nav_controller is not None:
-                    face_x, face_y = nav_controller.face_target()
                 if nav_perception is not None:
                     perc = nav_perception.update(
-                        img, face_x=face_x, face_y=face_y, now=now
+                        img, now=captured_at
                     )
                     raw_pose = perc.pose
                 else:
@@ -973,59 +967,6 @@ def detection_process(
                 and nav_controller is not None
                 and activated.is_set()
             )
-            if use_nav_movement and nav_movement_started_at <= 0.0:
-                nav_movement_started_at = now
-
-            # Product fail-open: never stay on generic_dm when auto + map unknown.
-            if (
-                use_nav_movement
-                and not nav_fail_open_done
-                and nav_controller is not None
-                and nav_pack is not None
-                and nav_movement_started_at > 0.0
-                and now - nav_movement_started_at >= 8.0
-            ):
-                from nav.pack_resolve import (
-                    PRODUCT_DEFAULT_PACK,
-                    should_fail_open_to_default,
-                )
-
-                confirmed = (
-                    map_detect_state.confirmed_script
-                    if map_detect_state is not None
-                    else "generic_dm"
-                )
-                locked = bool(map_detect_state.locked) if map_detect_state else False
-                if should_fail_open_to_default(
-                    explicit_pack=config.nav.pack_id,
-                    active_pack_id=nav_pack.pack_id,
-                    confirmed_script=confirmed,
-                    map_locked=locked,
-                ):
-                    try:
-                        from nav.pack import load_nav_pack
-                        from nav.paths import resolve_nav_pack_path
-
-                        new_pack = load_nav_pack(
-                            resolve_nav_pack_path(PRODUCT_DEFAULT_PACK)
-                        )
-                        nav_controller.reload_pack(new_pack)
-                        nav_pack = new_pack
-                        active_nav_pack_id = PRODUCT_DEFAULT_PACK
-                        if nav_metrics is not None:
-                            nav_metrics = NavMetrics(
-                                log_interval_sec=config.nav.metrics_log_interval_sec,
-                            )
-                            nav_metrics.set_pack_id(new_pack.pack_id)
-                            nav_metrics.start(now)
-                        logger.warning(
-                            "nav: fail-open pack %s (map_detect silent; "
-                            "was generic_dm)",
-                            PRODUCT_DEFAULT_PACK,
-                        )
-                    except Exception as exc:
-                        logger.error("nav: fail-open failed (%s)", exc)
-                nav_fail_open_done = True
 
             nav_tick_result = None
 
@@ -1083,12 +1024,9 @@ def detection_process(
                         patrol_runner.pause()
                     # Keep path state — tick paused so logs retain path=…
                     radar_progressing = False
-                    if nav_radar_flow is not None and nav_reader is not None:
-                        flow = nav_radar_flow.update(nav_reader.last_ring_gray)
-                        radar_progressing = flow.progressing
                     nav_tick_result = nav_controller.tick(
                         nav_pose,
-                        now=now,
+                        now=time.monotonic(),
                         paused=True,
                         team=current_team_str,
                         look_sweeping=False,
@@ -1101,12 +1039,9 @@ def detection_process(
                         and not nav_blocks_look
                     )
                     radar_progressing = False
-                    if nav_radar_flow is not None and nav_reader is not None:
-                        flow = nav_radar_flow.update(nav_reader.last_ring_gray)
-                        radar_progressing = flow.progressing
                     nav_tick_result = nav_controller.tick(
                         nav_pose,
-                        now=now,
+                        now=time.monotonic(),
                         paused=False,
                         team=current_team_str,
                         look_sweeping=look_sweeping,
@@ -1209,7 +1144,7 @@ def detection_process(
                     logger.info(
                         "nav: state=%s phase=%s pose=(%.2f,%.2f) yaw=%.0f conf=%.2f "
                         "valid=%s mode=%s dist=%.3f yaw_err=%.0f fwd=%s fail_open=%s "
-                        "goal=%s target=%s path=%s%s",
+                        "goal=%s target=%s path=%s%s reason=%s",
                         state_label,
                         phase_label,
                         log_pose.x_norm,
@@ -1238,9 +1173,10 @@ def detection_process(
                             )
                         ),
                         pause_reason,
+                        nav_tick_result.reason if nav_tick_result else getattr(nav_perception, "reason", "read_only"),
                     )
                     last_nav_debug_log = now
-            elif config.patrol.enabled and patrol_runner is not None:
+            elif config.patrol.enabled and patrol_runner is not None and not nav_requested:
                 prev_mode = patrol_mode
                 patrol_mode = next_mode_after_combat_check(
                     mode=patrol_mode,
@@ -1359,6 +1295,7 @@ def detection_process(
             elif (
                 activated.is_set()
                 and config.aim.auto_move
+                and not nav_requested
                 and now - last_move_time >= config.aim.move_interval_sec
             ):
                 try:
@@ -1378,7 +1315,7 @@ def detection_process(
                     and not patrol_buy_freeze
                 )
                 # Product: Look never while path-seeking / waiting place.
-                nav_allows_look = True
+                nav_allows_look = not nav_requested
                 if use_nav_movement and nav_controller is not None:
                     nav_allows_look = not nav_controller.suppresses_look
                 look_patrol_tick = nav_locomotion or should_patrol_tick(
@@ -1598,7 +1535,7 @@ def detection_process(
         if patrol_runner is not None:
             patrol_runner.release_all_keys()
         if nav_controller is not None:
-            nav_controller.release_keys()
+            nav_controller.close()
         if nav_metrics is not None:
             nav_metrics.maybe_log(time.monotonic(), logger, force=True)
 

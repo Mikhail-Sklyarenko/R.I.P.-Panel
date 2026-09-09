@@ -41,6 +41,8 @@ _WALL_TURN_DEG = 95.0
 
 
 class NavState(str, Enum):
+    WAIT_POSE = "wait_pose"
+    BLOCKED = "blocked"
     SEEK_ENTRY = "seek_entry"
     SEEK_GOAL = "seek_goal"
     AT_GOAL = "at_goal"
@@ -76,6 +78,8 @@ class NavTickResult:
     forward_fail_open: bool = False
     pose_mode: str = ""
     path: str = ""
+    reason: str = ""
+    pose_age_sec: float = 0.0
 
 
 def _is_map_pose(pose: PoseResult) -> bool:

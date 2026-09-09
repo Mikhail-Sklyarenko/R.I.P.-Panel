@@ -1,0 +1,15 @@
+{
+  "map_id": "de_dust2",
+  "version": "1.0.0",
+  "scope": "dust2_mid_lane",
+  "clearance_px": 6,
+  "resolution": [
+    1024,
+    1024
+  ],
+  "map_sha256": "3be20317d1383da6f390a5bb245cabb65857ef08b1e2c5b82b5938a8cb3167bb",
+  "route_pack": "dust2_visual_mvp",
+  "live_validated": false,
+  "mask_source": "radar floor palette intersected with inspected central lane rectangle; structures excluded",
+  "supported_start_region": "central lane only; other spawns require manual positioning"
+}

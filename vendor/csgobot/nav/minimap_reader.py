@@ -88,6 +88,8 @@ class MinimapReader:
         self._mm = calibration.minimap
         self._last_ring_gray: Optional[np.ndarray] = None
         self._last_circle: Optional[RadarCircle] = None
+        self.last_icon_xy: Optional[tuple[float, float]] = None
+        self.last_icon_component: Optional[np.ndarray] = None
 
     @property
     def calibration(self) -> NavCalibration:
@@ -211,6 +213,8 @@ class MinimapReader:
     def read(self, frame: np.ndarray) -> PoseResult:
         self._last_ring_gray = None
         self._last_circle = None
+        self.last_icon_xy = None
+        self.last_icon_component = None
         if frame is None or frame.size == 0:
             return PoseResult.invalid()
 
@@ -240,6 +244,7 @@ class MinimapReader:
             return PoseResult.invalid()
 
         area, bx, by, center_dist = picked
+        self.last_icon_xy = (bx, by)
         # Component mask for yaw
         if cv2 is not None:
             num, labels, _stats, _c = cv2.connectedComponentsWithStats(
@@ -261,6 +266,7 @@ class MinimapReader:
             component = mask
 
         yaw_deg = _yaw_from_arrow_tip(crop, component)
+        self.last_icon_component = component
         self._last_ring_gray = self._build_ring_gray(
             crop, component, local_cx=local_cx, local_cy=local_cy, radius=radius
         )

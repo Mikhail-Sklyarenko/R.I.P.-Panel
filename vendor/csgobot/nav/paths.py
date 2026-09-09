@@ -42,3 +42,19 @@ def resolve_map_meta_path(map_id: str) -> Path:
 
 def resolve_map_radar_path(map_id: str) -> Path:
     return resolve_nav_root() / "maps" / map_id / "radar.png"
+
+
+def resolve_visual_profile_dir(map_id: str) -> Path:
+    if not map_id or Path(map_id).name != map_id or map_id in (".", ".."):
+        raise ValueError("Invalid map id")
+    return _data_dir() / "nav_profiles" / map_id
+
+
+def resolve_visual_profile_file(map_id: str, filename: str) -> Path:
+    """User calibration overrides bundled defaults per asset, not per folder."""
+    if Path(filename).name != filename:
+        raise ValueError("Invalid profile asset name")
+    custom = resolve_visual_profile_dir(map_id) / filename
+    if custom.is_file():
+        return custom
+    return resolve_nav_root() / "profiles" / map_id / filename

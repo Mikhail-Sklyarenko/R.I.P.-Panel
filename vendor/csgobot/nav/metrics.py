@@ -38,6 +38,9 @@ class NavMetrics:
     _last_goal_id: str = ""
     _last_target_id: str = ""
     _pack_id: str = ""
+    _last_reason: str = ""
+    _last_state: str = ""
+    _last_pose_age_sec: float = 0.0
 
     def set_pack_id(self, pack_id: str) -> None:
         self._pack_id = pack_id.strip()
@@ -60,6 +63,9 @@ class NavMetrics:
             self.start(now)
 
         state_key = result.state.value
+        self._last_state = state_key
+        self._last_reason = result.reason
+        self._last_pose_age_sec = result.pose_age_sec
         self._state_seconds[state_key] = (
             self._state_seconds.get(state_key, 0.0) + max(dt, 0.0)
         )
@@ -142,6 +148,11 @@ class NavMetrics:
             pose_xy = [round(self._last_pose.x_norm, 3), round(self._last_pose.y_norm, 3)]
 
         return {
+            "nav_state": self._last_state,
+            "reason": self._last_reason,
+            "pose_age_sec": round(self._last_pose_age_sec, 3),
+            "blocked_sec": round(self._state_seconds.get("blocked", 0.0), 1),
+            "wait_pose_sec": round(self._state_seconds.get("wait_pose", 0.0), 1),
             "uptime_sec": round(uptime, 1),
             "pack_id": self._pack_id or None,
             "state": self._last_target_id or self._last_goal_id or "?",

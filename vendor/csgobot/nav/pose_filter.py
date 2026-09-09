@@ -40,6 +40,11 @@ class PoseFilter:
 
     def update(self, raw: PoseResult, *, now: Optional[float] = None) -> PoseResult:
         ts = time.monotonic() if now is None else now
+        # Measured visual poses retain their timestamp and never turn into held
+        # place coordinates. Smoothing/holding must not manufacture fresh data.
+        if raw.radar_mode == "visual":
+            self.reset()
+            return raw
         if not raw.valid:
             if self._x is not None and (ts - self._last_valid_at) <= self._cfg.lost_timeout_sec:
                 return PoseResult(

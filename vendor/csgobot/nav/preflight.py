@@ -120,6 +120,17 @@ def _run_nav_preflight_one(
             goal_ids = [g.id for g in pack.goals]
             if not pack.goals:
                 errors.append("nav pack has no goals")
+            from nav.paths import resolve_visual_profile_file
+            visual_meta = resolve_visual_profile_file(pack.map_id, "navigation.json")
+            if not visual_meta.is_file() or not (visual_meta.parent / "walkable.png").is_file():
+                warnings.append(
+                    f"{pack.map_id}: measured navigation needs an annotated walkable profile; "
+                    "movement will remain blocked until scripts/nav_workbench.py mask is completed"
+                )
+            if not resolve_visual_profile_file(pack.map_id, "atlas.json").is_file():
+                warnings.append(
+                    f"{pack.map_id}: no calibrated HUD atlas; direct radar-image matching may reject live frames"
+                )
             meta_path = resolve_map_meta_path(pack.map_id)
             radar_path = resolve_map_radar_path(pack.map_id)
             if not meta_path.is_file():

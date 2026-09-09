@@ -24,6 +24,13 @@ def is_auto_pack(pack_id: str) -> bool:
     return pack_id.strip().lower() in AUTO_PACK_IDS
 
 
+def measured_runtime_pack(pack_id: str, explicit_pack: str) -> str:
+    """Auto Dust2 uses the shipped measured route; explicit choices stay explicit."""
+    if pack_id == "dust2_dm" and is_auto_pack(explicit_pack):
+        return "dust2_visual_mvp"
+    return pack_id
+
+
 def is_placeholder_script(script_id: str) -> bool:
     return script_id.strip().lower() in PLACEHOLDER_SCRIPTS
 

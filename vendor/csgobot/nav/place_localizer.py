@@ -126,6 +126,10 @@ class PlaceLocalizer:
         self._load()
 
     @property
+    def map_id(self) -> str:
+        return self._map_id
+
+    @property
     def ready(self) -> bool:
         return len(self._templates) > 0
 

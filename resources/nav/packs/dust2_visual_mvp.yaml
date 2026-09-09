@@ -1,0 +1,29 @@
+meta:
+  pack_id: dust2_visual_mvp
+  map_id: de_dust2
+  mode: deathmatch
+  version: "1.0.0"
+strategy: route_cycle
+# Coordinates measured in the bundled radar image, not label-landmark guesses.
+# Scope: central same-floor lane only. No whole-map spawn routing is claimed.
+goal: {id: mid, x: 0.458, y: 0.432, arrive_radius: 0.006}
+goals:
+  - {id: mid, x: 0.458, y: 0.432, arrive_radius: 0.006}
+  - {id: mid_upper, x: 0.461, y: 0.606, arrive_radius: 0.006}
+entries: []
+waypoints: []
+edges: []
+routing:
+  mode: cycle
+  dwell_at_goal_sec: 1.0
+  direct_goal_dist: 0.0
+humanize:
+  turn_rate_deg_per_sec: 100.0
+  speed_jitter: 0.0
+  micro_pause_chance: 0.0
+  path_wobble_deg: 0.0
+  forward_jitter_chance: 0.0
+fallback:
+  macro_script: generic_dm
+  macro_sec: 0
+  retry_nav_after_macro: false
