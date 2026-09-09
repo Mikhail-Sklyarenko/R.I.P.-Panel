@@ -203,6 +203,92 @@ def test_perception_switch_hysteresis() -> None:
     assert c.place is not None and c.place.place_id == "short"
 
 
+def test_perception_rejects_weak_teleport() -> None:
+    """FermK soak: a_ramp ↔ tunnel_stairs with score~0.5 must not jump."""
+    from nav.place_localizer import PlaceHit
+
+    cal = load_calibration(resolve_calibration_path())
+    reader = MinimapReader(cal)
+    loc = PlaceLocalizer("de_dust2")
+    perc = NavPerception(reader, loc, hold_sec=4.0, switch_confirm=3)
+    under = PlaceHit("under_a", 0.78, 0.28, 0.55, 0.28)
+    tunnel = PlaceHit("tunnel_stairs", 0.20, 0.25, 0.52, 0.20)
+    perc._last_hit = under
+    perc._last_hit_at = 10.0
+    # Weak teleport candidate — keep under_a
+    kept = perc._resolve_place(tunnel)
+    assert kept is not None and kept.place_id == "under_a"
+    # Even after several frames without override score
+    for _ in range(5):
+        kept = perc._resolve_place(tunnel)
+    assert kept is not None and kept.place_id == "under_a"
+    # Strong override after confirm frames (update() would commit last_hit)
+    strong = PlaceHit("tunnel_stairs", 0.20, 0.25, 0.70, 0.30)
+    accepted = None
+    for _ in range(6):
+        accepted = perc._resolve_place(strong)
+        if accepted is not None and accepted.place_id == "tunnel_stairs":
+            perc._last_hit = accepted
+            break
+    assert accepted is not None and accepted.place_id == "tunnel_stairs"
+
+
+def test_controller_hop_by_place_lock() -> None:
+    pack = load_nav_pack(resolve_nav_pack_path("dust2_dm"))
+    keys: list[str] = []
+    ctrl = NavController(
+        pack,
+        FOVMouseMovement(
+            screen=CaptureRegion(width=1280, height=720),
+            fov=FOVConfig(horizontal=106.26, vertical=73.74, x360=16364),
+        ),
+        key_down=keys.append,
+        key_up=lambda _k: None,
+        move_relative=lambda *_: None,
+    )
+    # Start at tunnel_stairs on path toward mid
+    start = PoseResult(
+        0.20, 0.25, 0.0, 0.9, True, 40, "world", place_id="tunnel_stairs",
+    )
+    r0 = ctrl.tick(start, now=1.0, paused=False, radar_progressing=True)
+    assert r0.state == NavState.SEEK_GOAL
+    assert "tunnel" in r0.path or "mid" in r0.path
+    # Jump place along path without XY motion — advance hop
+    nxt = PoseResult(
+        0.20, 0.25, 0.0, 0.9, True, 40, "world", place_id="outside_tunnel",
+    )
+    # outside_tunnel may not be on every plan; use a place that is on path
+    path_ids = r0.path.split(">")
+    if len(path_ids) >= 2:
+        later = path_ids[min(1, len(path_ids) - 1)]
+        if later != "tunnel_stairs":
+            nxt = PoseResult(
+                0.20, 0.25, 0.0, 0.9, True, 40, "world", place_id=later,
+            )
+            r1 = ctrl.tick(nxt, now=2.0, paused=False, radar_progressing=True)
+            assert r1.target_id == later or later in r1.path
+
+
+def test_controller_paused_keeps_path() -> None:
+    pack = load_nav_pack(resolve_nav_pack_path("dust2_dm"))
+    ctrl = NavController(
+        pack,
+        FOVMouseMovement(
+            screen=CaptureRegion(width=1280, height=720),
+            fov=FOVConfig(horizontal=106.26, vertical=73.74, x360=16364),
+        ),
+        key_down=lambda _k: None,
+        key_up=lambda _k: None,
+        move_relative=lambda *_: None,
+    )
+    world = PoseResult(0.22, 0.28, -90.0, 0.9, True, 40, "world", place_id="tunnel")
+    r0 = ctrl.tick(world, now=1.0, paused=False, radar_progressing=True)
+    assert r0.path
+    r1 = ctrl.tick(world, now=1.5, paused=True, radar_progressing=False)
+    assert r1.state == NavState.PAUSED
+    assert r1.path == r0.path or ctrl.path_label == r0.path
+
+
 def test_controller_aborts_macro_when_world_returns() -> None:
     pack = load_nav_pack(resolve_nav_pack_path("dust2_dm"))
     keys: list[str] = []

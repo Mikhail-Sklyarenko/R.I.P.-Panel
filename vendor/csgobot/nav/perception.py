@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import math
 import os
 import time
 from dataclasses import dataclass
@@ -22,6 +23,12 @@ from nav.world_pose import YawTracker
 
 logger = logging.getLogger("CS2Bot.nav")
 
+# FermK soak: A↔tunnel jumps Δmap≈0.52 with weak scores — reject by default.
+_TELEPORT_MAX = 0.28
+_TELEPORT_OVERRIDE_SCORE = 0.62
+_TELEPORT_OVERRIDE_MARGIN = 0.22
+_TELEPORT_CONFIRM = 4
+
 
 @dataclass(frozen=True)
 class PerceptionResult:
@@ -31,8 +38,12 @@ class PerceptionResult:
     place_held: bool = False
 
 
+def _map_dist(ax: float, ay: float, bx: float, by: float) -> float:
+    return math.hypot(float(ax) - float(bx), float(ay) - float(by))
+
+
 class NavPerception:
-    """Product perception: place-label → world pose, hold + switch hysteresis."""
+    """Product perception: place-label → world pose, hold + anti-teleport."""
 
     def __init__(
         self,
@@ -42,9 +53,10 @@ class NavPerception:
         *,
         hold_sec: float = 4.0,
         log_interval_sec: float = 2.0,
-        switch_confirm: int = 2,
+        switch_confirm: int = 3,
         dump_dir: Optional[Path] = None,
         dump_interval_sec: float = 8.0,
+        teleport_max: float = _TELEPORT_MAX,
     ) -> None:
         self.reader = reader
         self.localizer = localizer
@@ -54,12 +66,15 @@ class NavPerception:
         self._switch_confirm = max(1, int(switch_confirm))
         self._dump_dir = dump_dir
         self._dump_interval = max(3.0, float(dump_interval_sec))
+        self._teleport_max = max(0.1, float(teleport_max))
         self._last_hit: Optional[PlaceHit] = None
         self._last_hit_at: float = 0.0
         self._last_log_at: float = 0.0
         self._last_dump_at: float = 0.0
+        self._last_reject_log_at: float = 0.0
         self._pending_id: Optional[str] = None
         self._pending_count: int = 0
+        self._pending_hit: Optional[PlaceHit] = None
 
     def reset(self) -> None:
         self.yaw.reset()
@@ -67,27 +82,79 @@ class NavPerception:
         self._last_hit_at = 0.0
         self._pending_id = None
         self._pending_count = 0
+        self._pending_hit = None
         self.localizer.set_sticky(None)
 
+    def _is_teleport(self, candidate: PlaceHit) -> bool:
+        if self._last_hit is None:
+            return False
+        return (
+            _map_dist(
+                self._last_hit.x, self._last_hit.y, candidate.x, candidate.y
+            )
+            > self._teleport_max
+        )
+
+    def _teleport_override_ok(self, candidate: PlaceHit) -> bool:
+        return (
+            candidate.score >= _TELEPORT_OVERRIDE_SCORE
+            and candidate.margin >= _TELEPORT_OVERRIDE_MARGIN
+            and self._pending_count >= _TELEPORT_CONFIRM
+        )
+
     def _resolve_place(self, raw: Optional[PlaceHit]) -> Optional[PlaceHit]:
-        """Hysteresis: require N consecutive reads to switch place_id."""
+        """Hysteresis + anti-teleport before accepting a place switch."""
         if raw is None:
             self._pending_id = None
             self._pending_count = 0
+            self._pending_hit = None
             return None
         if self._last_hit is None or raw.place_id == self._last_hit.place_id:
             self._pending_id = None
             self._pending_count = 0
+            self._pending_hit = None
             return raw
+
         # Candidate switch
         if raw.place_id == self._pending_id:
             self._pending_count += 1
+            self._pending_hit = raw
         else:
             self._pending_id = raw.place_id
             self._pending_count = 1
-        if self._pending_count >= self._switch_confirm:
+            self._pending_hit = raw
+
+        need = self._switch_confirm
+        teleport = self._is_teleport(raw)
+        if teleport:
+            need = max(need, _TELEPORT_CONFIRM)
+            if not self._teleport_override_ok(raw):
+                now = time.monotonic()
+                if now - self._last_reject_log_at >= 2.0:
+                    self._last_reject_log_at = now
+                    assert self._last_hit is not None
+                    logger.info(
+                        "nav: place-reject teleport from=%s to=%s Δ=%.2f "
+                        "score=%.3f margin=%.3f pending=%d/%d",
+                        self._last_hit.place_id,
+                        raw.place_id,
+                        _map_dist(
+                            self._last_hit.x,
+                            self._last_hit.y,
+                            raw.x,
+                            raw.y,
+                        ),
+                        raw.score,
+                        raw.margin,
+                        self._pending_count,
+                        need,
+                    )
+                return self._last_hit
+
+        if self._pending_count >= need:
             self._pending_id = None
             self._pending_count = 0
+            self._pending_hit = None
             return raw
         # Keep previous place id coords until confirmed
         return self._last_hit
@@ -127,7 +194,9 @@ class NavPerception:
                     place.margin,
                     place.x,
                     place.y,
-                    " (held-id)" if place is self._last_hit and raw_place.place_id != place.place_id else "",
+                    " (held-id)"
+                    if place is self._last_hit and raw_place.place_id != place.place_id
+                    else "",
                 )
             self.yaw.on_place(place.place_id, place.x, place.y, face_x, face_y)
             world = self.yaw.to_world_pose(
@@ -182,6 +251,4 @@ def resolve_place_dump_dir() -> Optional[Path]:
     custom = os.environ.get("CSGOBOT_NAV_DUMP_DIR", "").strip()
     if custom:
         return Path(custom)
-    # nav/perception.py → vendor/csgobot/
-    root = Path(__file__).resolve().parents[1]
-    return root / "data" / "nav_place_dumps"
+    return Path(__file__).resolve().parents[1] / "data" / "nav_place_dumps"

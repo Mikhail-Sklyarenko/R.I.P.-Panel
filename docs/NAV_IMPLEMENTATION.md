@@ -35,10 +35,13 @@ Product locomotion unlock (post FermK soak):
 1. **Place hold 4s** — label flicker keeps `mode=world` (perception + pose filter)
 2. **Abort macro on world** — never stay in `generic_dm` after a place hit
 3. **Macro off by default** — `CSGOBOT_NAV_ALLOW_MACRO=1` to re-enable short 8s safety
-4. **Look muted** while `seek` / `wait_place`
+4. **Look muted** while `seek` / `wait_place` / brief pause
 5. Log: `nav: place=<id> score=… margin=…`
-6. **Multi-offset strip** + sticky bias + **2-frame switch hysteresis**
+6. **Multi-offset strip** + sticky bias + **3-frame switch hysteresis**
+7. **Anti-teleport** — reject A↔tunnel jumps unless strong score/margin + 4 confirms
 8. **Match-ready latch (12 frames)** — stop false `map_transition` pauses mid-DM
+9. **Hop by place lock** — advance path when label matches a later waypoint (XY may freeze)
+10. **Combat engage ≤130px** (or firing) — keep path while paused; do not clear route
 
 Expect:
 
@@ -65,8 +68,10 @@ Product behavior now:
 1. **Arrow-tip yaw** (centroid → bright tip) in the same frame as `bearing_deg`
 2. **Crawl + fail-open**: after ~0.9s without pose progress, hold W while turning (hard walk by ~1.8s)
 3. **Stuck escape = thrust + rotate** (W held during escape)
-4. **DM combat gate**: pause Nav only for close engage (≤220px) or active fire — not every detection
+4. **DM combat gate**: pause Nav only for close engage (≤130px) or active fire — not every detection
 5. Metrics: `forward_held_pct`, `fail_open_pct`, `avg_yaw_err_deg`; debug log includes `yaw_err` / `fwd` / pause reason
+6. Log may show `nav: place-reject teleport …` when weak A↔tunnel NCC is blocked
+7. Stuck timeout is longer while the same place label is frozen (discrete GPS)
 
 Expect in stderr while seeking:
 

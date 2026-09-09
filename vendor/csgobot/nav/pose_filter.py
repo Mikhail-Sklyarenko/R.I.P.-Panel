@@ -24,6 +24,7 @@ class PoseFilter:
         self._x: Optional[float] = None
         self._y: Optional[float] = None
         self._yaw: Optional[float] = None
+        self._place_id: Optional[str] = None
         self._last_valid_at: float = 0.0
         self._last_world_at: float = 0.0
         self._radar_mode: str = "centered"
@@ -32,6 +33,7 @@ class PoseFilter:
         self._x = None
         self._y = None
         self._yaw = None
+        self._place_id = None
         self._last_valid_at = 0.0
         self._last_world_at = 0.0
         self._radar_mode = "centered"
@@ -48,6 +50,7 @@ class PoseFilter:
                     valid=True,
                     blob_area_px=raw.blob_area_px,
                     radar_mode=self._radar_mode,
+                    place_id=self._place_id,
                 )
             return PoseResult.invalid()
 
@@ -73,12 +76,14 @@ class PoseFilter:
                 valid=True,
                 blob_area_px=raw.blob_area_px,
                 radar_mode="world",
+                place_id=self._place_id,
             )
 
         self._radar_mode = raw.radar_mode or "centered"
         if raw.radar_mode == "world":
             self._x = raw.x_norm
             self._y = raw.y_norm
+            self._place_id = raw.place_id or self._place_id
             if self._yaw is None:
                 self._yaw = raw.yaw_deg
             else:
@@ -95,6 +100,7 @@ class PoseFilter:
                 valid=True,
                 blob_area_px=raw.blob_area_px,
                 radar_mode="world",
+                place_id=self._place_id,
             )
 
         alpha = self._cfg.smooth_alpha
@@ -108,6 +114,7 @@ class PoseFilter:
             yaw_delta = normalize_angle_deg(raw.yaw_deg - (self._yaw or 0.0))
             self._yaw = normalize_angle_deg((self._yaw or 0.0) + alpha * yaw_delta)
 
+        self._place_id = None
         self._last_valid_at = ts
         return PoseResult(
             x_norm=self._x,
@@ -117,4 +124,5 @@ class PoseFilter:
             valid=True,
             blob_area_px=raw.blob_area_px,
             radar_mode=self._radar_mode,
+            place_id=None,
         )

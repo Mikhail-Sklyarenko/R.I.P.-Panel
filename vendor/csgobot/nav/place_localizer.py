@@ -111,10 +111,10 @@ class PlaceLocalizer:
         self,
         map_id: str,
         *,
-        min_score: float = 0.50,
-        min_margin: float = 0.15,
+        min_score: float = 0.54,
+        min_margin: float = 0.18,
         sticky_id: Optional[str] = None,
-        sticky_slack: float = 0.06,
+        sticky_slack: float = 0.04,
     ) -> None:
         self._map_id = map_id
         self._min_score = min_score
@@ -269,8 +269,8 @@ class PlaceLocalizer:
         min_score = self._min_score
         min_margin = self._min_margin
         if self._sticky_id and best.place_id == self._sticky_id:
-            min_score = max(0.42, self._min_score - 0.06)
-            min_margin = max(0.08, self._min_margin - 0.05)
+            min_score = max(0.48, self._min_score - 0.04)
+            min_margin = max(0.12, self._min_margin - 0.04)
         accepted = accept_score >= min_score and margin >= min_margin
         dbg = PlaceMatchDebug(
             best=hit if accepted else hit,

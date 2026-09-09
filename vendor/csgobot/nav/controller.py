@@ -121,6 +121,8 @@ class NavController:
         self._flow_progress_until = 0.0
         self._announced = False
         self._place_wait_since: Optional[float] = None
+        self._locked_place_id: Optional[str] = None
+        self._place_unchanged_since: Optional[float] = None
         self._wps = self._load_waypoints()
 
     def _load_waypoints(self) -> tuple[NavWaypoint, ...]:
@@ -150,12 +152,14 @@ class NavController:
 
     @property
     def suppresses_look(self) -> bool:
-        """Product: Look must not steal the mouse while we seek or wait for place."""
+        """Product: Look must not steal the mouse while we seek, wait, or briefly pause."""
         return self._state in (
             NavState.SEEK_ENTRY,
             NavState.SEEK_GOAL,
             NavState.STUCK_ESCAPE,
             NavState.WAIT_PLACE,
+            NavState.PAUSED,
+            NavState.AT_GOAL,
         )
 
     @property
@@ -176,6 +180,10 @@ class NavController:
 
     def face_target(self) -> tuple[float, float]:
         return self._target.x, self._target.y
+
+    @property
+    def path_label(self) -> str:
+        return self._path_label()
 
     def release_keys(self) -> None:
         if self._held_key is not None:
@@ -206,6 +214,8 @@ class NavController:
         self._session_started_at = None
         self._announced = False
         self._place_wait_since = None
+        self._locked_place_id = None
+        self._place_unchanged_since = None
 
     def _set_move_key(self, key: Optional[str]) -> None:
         if key == self._held_key:
@@ -263,6 +273,54 @@ class NavController:
             self._target.x,
             self._target.y,
         )
+
+    def _sync_place_id(self, pose: PoseResult, *, now: float) -> None:
+        pid = (pose.place_id or "").strip() or None
+        if pid != self._locked_place_id:
+            prev = self._locked_place_id
+            self._locked_place_id = pid
+            self._place_unchanged_since = now
+            if pid:
+                self._last_progress_at = now
+                # Off-path landmark → replan from new place (anti-teleport already gated).
+                if (
+                    self._planned
+                    and self._path_ids
+                    and pid not in self._path_ids
+                    and prev is not None
+                ):
+                    self._planned = False
+                    self._log.info(
+                        "nav: place off-path %s (was path %s) — replan",
+                        pid,
+                        ">".join(self._path_ids),
+                    )
+        elif self._place_unchanged_since is None:
+            self._place_unchanged_since = now
+
+    def _advance_path_by_place(self, pose: PoseResult, *, now: float) -> bool:
+        """Discrete GPS: if CS2 place label matches a later hop, advance index."""
+        pid = (pose.place_id or "").strip()
+        if not pid or not self._path_ids:
+            return False
+        try:
+            idx = self._path_ids.index(pid)
+        except ValueError:
+            return False
+        if idx <= self._path_index:
+            return False
+        self._path_index = idx
+        self._target = self._path_goals[self._path_index]
+        self._log.info("nav: hop -> %s (place lock)", self._target.id)
+        self._yaw.on_place(
+            f"hop:{self._target.id}",
+            pose.x_norm,
+            pose.y_norm,
+            self._target.x,
+            self._target.y,
+        )
+        self._last_progress_at = now
+        return True
 
     def _path_label(self) -> str:
         return ">".join(self._path_ids) if self._path_ids else self._route_goal.id
@@ -444,6 +502,7 @@ class NavController:
             return result
 
         self._place_wait_since = None
+        self._sync_place_id(pose, now=now)
         if not self._announced:
             self._log.info(
                 "nav: place-localized goal-seek (goal=%s) — reading map labels",
@@ -459,7 +518,8 @@ class NavController:
             self._at_goal_since = None
             self._humanizer.reset()
 
-        # Advance along path hops
+        # Advance along path hops (XY arrive OR discrete place lock on later hop)
+        advanced_place = self._advance_path_by_place(pose, now=now)
         while (
             self._path_goals
             and self._path_index < len(self._path_goals) - 1
@@ -481,6 +541,8 @@ class NavController:
                 self._target.y,
             )
             self._last_progress_at = now
+        if advanced_place:
+            pass  # progress already stamped
 
         dist_goal = dist_norm(
             pose.x_norm, pose.y_norm, self._route_goal.x, self._route_goal.y,
@@ -499,6 +561,7 @@ class NavController:
                 valid=True,
                 blob_area_px=pose.blob_area_px,
                 radar_mode="world",
+                place_id=pose.place_id,
             )
 
         if self._state == NavState.STUCK_ESCAPE:
@@ -506,16 +569,24 @@ class NavController:
             self._last_pose = pose
             return result
 
-        # Honest stuck: holding W but radar not scrolling
+        # Honest stuck: holding W but radar not scrolling.
+        # Discrete place pose does not move XY — allow longer timeout while label frozen.
         grace = (
             self._session_started_at is not None
             and now - self._session_started_at < self._stuck_grace_sec
         )
+        stuck_timeout = self._pack.stuck.progress_timeout_sec
+        if (
+            pose.place_id
+            and self._place_unchanged_since is not None
+            and now - self._place_unchanged_since >= 1.5
+        ):
+            stuck_timeout = max(stuck_timeout * 2.2, stuck_timeout + 2.5)
         if (
             not grace
             and self._held_key == "w"
             and not flow_now
-            and now - self._last_progress_at >= self._pack.stuck.progress_timeout_sec
+            and now - self._last_progress_at >= stuck_timeout
         ):
             self._start_escape(now)
             result = self._make_result(
@@ -525,7 +596,7 @@ class NavController:
             return result
 
         at_goal = dist_goal <= self._route_goal.arrive_radius
-        if at_goal:
+        if at_goal or (pose.place_id and pose.place_id == self._route_goal.id):
             self._state = NavState.AT_GOAL
             if self._at_goal_since is None:
                 self._at_goal_since = now
@@ -581,7 +652,7 @@ class NavController:
         self._state = NavState.SEEK_GOAL
         self._last_progress_at = now
         self.release_keys()
-        self._planned = False  # replan after escape
+        # Keep current path — full replan after escape caused FermK route thrash.
         return self._make_result(state=self._state, pose=pose, dist=dist_goal)
 
     def _drive_toward_target(

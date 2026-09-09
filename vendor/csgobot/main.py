@@ -912,8 +912,8 @@ def detection_process(
                 last_enemy_seen = now
 
             # Product DM: pause Nav only for close engage or active fire.
-            # Distant detections must not freeze locomotion (farm soak root cause).
-            NAV_COMBAT_ENGAGE_PX = 220.0
+            # FermK soak: 220px froze seek too often — tighten to close fights.
+            NAV_COMBAT_ENGAGE_PX = 130.0
             nav_combat_hold = bool(
                 enemy_target is not None
                 and (
@@ -1048,8 +1048,6 @@ def detection_process(
                     combat_clear_sec=config.patrol.combat_clear_sec,
                 )
                 if nav_combat_hold:
-                    if nav_controller is not None:
-                        nav_controller.release_keys()
                     if look_controller is not None:
                         look_controller.abort(now=now)
 
@@ -1077,10 +1075,21 @@ def detection_process(
                     or map_transition_active
                 )
                 if nav_paused:
-                    if nav_controller is not None:
-                        nav_controller.release_keys()
                     if map_transition_active and patrol_runner is not None:
                         patrol_runner.pause()
+                    # Keep path state — tick paused so logs retain path=…
+                    radar_progressing = False
+                    if nav_radar_flow is not None and nav_reader is not None:
+                        flow = nav_radar_flow.update(nav_reader.last_ring_gray)
+                        radar_progressing = flow.progressing
+                    nav_tick_result = nav_controller.tick(
+                        nav_pose,
+                        now=now,
+                        paused=True,
+                        team=current_team_str,
+                        look_sweeping=False,
+                        radar_progressing=radar_progressing,
+                    )
                 else:
                     look_sweeping = (
                         look_controller is not None
@@ -1149,7 +1158,19 @@ def detection_process(
                         else "paused"
                     )
                     pause_reason = ""
-                    if nav_tick_result is None:
+                    if nav_paused or (
+                        nav_tick_result is not None
+                        and nav_tick_result.state.value == "paused"
+                    ):
+                        if nav_combat_hold:
+                            pause_reason = " combat_engage"
+                        elif patrol_buy_freeze:
+                            pause_reason = " buy_freeze"
+                        elif map_transition_active:
+                            pause_reason = " map_transition"
+                        elif look_hold_movement:
+                            pause_reason = " look"
+                    elif nav_tick_result is None:
                         if nav_combat_hold:
                             pause_reason = " combat_engage"
                         elif patrol_buy_freeze:
@@ -1206,7 +1227,11 @@ def detection_process(
                         (
                             nav_tick_result.path
                             if nav_tick_result is not None and nav_tick_result.path
-                            else "-"
+                            else (
+                                nav_controller.path_label
+                                if nav_controller is not None
+                                else "-"
+                            )
                         ),
                         pause_reason,
                     )

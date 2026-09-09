@@ -63,6 +63,7 @@ class YawTracker:
             valid=True,
             blob_area_px=icon.blob_area_px,
             radar_mode="world",
+            place_id=place_id,
         )
 
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Optional
 
 
 # centered = CS2 HUD icon lock only (XY is radar center, not world GPS)
@@ -19,6 +20,7 @@ class PoseResult:
     - ``centered``: x/y ≈ 0.5 (icon center). Do not chase as world GPS.
     - ``world``: x/y/yaw are map-normalized (0..1) for pack goals.
     - ``classic``: icon position on a fixed radar image.
+    - ``place_id``: locked CS2 location-name landmark (discrete GPS).
     """
 
     x_norm: float
@@ -28,7 +30,8 @@ class PoseResult:
     valid: bool
     blob_area_px: int = 0
     radar_mode: RadarMode = "classic"
+    place_id: Optional[str] = None
 
     @staticmethod
     def invalid() -> PoseResult:
-        return PoseResult(0.5, 0.5, 0.0, 0.0, False, 0, "none")
+        return PoseResult(0.5, 0.5, 0.0, 0.0, False, 0, "none", None)
