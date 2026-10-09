@@ -15,7 +15,7 @@ from core.wingman_fleet.budget import Budget
 from core.wingman_fleet.match_proof import Verdict, judge
 from core.wingman_fleet.models import (
     MENU_SCREENS, Command, CommandResult, CommandType, Identity, Link, MatchFingerprint,
-    Observation, RunPlan, Screen,
+    Observation, ResultStatus, RunPlan, Screen,
 )
 from core.wingman_fleet.pair_fsm import PairMachine, PairState
 from core.wingman_fleet.reasons import Reason
@@ -60,6 +60,7 @@ class RunCtx:
     seq: int = 0
     wave: int = 0
     cycles: int = 0
+    failed_cycles: int = 0
     attempt_id: str = ""
     found_at: dict[str, float] = field(default_factory=dict)
     accepted: bool = False
@@ -233,7 +234,9 @@ class RunMachine:
         for cid in self.ctx.issued.values():
             res = results.get(cid)
             if res is not None and res.terminal and not res.succeeded:
-                return self._abort_wave(now, obs, Reason.SEARCH_NOT_STARTED, res.reason)
+                # Clicks are not proof the search failed. Wait for the screen or the phase timeout.
+                if res.status is not ResultStatus.UNCONFIRMED:
+                    return self._abort_wave(now, obs, Reason.SEARCH_NOT_STARTED, res.reason)
         if any(obs[a].screen in FOUND_SCREENS for a in self.agents):
             self.goto(RunState.SEARCHING, now, Reason.OK)
             return []
@@ -378,7 +381,7 @@ class RunMachine:
             return cmds
         if now - self.ctx.entered_at > self.plan.retry.post_match_timeout_sec:
             self._release_pairs(now, recreate=True, reason=Reason.COMMAND_TIMEOUT)
-            self.ctx.cycles += 1
+            self.ctx.failed_cycles += 1
             self.goto(RunState.PREPARING, now, Reason.COMMAND_TIMEOUT, "post-match return slow")
         return cmds
 

@@ -96,11 +96,24 @@ class FleetStore:
                 " ('pending','accepted') ORDER BY issued_at, rowid", (agent_id, run_id)).fetchall()
         return [Command.from_dict(json.loads(r[0])) for r in rows]
 
-    def record_result(self, result: CommandResult) -> bool:
-        """Store the agent's result; a terminal status is never overwritten."""
+    def _owned_row(self, result: CommandResult, agent_id: str, run_id: str):
+        if not agent_id or not run_id:
+            return None
+        row = self.db.execute(
+            "SELECT status, agent_id, run_id FROM commands WHERE command_id=?",
+            (result.command_id,)).fetchone()
+        if row is None or row[1] != agent_id or row[2] != run_id:
+            return None
+        return row
+
+    def record_result(self, result: CommandResult, *, agent_id: str, run_id: str) -> bool:
+        """Store a result only for the agent and run that own the command.
+
+        A terminal status is never overwritten. False means nothing new was written:
+        unknown command, wrong owner, or a result that was already terminal.
+        """
         with self._lock:
-            row = self.db.execute("SELECT status FROM commands WHERE command_id=?",
-                                  (result.command_id,)).fetchone()
+            row = self._owned_row(result, agent_id, run_id)
             if row is None:
                 return False
             if row[0] not in ("pending", ResultStatus.ACCEPTED.value):
@@ -108,6 +121,14 @@ class FleetStore:
             self.db.execute("UPDATE commands SET status=?, result_json=?, updated_at=? WHERE command_id=?",
                             (result.status.value, dumps(result), time.time(), result.command_id))
             return True
+
+    def result_is_stored(self, result: CommandResult, *, agent_id: str, run_id: str) -> bool:
+        """True when this agent already has a terminal result for its own command."""
+        with self._lock:
+            row = self._owned_row(result, agent_id, run_id)
+            if row is None:
+                return False
+            return row[0] not in ("pending", ResultStatus.ACCEPTED.value)
 
     def expire_pending(self, run_id: str, now_monotonic: float, issued_before: float) -> list[str]:
         with self._lock:

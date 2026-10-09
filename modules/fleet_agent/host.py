@@ -120,10 +120,16 @@ class FleetHost:
         return st
 
     def stop(self) -> None:
-        if self.agent is not None:
-            self.agent.stop()
-            self.agent.shutdown()
+        agent = self.agent
+        thread = self._thread
+        if agent is not None:
+            agent.stop()
+        if thread is not None and thread.is_alive():
+            thread.join(timeout=3.0)
+        if agent is not None:
+            agent.shutdown()
             self.agent = None
+        self._thread = None
         if self.backend is not None:
             self.backend.close()
             self.backend = None

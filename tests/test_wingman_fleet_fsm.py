@@ -297,8 +297,10 @@ def test_store_command_idempotency_and_terminal_results(tmp_path):
     assert store.add_commands([cmd]) == [cmd]
     assert store.add_commands([cmd]) == []
     assert [c.command_id for c in store.pending_for("pc1", plan.run_id)] == ["cid-1"]
-    store.record_result(CommandResult("cid-1", ResultStatus.COMPLETED))
-    store.record_result(CommandResult("cid-1", ResultStatus.FAILED, "late duplicate"))
+    assert store.record_result(CommandResult("cid-1", ResultStatus.COMPLETED),
+                               agent_id="pc1", run_id=plan.run_id)
+    assert not store.record_result(CommandResult("cid-1", ResultStatus.FAILED, "late duplicate"),
+                                   agent_id="pc1", run_id=plan.run_id)
     assert store.results(plan.run_id)["cid-1"].status is ResultStatus.COMPLETED
     assert store.pending_for("pc1", plan.run_id) == []
 

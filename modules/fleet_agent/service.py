@@ -54,6 +54,10 @@ class AgentService:
         self._stop = threading.Event()
         self.last_error = ""
         self.run_id = ""
+        self.epoch = 0
+        self.session_stopped = False
+        self._shut_down = False
+        self._draining = False
 
     # ----- clocks / lease ------------------------------------------------------------
     def coordinator_time(self) -> float:
@@ -111,7 +115,10 @@ class AgentService:
             self._link_down(now, str(exc))
             return False
         t1 = self.wall()
-        self.journal.ack([r.command_id for r in results])
+        accepted = resp.get("accepted_results")
+        if isinstance(accepted, list):
+            sent = {r.command_id for r in results}
+            self.journal.ack([str(cid) for cid in accepted if str(cid) in sent])
         if "server_time" in resp:
             self.clock_offset = float(resp["server_time"]) - (t0 + t1) / 2.0
         if not resp.get("ok"):
@@ -121,7 +128,9 @@ class AgentService:
         if self.offline:
             self.log("agent: coordinator link restored")
         self.offline, self.last_ok, self.last_error = False, now, ""
-        self.run_id = str(resp.get("run_id", ""))
+        if not self.session_stopped:
+            self.cancel.clear()
+        self._rotate_run(str(resp.get("run_id", "")))
         self._set_lease(resp.get("gameplay"), now)
         server_time = float(resp.get("server_time", self.wall()))
         for raw in resp.get("commands") or ():
@@ -137,12 +146,30 @@ class AgentService:
             if not self.offline:
                 self.offline = True
                 self.log(f"agent: coordinator unreachable ({why}) — automation cancelled, inputs released")
-                self._abort_all(Reason.AGENT_OFFLINE.value, why)
+                self._invalidate_queue(Reason.AGENT_OFFLINE.value, why, latch=False)
                 self.backend.safe_stop("coordinator offline")
         else:
             self.enforce_lease()
 
     # ----- commands ------------------------------------------------------------------
+    def _rotate_run(self, run_id: str) -> None:
+        """A new run_id drops the previous session. The first bind does not."""
+        with self._lock:
+            if run_id == self.run_id:
+                return
+            previous = self.run_id
+            self.run_id = run_id
+            if not previous:
+                return
+            pending = list(self.queue)
+            self.queue.clear()
+            self.epoch += 1
+            if run_id:
+                self.session_stopped = False
+                self.cancel.clear()
+        detail = f"run changed to {run_id}" if run_id else "coordinator has no run"
+        self._fail_queued(pending, Reason.OPERATOR_STOP.value, detail)
+
     def _accept(self, cmd: Command, server_time: float) -> None:
         if cmd.agent_id != self.agent_id:
             return
@@ -157,22 +184,54 @@ class AgentService:
             self.journal.finish(CommandResult(cmd.command_id, ResultStatus.EXPIRED, Reason.COMMAND_TIMEOUT.value,
                                               "received after its deadline"))
             return
+        if self.run_id and cmd.run_id and cmd.run_id != self.run_id:
+            self._fail(cmd, Reason.OPERATOR_STOP.value, "stale run")
+            return
         if cmd.type in URGENT:
-            self.cancel.set()
+            # SAFE_STOP latches the session. STOP_GAMEPLAY only drops the queue.
+            self._invalidate_queue(Reason.OPERATOR_STOP.value, cmd.type.value,
+                                   latch=cmd.type is CommandType.SAFE_STOP)
             self._run(cmd)
             return
         with self._lock:
-            self.queue.append(cmd)
-        self._wake.set()
+            if self.session_stopped or self.cancel.is_set() or self._stop.is_set():
+                rejected = True
+            else:
+                rejected = False
+                self.queue.append((cmd, self.epoch))
+                self._wake.set()
+        if rejected:
+            self._fail(cmd, Reason.OPERATOR_STOP.value, "cancelled")
 
-    def _abort_all(self, reason: str, detail: str) -> None:
-        self.cancel.set()
+    def _invalidate_queue(self, reason: str, detail: str, *, latch: bool) -> None:
         with self._lock:
-            pending, self.queue = list(self.queue), deque()
-        for cmd in pending:
-            self.journal.finish(CommandResult(cmd.command_id, ResultStatus.FAILED, reason, detail))
+            self.epoch += 1
+            self.cancel.set()
+            if latch:
+                self.session_stopped = True
+            pending = list(self.queue)
+            self.queue.clear()
+        self._fail_queued(pending, reason, detail)
 
-    def _run(self, cmd: Command) -> None:
+    def _fail_queued(self, pending: list, reason: str, detail: str) -> None:
+        for item in pending:
+            cmd = item[0] if isinstance(item, tuple) else item
+            self._fail(cmd, reason, detail)
+
+    def _fail(self, cmd: Command, reason: str, detail: str) -> None:
+        known = self.journal.known(cmd.command_id)
+        if known is None or known[0] != "running":
+            return
+        self.journal.finish(CommandResult(cmd.command_id, ResultStatus.FAILED, reason, detail))
+
+    def _run(self, cmd: Command, epoch: int | None = None) -> None:
+        if cmd.type not in URGENT:
+            with self._lock:
+                stale = (self.cancel.is_set() or self.session_stopped
+                         or (epoch is not None and epoch != self.epoch))
+            if stale:
+                self._fail(cmd, Reason.OPERATOR_STOP.value, "cancelled")
+                return
         ctx = ExecContext(self.cancel, self.coordinator_time, lambda: self.lease_attempt)
         try:
             result = self.backend.execute(cmd, ctx)
@@ -185,18 +244,34 @@ class AgentService:
         self.journal.finish(result)
 
     def drain(self) -> None:
-        while True:
-            with self._lock:
-                if not self.queue:
-                    return
-                cmd = self.queue.popleft()
-                self.current = cmd
-                self.cancel.clear()
-            try:
-                self._run(cmd)
-            finally:
+        with self._lock:
+            if self._draining:
+                return
+            self._draining = True
+        try:
+            while not self._stop.is_set():
                 with self._lock:
-                    self.current = None
+                    if not self.queue:
+                        return
+                    cmd, cmd_epoch = self.queue.popleft()
+                    if cmd_epoch != self.epoch or self.cancel.is_set() or self.session_stopped:
+                        self.current = None
+                        stale = True
+                    else:
+                        stale = False
+                        self.current = cmd
+                if stale:
+                    self._fail(cmd, Reason.OPERATOR_STOP.value, "cancelled")
+                    continue
+                try:
+                    self._run(cmd, cmd_epoch)
+                finally:
+                    with self._lock:
+                        if self.current is cmd:
+                            self.current = None
+        finally:
+            with self._lock:
+                self._draining = False
 
     # ----- threads -------------------------------------------------------------------
     def _executor(self) -> None:
@@ -230,10 +305,18 @@ class AgentService:
         self._wake.set()
 
     def shutdown(self) -> None:
+        with self._lock:
+            if self._shut_down:
+                return
+            self._shut_down = True
         self._stop.set()
-        self._abort_all(Reason.OPERATOR_STOP.value, "agent shutting down")
+        self._wake.set()
+        self._invalidate_queue(Reason.OPERATOR_STOP.value, "agent shutting down", latch=True)
         self._set_lease(None, self.clock())
-        self.backend.safe_stop("agent shutdown")
+        try:
+            self.backend.safe_stop("agent shutdown")
+        except Exception as exc:
+            self.log(f"agent: safe_stop during shutdown failed: {exc!r}")
 
     def snapshot(self) -> dict[str, Any]:
         return {"agent_id": self.agent_id, "run_id": self.run_id, "offline": self.offline,

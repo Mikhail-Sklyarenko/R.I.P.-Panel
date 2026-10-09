@@ -199,7 +199,7 @@ class PairMachine:
 
     def solo(self, o: Observation, role: Role) -> bool:
         own = norm(self.pair.member(role).display_name)
-        return len(o.lobby.members) <= 1 and all(norm(m) == own for m in o.lobby.members)
+        return len(o.lobby.members) == 1 and norm(o.lobby.members[0]) == own
 
     @staticmethod
     def configured(o: Observation) -> bool:
@@ -405,6 +405,10 @@ class PairMachine:
             if res.reason in {r.value for r in MANUAL_ONLY}:
                 self.goto(PairState.MANUAL, now, Reason(res.reason), res.detail)
                 return []
+            if res.status is ResultStatus.UNCONFIRMED:
+                # Issued, not verified. Wait for a fresh observation; do not spend a failure.
+                self.ctx.confirm_until = now + spec.confirm_sec
+                return []
             if res.succeeded:
                 self.ctx.step_index += 1
                 plan = spec.commands(self, L, F)
@@ -514,9 +518,10 @@ def _friend_exhausted(m: PairMachine, now):
 
 def _reset_cmds(m: PairMachine, L, F):
     cmds = []
-    if not m.solo(L, Role.LEADER):
+    # An empty roster was not observed. It is not a party that must be left.
+    if L.lobby.members and not m.solo(L, Role.LEADER):
         cmds.append((Role.LEADER, CommandType.LEAVE_LOBBY, {}))
-    if not m.solo(F, Role.FOLLOWER):
+    if F.lobby.members and not m.solo(F, Role.FOLLOWER):
         cmds.append((Role.FOLLOWER, CommandType.LEAVE_LOBBY, {}))
     return cmds
 
@@ -534,6 +539,8 @@ def _configure_cmds(m: PairMachine, L, F):
 
 
 def _configure_done(m: PairMachine, L, F):
+    if not L.lobby.members:
+        return None
     if not m.solo(L, Role.LEADER) and not m.roster_ok(L, Role.LEADER):
         return PairState.LOBBY_RESET
     return PairState.LOBBY_INVITE if m.configured(L) else None

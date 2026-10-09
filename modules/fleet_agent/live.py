@@ -90,7 +90,7 @@ class WindowsBackend:
             ("csgobot", check_worker_preflight, 120.0),
             ("nav", check_inferno_pack, 120.0),
             ("camera", check_virtual_camera, 15.0),
-            ("gsi", self._check_gsi, 5.0),
+            ("gsi", self._check_gsi, 0),
             ("observer", lambda: (self.observer.calibrated, "wingman_fleet.yaml"), 30.0),
             ("input", lambda: (True, self.inputs.describe()), 0),
         ], clock=clock)
@@ -122,6 +122,8 @@ class WindowsBackend:
         view = self.gsi.view()
         if view.age_sec == float("inf"):
             return False, "no packets yet (restart CS2 after GSI install)"
+        if not view.fresh:
+            return False, f"stale age={view.age_sec:.1f}s"
         return True, f"age={view.age_sec:.1f}s"
 
     def close(self) -> None:
@@ -154,16 +156,20 @@ class WindowsBackend:
         if ev.state is not self._last_screen:
             self._last_screen, self._screen_since = ev.state, self.clock()
         self._modal = ev.blocking_modal
-        if ev.state in (Screen.MAIN_MENU, Screen.PLAY_MENU) and found.persona:
-            self._lobby = LobbyView((found.persona,), True, "", "")
-        results = self.preflight.cached()
+        # No lobby sensor yet. A remembered or clicked roster is not an observation.
+        self._lobby = LobbyView()
+        results = self.preflight.refresh_for_observation()
         ok, failures = Preflight.summary(results)
         fp = None
-        if ev.state is Screen.IN_MATCH:
+        if ev.state is Screen.IN_MATCH and gsi.fresh:
             names = self.gsi.roster_names() if self.gsi else ()
             token = self.gsi.server_token() if self.gsi else ""
-            fp = fingerprint_from_names(token, names, observed_age_sec=gsi.age_sec) or self._last_fp
-            self._last_fp = fp
+            fresh_fp = fingerprint_from_names(token, names, observed_age_sec=gsi.age_sec)
+            if fresh_fp is not None and fresh_fp.observed_age_sec <= 2.0:
+                self._last_fp = fresh_fp
+                fp = fresh_fp
+        else:
+            self._last_fp = None
         from modules.combat import csgobot_ai
         worker = csgobot_ai._PROCESS is not None and csgobot_ai._PROCESS.poll() is None
         return Observation(
@@ -236,6 +242,7 @@ class WindowsBackend:
 
     def safe_stop(self, reason: str) -> None:
         self.log(f"fleet: safe_stop ({reason})")
+        self._last_fp = None
         self.stop_file.write_text(reason, encoding="utf-8")
         self.set_gameplay("")
         self.inputs.release_all()
@@ -271,6 +278,8 @@ class WindowsBackend:
             return self._probe(cmd)
         if cmd.type is CommandType.SCREENSHOT:
             path = self._shot("operator")
+            if not path:
+                return CommandResult(cmd.command_id, ResultStatus.FAILED, Reason.CAPTURE_STALE.value, "no image")
             return CommandResult(cmd.command_id, ResultStatus.COMPLETED, "", path)
         if cmd.type is CommandType.RESTART_CS2:
             return self._restart(cmd, steam=False)
@@ -368,12 +377,7 @@ class WindowsBackend:
         if cmd.type is CommandType.LEAVE_LOBBY:
             return self._click_seq(cmd, ctx, ["leave_lobby"])
         if cmd.type is CommandType.CONFIGURE_LOBBY:
-            res = self._click_seq(cmd, ctx, ["play", "mode_wingman", "map_inferno"])
-            if res.succeeded:
-                self._lobby = LobbyView(self._lobby.members or (obs.steam_id64,), True,
-                                        str(cmd.params.get("mode", "wingman")),
-                                        str(cmd.params.get("map_id", "de_inferno")))
-            return res
+            return self._click_seq(cmd, ctx, ["play", "mode_wingman", "map_inferno"])
         if cmd.type is CommandType.INVITE:
             if cmd.params.get("replace_stale"):
                 self._invite_from = ""
@@ -431,7 +435,8 @@ class WindowsBackend:
             self._shot(cmd.type.value)
             return CommandResult(cmd.command_id, ResultStatus.FAILED, Reason.COMMAND_FAILED.value, repr(exc))
         self._shot(f"{cmd.type.value}_after")
-        return CommandResult(cmd.command_id, ResultStatus.COMPLETED)
+        return CommandResult(cmd.command_id, ResultStatus.UNCONFIRMED, Reason.EFFECT_UNCONFIRMED.value,
+                             "clicks issued; effect not observed")
 
     def _console_or_click(self, cmd: Command, console: str, clicks: list[str]) -> CommandResult:
         try:
@@ -439,7 +444,7 @@ class WindowsBackend:
             from modules.ui_nav.window import find_cs2_hwnd
             with self.inputs.ui(cmd.type.value):
                 run_cs2_console_commands(find_cs2_hwnd(), console)
-            return CommandResult(cmd.command_id, ResultStatus.COMPLETED, "", console)
+            return CommandResult(cmd.command_id, ResultStatus.UNCONFIRMED, Reason.EFFECT_UNCONFIRMED.value, console)
         except Exception:
             dummy = ExecContext(threading.Event(), time.time, lambda: "")
             return self._click_seq(cmd, dummy, clicks)

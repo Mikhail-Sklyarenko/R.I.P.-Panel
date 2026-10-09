@@ -52,6 +52,7 @@ class Reason(str, Enum):
     CALIBRATION_MISSING = "calibration_missing"
     GAMEPLAY_NOT_ADMITTED = "gameplay_not_admitted"
     INPUT_BUSY = "input_busy"
+    EFFECT_UNCONFIRMED = "effect_unconfirmed"
 
 
 # Reasons that must never be retried automatically.
@@ -116,6 +117,7 @@ TEXT_RU: dict[Reason, str] = {
     Reason.CALIBRATION_MISSING: "нет калибровки меню CS2 для этого ПК",
     Reason.GAMEPLAY_NOT_ADMITTED: "игровой допуск не выдан координатором",
     Reason.INPUT_BUSY: "ввод занят другим владельцем",
+    Reason.EFFECT_UNCONFIRMED: "действие отправлено, эффект ещё не наблюдался",
 }
 
 

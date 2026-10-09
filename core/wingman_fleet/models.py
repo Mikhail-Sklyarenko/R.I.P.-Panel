@@ -75,11 +75,13 @@ class ResultStatus(str, Enum):
     EXPIRED = "expired"
     COMPLETED = "completed"
     FAILED = "failed"
+    # Clicks or console text were issued. The effect was not observed.
+    UNCONFIRMED = "unconfirmed"
 
 
 TERMINAL_RESULTS = frozenset({
     ResultStatus.ALREADY_APPLIED, ResultStatus.REJECTED, ResultStatus.EXPIRED,
-    ResultStatus.COMPLETED, ResultStatus.FAILED,
+    ResultStatus.COMPLETED, ResultStatus.FAILED, ResultStatus.UNCONFIRMED,
 })
 
 

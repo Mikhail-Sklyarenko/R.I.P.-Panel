@@ -15,6 +15,9 @@ from typing import Callable
 
 CheckFn = Callable[[], tuple[bool, str]]
 REQUIRED_CLIENT = (1280, 720)
+# Checks at or below this TTL may run on the observation path. Heavier checks
+# stay cached until a PREFLIGHT command, and become a stale failure when the TTL ends.
+CHEAP_MAX_TTL = 5.0
 
 
 @dataclass(frozen=True)
@@ -51,10 +54,47 @@ class Preflight:
         return out
 
     def cached(self) -> list[CheckResult]:
-        """Last known results without running anything (observation path)."""
+        """Last known results. An expired TTL is a failure and does not re-run the check."""
+        now = self.clock()
+        out = []
         with self._lock:
-            known = {c: r for c, (_, r) in self._cache.items()}
-        return [known.get(code, CheckResult(code, False, "not checked yet")) for code, _, _ in self.checks]
+            for code, _, ttl in self.checks:
+                cached = self._cache.get(code)
+                if cached is None:
+                    out.append(CheckResult(code, False, "not checked yet"))
+                elif ttl and now - cached[0] >= ttl:
+                    out.append(CheckResult(code, False, "stale"))
+                else:
+                    out.append(cached[1])
+        return out
+
+    def refresh_for_observation(self) -> list[CheckResult]:
+        """Refresh cheap checks. Expensive ones are reported from cache or as stale."""
+        out = []
+        now = self.clock()
+        for code, fn, ttl in self.checks:
+            with self._lock:
+                cached = self._cache.get(code)
+            if ttl > CHEAP_MAX_TTL:
+                if cached is None:
+                    out.append(CheckResult(code, False, "not checked yet"))
+                elif now - cached[0] < ttl:
+                    out.append(cached[1])
+                else:
+                    out.append(CheckResult(code, False, "stale"))
+                continue
+            if cached and ttl and now - cached[0] < ttl:
+                out.append(cached[1])
+                continue
+            try:
+                ok, detail = fn()
+            except Exception as exc:
+                ok, detail = False, repr(exc)
+            res = CheckResult(code, bool(ok), str(detail)[:200])
+            with self._lock:
+                self._cache[code] = (now, res)
+            out.append(res)
+        return out
 
     @staticmethod
     def summary(results: list[CheckResult]) -> tuple[bool, tuple[str, ...]]:

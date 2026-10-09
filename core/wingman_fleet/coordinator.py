@@ -179,14 +179,20 @@ class Coordinator:
             st.computer = str(payload.get("computer", ""))
             st.protocol = obs.protocol
             st.last_seen, st.observation, st.received_at = now, obs, now
+            active_run = self.plan.run_id if self.plan else ""
+            accepted: list[str] = []
             for r in results:
-                if self.store.record_result(r) and r.terminal and not r.succeeded:
-                    self.store.event("command_result", run_id=self.plan.run_id if self.plan else "",
+                stored = self.store.record_result(r, agent_id=agent_id, run_id=active_run)
+                if stored and r.terminal and not r.succeeded:
+                    self.store.event("command_result", run_id=active_run,
                                      agent_id=agent_id, reason=r.reason, detail=f"{r.command_id}: {r.detail}",
                                      data=r.evidence or None)
+                if stored or self.store.result_is_stored(r, agent_id=agent_id, run_id=active_run):
+                    accepted.append(r.command_id)
             if obs.protocol != PROTOCOL_VERSION:
                 return 200, {"ok": False, "error": "protocol_mismatch", "server_time": now,
-                             "protocol": PROTOCOL_VERSION, "commands": [], "gameplay": None}
+                             "protocol": PROTOCOL_VERSION, "commands": [], "gameplay": None,
+                             "accepted_results": accepted}
             commands, gameplay, run_id = [], None, ""
             if self.plan is not None and agent_id in self.plan.agent_ids:
                 run_id = self.plan.run_id
@@ -195,7 +201,8 @@ class Coordinator:
                 if attempt:
                     gameplay = {"attempt_id": attempt, "ttl_sec": GAMEPLAY_TTL_SEC}
             return 200, {"ok": True, "server_time": now, "run_id": run_id, "commands": commands,
-                         "gameplay": gameplay, "protocol": PROTOCOL_VERSION}
+                         "gameplay": gameplay, "protocol": PROTOCOL_VERSION,
+                         "accepted_results": accepted}
 
     # ----- FSM tick ------------------------------------------------------------------
     def tick(self) -> list[Command]:
@@ -241,6 +248,7 @@ class Coordinator:
                                    "run_reason": describe(self.run.ctx.reason, self.run.ctx.detail)
                                    if self.run and self.run.ctx.reason else "",
                                    "cycles": self.run.ctx.cycles if self.run else 0,
+                                   "failed_cycles": self.run.ctx.failed_cycles if self.run else 0,
                                    "wave": self.run.ctx.wave if self.run else 0,
                                    "pairs": [], "agents": {}}
             for agent_id, st in sorted(self.agents.items()):
