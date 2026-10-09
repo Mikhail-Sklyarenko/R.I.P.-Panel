@@ -21,6 +21,20 @@ class ScreenState(str, Enum):
     IN_DM = "in_dm"
 
 
+class WingmanMenuState(str, Enum):
+    """Product fleet screens; DM ScreenState stays unchanged."""
+
+    UNKNOWN = "unknown"
+    MAIN_MENU = "main_menu"
+    PLAY_MENU = "play_menu"
+    SEARCHING = "searching"
+    MATCH_CONFIRM = "match_confirm"
+    LOADING = "loading"
+    IN_MATCH = "in_match"
+    MATCH_RESULT = "match_result"
+    MODAL = "modal"
+
+
 _STATE_MAP = {
     ScreenState.MAIN_MENU: "main_menu",
     ScreenState.SEARCHING: "searching",
@@ -184,6 +198,11 @@ def detect_state(
     *,
     min_match: int | None = None,
 ) -> bool:
+    if coords.base_width==1280 and state in (ScreenState.MAIN_MENU,ScreenState.IN_DM):
+        from modules.ui_nav.menu_labels import play_button
+        menu=play_button(img) is not None
+        if state==ScreenState.MAIN_MENU:return menu
+        if menu:return False
     key = _STATE_MAP[state]
     probes = coords.probes(key)
     if not probes:
@@ -202,10 +221,13 @@ def wait_for_state(
     timeout_sec: float,
     poll_sec: float = 0.5,
     min_match: int | None = None,
+    should_stop: Callable[[], bool] | None = None,
 ) -> Image.Image:
     deadline = time.monotonic() + timeout_sec
     attempt = 0
     while time.monotonic() < deadline:
+        if should_stop and should_stop():
+            raise UiNavTimeoutError("state wait stopped")
         attempt += 1
         img = driver.capture()
         artifacts.save_image(f"wait_{state.value}_{attempt}", img)
@@ -312,3 +334,21 @@ def wait_for_in_dm(
             f"expected={list(r0.expected_rgb)}"
         )
     raise UiNavTimeoutError(f"timeout waiting for in_dm ({timeout_sec}s)")
+
+
+_WINGMAN_PROBE_ORDER = (
+    ("wingman_confirm", WingmanMenuState.MATCH_CONFIRM),
+    ("wingman_searching", WingmanMenuState.SEARCHING),
+    ("wingman_result", WingmanMenuState.MATCH_RESULT),
+    ("wingman_modal", WingmanMenuState.MODAL),
+    ("wingman_play", WingmanMenuState.PLAY_MENU),
+    ("main_menu", WingmanMenuState.MAIN_MENU),
+)
+
+
+def detect_wingman_menu(img: Image.Image, coords: NavCoords) -> WingmanMenuState:
+    """Calibrated probes for the fleet observer; UNKNOWN when nothing matches."""
+    for key, state in _WINGMAN_PROBE_ORDER:
+        if detect_probe_key(img, coords, key, min_match=1):
+            return state
+    return WingmanMenuState.UNKNOWN

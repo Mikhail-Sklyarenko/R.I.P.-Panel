@@ -1,0 +1,74 @@
+[
+  {
+    "from": "StartDeathmatchNavigation.bat",
+    "to": "tools/navigation/StartDeathmatchNavigation.bat"
+  },
+  {
+    "from": "EnableAutoCapture.bat",
+    "to": "tools/training/EnableAutoCapture.bat"
+  },
+  {
+    "from": "BuildHardNegativesFromRaw.bat",
+    "to": "tools/training/BuildHardNegativesFromRaw.bat"
+  },
+  {
+    "from": "BuildOurCs2FromRaw.bat",
+    "to": "tools/training/BuildOurCs2FromRaw.bat"
+  },
+  {
+    "from": "EnsureWeights.bat",
+    "to": "tools/training/EnsureWeights.bat"
+  },
+  {
+    "from": "RunSortDatasetExport.bat",
+    "to": "tools/training/RunSortDatasetExport.bat"
+  },
+  {
+    "from": "BootstrapDataset.bat",
+    "to": "tools/training/BootstrapDataset.bat"
+  },
+  {
+    "from": "NavigationStudio.bat",
+    "to": "tools/navigation/NavigationStudio.bat"
+  },
+  {
+    "from": "StartExpandedDust2.bat",
+    "to": "tools/navigation/StartExpandedDust2.bat"
+  },
+  {
+    "from": "ImportEmptyYoloSplits.bat",
+    "to": "tools/training/ImportEmptyYoloSplits.bat"
+  },
+  {
+    "from": "EnableFpGuard.bat",
+    "to": "tools/training/EnableFpGuard.bat"
+  },
+  {
+    "from": "StartVisualNavigation.bat",
+    "to": "tools/navigation/StartVisualNavigation.bat"
+  },
+  {
+    "from": "ExtractDatasetArchives.bat",
+    "to": "tools/training/ExtractDatasetArchives.bat"
+  },
+  {
+    "from": "VerifyVisualNavigation.bat",
+    "to": "tools/navigation/VerifyVisualNavigation.bat"
+  },
+  {
+    "from": "EnableHardNegCapture.bat",
+    "to": "tools/training/EnableHardNegCapture.bat"
+  },
+  {
+    "from": "BuildProductWithHardNegatives.bat",
+    "to": "tools/training/BuildProductWithHardNegatives.bat"
+  },
+  {
+    "from": "TrainProductModel.bat",
+    "to": "tools/training/TrainProductModel.bat"
+  },
+  {
+    "from": "ReplayVisualNavigation.bat",
+    "to": "tools/navigation/ReplayVisualNavigation.bat"
+  }
+]

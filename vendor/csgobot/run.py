@@ -84,7 +84,7 @@ LONG_RANGE_BODY_BIAS = True
 ROI_ZOOM_ENABLED = True
 ROI_FRACTION = 0.75
 SMOOTHING = 2.4  # A1.2.1: stable hold; dual-phase still snaps when far
-LEAD_AIM_ENABLED = True  # velocity lead for moving targets
+LEAD_AIM_ENABLED = False  # velocity lead for moving targets
 LEAD_MS = 80.0  # override: CSGOBOT_LEAD_MS
 ADAPTIVE_SMOOTHING = True  # override: CSGOBOT_ADAPTIVE_SMOOTHING=0
 BODY_FALLBACK_SEC = 0.2  # override: CSGOBOT_BODY_FALLBACK_MS=200
@@ -94,12 +94,12 @@ SHOOT_COOLDOWN_SEC = 0.05  # tap mode; env CSGOBOT_SHOOT_COOLDOWN_MS
 BURST_SIZE = 7
 BURST_SHOT_INTERVAL_SEC = 0.05
 BURST_GAP_SEC = 0.10
-HOLD_MAX_SEC = 0.8
-HOLD_REPRESS_GAP_SEC = 0.05
+HOLD_MAX_SEC = 0.22
+HOLD_REPRESS_GAP_SEC = 0.18
 HOLD_RELEASE_GRACE_SEC = 0.08
 HEAD_SHOOT_CONFIDENCE = 0.60
 BODY_SHOOT_CONFIDENCE = 0.50
-PATROL_ENABLED = True
+PATROL_ENABLED = False  # historical macro patrol; inactive in visual navigation
 PATROL_SCRIPT = "generic_dm"  # resources/patrol/{name}.yaml — relative macro, any DM spawn
 PATROL_COMBAT_CLEAR_SEC = 0.75  # resume patrol after enemy gone (seconds)
 ANTI_STUCK_ENABLED = True
@@ -124,7 +124,7 @@ TEAM_MANUAL_OVERRIDE_SEC = 30.0  # Ctrl+T sticky window + sync confirmed_team
 AUTO_MAP_DETECT = True
 MAP_DETECT_CONFIRM_FRAMES = 3
 MAP_DETECT_LOCK = True
-LOOK_ENABLED = True
+LOOK_ENABLED = False  # camera belongs to navigation or combat
 LOOK_YAW_MIN = 80.0
 LOOK_YAW_MAX = 90.0
 # L1.3: natural speed + 120 Hz mouse thread (not YOLO-tick bound)
@@ -150,8 +150,8 @@ MOUSE_MAX_DELTA = 35
 MOUSE_MIN_DELTA = 2
 # Aim L1.3-style: dedicated mouse thread (0 = legacy YOLO-tick mouse)
 AIM_MOUSE_HZ = 120.0
-AIM_MOUSE_STEP_MAX = 20  # A1.2.1: calmer far snap (was 28)
-AIM_MOUSE_COAST = True
+AIM_MOUSE_STEP_MAX = 32  # Fast acquisition; near-target cap remains 8
+AIM_MOUSE_COAST = False
 AIM_MOUSE_COAST_MAX_SEC = 0.10
 # A1.1 soft-settle + A1.2 dual-phase + A1.2.1 stable hold
 AIM_SETTLE = True
@@ -186,8 +186,9 @@ PREVIEW_HEIGHT = 360
 # Env: CSGOBOT_AUTO_CAPTURE=1  (see docs/AUTO_CAPTURE.md)
 AUTO_CAPTURE = False
 
-# Minimap navigation (PR-N0/N1) — pose read + log; movement in PR-N2
-NAV_ENABLED = False
+# Current measured navigation: VisualPerception -> VisualNavController.
+# run.py is the panel worker, not a second panel. Manual runs require CapsLock.
+NAV_ENABLED = True
 NAV_READ_ONLY = False
 NAV_PACK = "auto"
 NAV_DEBUG = False
@@ -413,7 +414,7 @@ def create_config() -> AppConfig:
     )
 
     patrol_config = PatrolConfig(
-        enabled=PATROL_ENABLED,
+        enabled=PATROL_ENABLED and not nav_config.enabled,
         script_name=PATROL_SCRIPT,
         combat_clear_sec=PATROL_COMBAT_CLEAR_SEC,
         anti_stuck_enabled=ANTI_STUCK_ENABLED,
@@ -422,7 +423,7 @@ def create_config() -> AppConfig:
         unstuck_cooldown_sec=UNSTUCK_COOLDOWN_SEC,
     )
 
-    patrol_override = resolve_patrol_script_override()
+    patrol_override = resolve_patrol_script_override() if not nav_config.enabled else ""
     map_detect_enabled = resolve_auto_map_enabled(AUTO_MAP_DETECT) and not patrol_override
     if patrol_override:
         patrol_config = PatrolConfig(
@@ -680,29 +681,20 @@ def main() -> int:
     else:
         logger.info("Map detect: disabled (CSGOBOT_AUTO_MAP=0 or CSGOBOT_PATROL_SCRIPT)")
     if config.nav.enabled:
-        from nav.paths import resolve_calibration_path, resolve_nav_pack_path
-
+        from nav.farm_runtime import expanded_mode, load_ground
+        from nav.release import ENGINE
+        from nav.visual_localizer import VisualLocalizer
         try:
-            cal_path = resolve_calibration_path(config.nav.calibration_path)
-            pack_path = resolve_nav_pack_path(config.nav.pack_id)
-            from nav.preflight import run_nav_preflight
-
-            pf = run_nav_preflight(
-                pack_id=config.nav.pack_id,
-                calibration_path=config.nav.calibration_path,
-            )
-            logger.info(
-                "Nav: enabled read_only=%s pack=%s v%s strategy=%s goals=%s",
-                config.nav.read_only,
-                pf.get("pack_id"),
-                pf.get("pack_version"),
-                pf.get("strategy"),
-                pf.get("goals"),
-            )
+            if expanded_mode():
+                logger.info("Nav: engine=%s mode=expanded_roam read_only=%s; selected map assets validated by worker",
+                            ENGINE, config.nav.read_only)
+            else:
+                logger.info("Nav: engine=%s mode=route pack=%s", ENGINE, config.nav.pack_id)
         except Exception as exc:
-            logger.warning("Nav: enabled but preflight failed (%s)", exc)
+            logger.error("Nav: visual assets failed validation: %s", exc)
+            raise
     else:
-        logger.info("Nav: disabled (CSGOBOT_NAV=1 to enable pose reader)")
+        logger.info("Nav: disabled explicitly; macro patrol remains disabled by default")
     logger.info(
         "Look: enabled=%s yaw=%.0f-%.0f° idle=%.0f-%.0fs sweep=%.2f-%.2fs",
         config.look.enabled,
@@ -744,4 +736,5 @@ def main() -> int:
 
 
 if __name__ == "__main__":
+    os.environ.setdefault("CSGOBOT_NAV_MODE", "expanded_roam")
     sys.exit(main())

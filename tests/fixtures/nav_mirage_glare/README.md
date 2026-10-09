@@ -1,0 +1,1 @@
+Radar crops from the independent Mirage bot test 2026-09-15 18-03-21.mp4. Not added to the calibration atlas. At 40, 60 and 400 seconds the old yellow/cyan union merged the marker with the translucent scene. 180 seconds is the jungle passage. These fixtures validate segmentation, not live traversal.

@@ -70,3 +70,28 @@ def detect_radar_circle(
         return None
     c = circles[0][0]
     return RadarCircle(cx=float(c[0]), cy=float(c[1]), radius=float(c[2]))
+
+
+def visible_ring_support(frame, circle):
+    """Current radial contrast at a previously measured HUD disk boundary.
+
+    This validates screen geometry only; it never supplies a world position.
+    A menu, missing HUD or relocated disk must not reuse a cached crop.
+    """
+    if frame is None or frame.ndim != 3:return False
+    angles=np.linspace(0,2*np.pi,96,endpoint=False)
+    def samples(radius):
+        x=np.rint(circle.cx+radius*np.cos(angles)).astype(int)
+        y=np.rint(circle.cy+radius*np.sin(angles)).astype(int)
+        valid=(x>=0)&(y>=0)&(x<frame.shape[1])&(y<frame.shape[0])
+        return x,y,valid
+    ax,ay,av=samples(circle.radius-3)
+    bx,by,bv=samples(circle.radius+3)
+    valid=av&bv
+    if np.count_nonzero(valid)<85:return False
+    inside=frame[ay[valid],ax[valid]].astype(float)
+    outside=frame[by[valid],bx[valid]].astype(float)
+    # The radar disk darkens the scene. Require broad angular evidence,
+    # not just a wall crossing a small arc.
+    contrast=outside.mean(1)-inside.mean(1)
+    return np.mean(contrast>12)>=.55

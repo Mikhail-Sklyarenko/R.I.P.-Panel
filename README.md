@@ -1,4 +1,15 @@
-# Farm Panel Prototype
+# Farm Panel — единая панель фарма
+
+**Запуск на Windows: `FarmPanel.bat` в корне этого проекта.**
+`Farm.bat` — совместимый ярлык к той же панели. Запуск `python main.py`
+и новая сборка EXE используют тот же режим навигации.
+
+Полный порядок запуска и структура: [PROJECT_GUIDE.md](docs/PROJECT_GUIDE.md).
+Флот Напарников Inferno (4 ПК): [WINGMAN_FLEET_MVP.md](docs/WINGMAN_FLEET_MVP.md).
+Архивные инструкции по навигации описывают этапы разработки; при расхождении
+используйте PROJECT_GUIDE.md. Старые EXE необходимо пересобрать.
+
+## Справочная информация
 
 Desktop farm panel prototype (CustomTkinter + Python core), separated from the original **FSM_PANEL** distribution in the parent directory.
 
@@ -35,9 +46,9 @@ powershell -ExecutionPolicy Bypass -File build\build_windows.ps1
 Output: `dist/FarmPanel/FarmPanel.exe`, `resources/`, `vendor/looter/`, writable `data/`.
 
 - **First run:** `docs/WINDOWS_FIRST_RUN.md`
-- **Farm PC setup:** `docs/FARM_PC_CHECKLIST.md` (`EnsureWeights.bat` for YOLO `.pt`)
+- **Farm PC setup:** `docs/FARM_PC_CHECKLIST.md` (`tools/training/EnsureWeights.bat` for YOLO `.pt`)
 - **Model lifecycle (farm vs train):** `docs/PRODUCT_MODEL_LIFECYCLE.md`
-- **Auto-capture CT data:** `docs/AUTO_CAPTURE.md` (`EnableAutoCapture.bat` on 1–2 collector PCs)
+- **Auto-capture CT data:** `docs/AUTO_CAPTURE.md` (`tools/training/EnableAutoCapture.bat` on 1–2 collector PCs)
 - **Accounts:** `data/import/logpass.txt` + `maFiles/` → UI **Import from logpass** (see `docs/FSM_ACCOUNT_IMPORT.md`)
 - **Vault CLI:** `vault_cli.bat import-fsm` or `FarmPanel.exe --vault-cli list`
 - **Dev launcher:** `FarmPanel.bat` (pythonw + source tree)
@@ -69,7 +80,7 @@ pip install -r requirements.txt
 
 Панель запускает `venv\Scripts\python.exe run.py` через **subprocess** (`modules/combat/csgobot_ai.py`). **Не** импортируйте csgobot в `panel/` или `core/`.
 
-`bot_mode`: `auto` (AI если run.py + venv есть) | `ai` | `simple` (10 min).
+В продуктовом запуске используется AI + visual navigation. Старые значения bot_mode сохранены для совместимости; при недоступном AI фарм сообщает об ошибке, без перехода на simple.
 
 ## Utils (B12)
 

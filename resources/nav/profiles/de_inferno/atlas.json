@@ -1,0 +1,1397 @@
+{
+  "map_id": "de_inferno",
+  "version": 1,
+  "source_video": "2026-09-13 16-53-26.mp4",
+  "source_sha256": "9a3e323d587a63c73058159298d87a42bbb3f0223b0c8a909618cf0ab26f2bc8",
+  "map_sha256": "e4929829f8475d2edcb44ee3537ffad094dc8008b4d6f5aa81e66e77ddb077ba",
+  "calibration_method": "21 direct geometric anchors plus visually inspected global contour alignments; no sequential pose integration",
+  "live_validated": false,
+  "references": [
+    {
+      "image": "anchor_002.png",
+      "to_map": [
+        [
+          2.7972027972027975,
+          0.0,
+          604.1958041958043
+        ],
+        [
+          0.0,
+          2.7972027972027975,
+          47.55244755244755
+        ]
+      ],
+      "source_time": 2,
+      "source_method": "inspected_global_contours",
+      "automated_wall_gate_passed": false,
+      "contour_score": 0.5042623281478882,
+      "wall_recall": 0.9863013698630136,
+      "wall_precision": 0.3719340570969039
+    },
+    {
+      "image": "anchor_008.png",
+      "to_map": [
+        [
+          2.7972027972027975,
+          0.0,
+          489.51048951048955
+        ],
+        [
+          0.0,
+          2.7972027972027975,
+          -58.74125874125875
+        ]
+      ],
+      "source_time": 8,
+      "source_method": "inspected_global_contours",
+      "automated_wall_gate_passed": false,
+      "contour_score": 0.4538482129573822,
+      "wall_recall": 0.7030242935052058,
+      "wall_precision": 0.4620051085568327
+    },
+    {
+      "image": "anchor_010.png",
+      "to_map": [
+        [
+          2.8169014084507045,
+          0.0,
+          428.16901408450707
+        ],
+        [
+          0.0,
+          2.8169014084507045,
+          -67.60563380281691
+        ]
+      ],
+      "source_time": 10,
+      "source_method": "inspected_global_contours",
+      "automated_wall_gate_passed": false,
+      "contour_score": 0.4712698459625244,
+      "wall_recall": 0.692992213570634,
+      "wall_precision": 0.5253063399041022
+    },
+    {
+      "image": "anchor_012.png",
+      "to_map": [
+        [
+          2.7972027972027975,
+          0.0,
+          391.6083916083916
+        ],
+        [
+          0.0,
+          2.7972027972027975,
+          -100.69930069930071
+        ]
+      ],
+      "source_time": 12,
+      "source_method": "inspected_global_contours",
+      "automated_wall_gate_passed": false,
+      "contour_score": 0.5637409687042236,
+      "wall_recall": 0.7555040556199305,
+      "wall_precision": 0.6010362694300518
+    },
+    {
+      "image": "anchor_014.png",
+      "to_map": [
+        [
+          2.8378131190931795,
+          -0.028544316935926763,
+          357.01491869962126
+        ],
+        [
+          0.028544316935926763,
+          2.8378131190931795,
+          -103.15526917578107
+        ]
+      ],
+      "source_time": 14,
+      "source_method": "map_contours",
+      "confidence": 0.7088063578231782,
+      "inliers": 8
+    },
+    {
+      "image": "anchor_016.png",
+      "to_map": [
+        [
+          2.7777777777777777,
+          0.0,
+          400.0
+        ],
+        [
+          0.0,
+          2.7777777777777777,
+          -97.22222222222223
+        ]
+      ],
+      "source_time": 16,
+      "source_method": "global_contours",
+      "confidence": 0.8941605839416059,
+      "inliers": 266
+    },
+    {
+      "image": "anchor_018.png",
+      "to_map": [
+        [
+          2.8169014084507045,
+          0.0,
+          270.42253521126764
+        ],
+        [
+          0.0,
+          2.8169014084507045,
+          -169.01408450704227
+        ]
+      ],
+      "source_time": 18,
+      "source_method": "inspected_global_contours",
+      "automated_wall_gate_passed": false,
+      "contour_score": 0.5257349610328674,
+      "wall_recall": 0.6945945945945946,
+      "wall_precision": 0.6036217303822937
+    },
+    {
+      "image": "anchor_020.png",
+      "to_map": [
+        [
+          2.8368794326241136,
+          0.0,
+          263.82978723404256
+        ],
+        [
+          0.0,
+          2.8368794326241136,
+          -238.29787234042556
+        ]
+      ],
+      "source_time": 20,
+      "source_method": "inspected_global_contours",
+      "automated_wall_gate_passed": false,
+      "contour_score": 0.4117783308029175,
+      "wall_recall": 0.4689119170984456,
+      "wall_precision": 0.5119047619047619
+    },
+    {
+      "image": "anchor_022.png",
+      "to_map": [
+        [
+          2.7972027972027975,
+          0.0,
+          218.1818181818182
+        ],
+        [
+          0.0,
+          2.7972027972027975,
+          -193.006993006993
+        ]
+      ],
+      "source_time": 22,
+      "source_method": "inspected_global_contours",
+      "automated_wall_gate_passed": false,
+      "contour_score": 0.40368103981018066,
+      "wall_recall": 0.4844606946983547,
+      "wall_precision": 0.5558564658090724
+    },
+    {
+      "image": "anchor_024.png",
+      "to_map": [
+        [
+          2.7777777777777777,
+          0.0,
+          177.77777777777777
+        ],
+        [
+          0.0,
+          2.7777777777777777,
+          -144.44444444444446
+        ]
+      ],
+      "source_time": 24,
+      "source_method": "inspected_global_contours",
+      "automated_wall_gate_passed": false,
+      "contour_score": 0.4698134660720825,
+      "wall_recall": 0.48502994011976047,
+      "wall_precision": 0.6084049665711557
+    },
+    {
+      "image": "anchor_026.png",
+      "to_map": [
+        [
+          2.7972027972027975,
+          0.0,
+          109.0909090909091
+        ],
+        [
+          0.0,
+          2.7972027972027975,
+          -139.86013986013987
+        ]
+      ],
+      "source_time": 26,
+      "source_method": "inspected_global_contours",
+      "automated_wall_gate_passed": false,
+      "contour_score": 0.4630281627178192,
+      "wall_recall": 0.5605247465712582,
+      "wall_precision": 0.5823680823680824
+    },
+    {
+      "image": "anchor_028.png",
+      "to_map": [
+        [
+          2.7586206896551726,
+          0.0,
+          118.62068965517241
+        ],
+        [
+          0.0,
+          2.7586206896551726,
+          -46.896551724137936
+        ]
+      ],
+      "source_time": 28,
+      "source_method": "inspected_global_contours",
+      "automated_wall_gate_passed": false,
+      "contour_score": 0.5412590503692627,
+      "wall_recall": 0.773972602739726,
+      "wall_precision": 0.5958429561200924
+    },
+    {
+      "image": "anchor_030.png",
+      "to_map": [
+        [
+          2.7972027972027975,
+          0.0,
+          206.99300699300701
+        ],
+        [
+          0.0,
+          2.7972027972027975,
+          -67.13286713286713
+        ]
+      ],
+      "source_time": 30,
+      "source_method": "inspected_global_contours",
+      "automated_wall_gate_passed": false,
+      "contour_score": 0.4456383287906647,
+      "wall_recall": 0.6090302719343252,
+      "wall_precision": 0.5356662180349933
+    },
+    {
+      "image": "anchor_032.png",
+      "to_map": [
+        [
+          2.7972027972027975,
+          0.0,
+          265.73426573426576
+        ],
+        [
+          0.0,
+          2.7972027972027975,
+          -22.37762237762238
+        ]
+      ],
+      "source_time": 32,
+      "source_method": "inspected_global_contours",
+      "automated_wall_gate_passed": false,
+      "contour_score": 0.4855647683143616,
+      "wall_recall": 0.6893534273213417,
+      "wall_precision": 0.5624275222265172
+    },
+    {
+      "image": "anchor_034.png",
+      "to_map": [
+        [
+          2.7972027972027975,
+          0.0,
+          288.1118881118881
+        ],
+        [
+          0.0,
+          2.7972027972027975,
+          64.33566433566433
+        ]
+      ],
+      "source_time": 34,
+      "source_method": "inspected_global_contours",
+      "automated_wall_gate_passed": false,
+      "contour_score": 0.5780329704284668,
+      "wall_recall": 0.7466367713004485,
+      "wall_precision": 0.6304481276856968
+    },
+    {
+      "image": "anchor_036.png",
+      "to_map": [
+        [
+          2.7972027972027975,
+          0.0,
+          215.3846153846154
+        ],
+        [
+          0.0,
+          2.7972027972027975,
+          67.13286713286713
+        ]
+      ],
+      "source_time": 36,
+      "source_method": "inspected_global_contours",
+      "automated_wall_gate_passed": false,
+      "contour_score": 0.4829484224319458,
+      "wall_recall": 0.6681569796323895,
+      "wall_precision": 0.5466395112016293
+    },
+    {
+      "image": "anchor_038.png",
+      "to_map": [
+        [
+          2.7972027972027975,
+          0.0,
+          179.02097902097904
+        ],
+        [
+          0.0,
+          2.7972027972027975,
+          139.86013986013987
+        ]
+      ],
+      "source_time": 38,
+      "source_method": "inspected_global_contours",
+      "automated_wall_gate_passed": false,
+      "contour_score": 0.4991576075553894,
+      "wall_recall": 0.7727272727272727,
+      "wall_precision": 0.5482807348092322
+    },
+    {
+      "image": "anchor_040.png",
+      "to_map": [
+        [
+          2.7972027972027975,
+          0.0,
+          142.65734265734267
+        ],
+        [
+          0.0,
+          2.7972027972027975,
+          204.19580419580421
+        ]
+      ],
+      "source_time": 40,
+      "source_method": "inspected_global_contours",
+      "automated_wall_gate_passed": false,
+      "contour_score": 0.4390852749347687,
+      "wall_recall": 0.6560678325384208,
+      "wall_precision": 0.48687448728465954
+    },
+    {
+      "image": "anchor_042.png",
+      "to_map": [
+        [
+          2.8368794326241136,
+          0.0,
+          124.822695035461
+        ],
+        [
+          0.0,
+          2.8368794326241136,
+          286.5248226950355
+        ]
+      ],
+      "source_time": 42,
+      "source_method": "inspected_global_contours",
+      "automated_wall_gate_passed": false,
+      "contour_score": 0.5316513776779175,
+      "wall_recall": 0.7192118226600985,
+      "wall_precision": 0.6723973256924546
+    },
+    {
+      "image": "anchor_044.png",
+      "to_map": [
+        [
+          2.7777777777777777,
+          0.0,
+          136.11111111111111
+        ],
+        [
+          0.0,
+          2.7777777777777777,
+          383.33333333333337
+        ]
+      ],
+      "source_time": 44,
+      "source_method": "global_contours",
+      "confidence": 0.8950065112070917,
+      "inliers": 274
+    },
+    {
+      "image": "anchor_046.png",
+      "to_map": [
+        [
+          2.7778178145567742,
+          -0.029594692954528812,
+          23.901049827341733
+        ],
+        [
+          0.029594692954528812,
+          2.7778178145567742,
+          354.83082375372817
+        ]
+      ],
+      "source_time": 46,
+      "source_method": "map_contours",
+      "confidence": 0.8821639227863965,
+      "inliers": 10
+    },
+    {
+      "image": "anchor_048.png",
+      "to_map": [
+        [
+          2.7972027972027975,
+          0.0,
+          -47.55244755244755
+        ],
+        [
+          0.0,
+          2.7972027972027975,
+          363.6363636363636
+        ]
+      ],
+      "source_time": 48,
+      "source_method": "inspected_global_contours",
+      "automated_wall_gate_passed": false,
+      "contour_score": 0.5082168579101562,
+      "wall_recall": 0.7552681992337165,
+      "wall_precision": 0.5842201834862385
+    },
+    {
+      "image": "anchor_050.png",
+      "to_map": [
+        [
+          2.8169014084507045,
+          0.0,
+          -135.21126760563382
+        ],
+        [
+          0.0,
+          2.8169014084507045,
+          377.46478873239437
+        ]
+      ],
+      "source_time": 50,
+      "source_method": "inspected_global_contours",
+      "automated_wall_gate_passed": false,
+      "contour_score": 0.6693325042724609,
+      "wall_recall": 0.8585365853658536,
+      "wall_precision": 0.6952380952380952
+    },
+    {
+      "image": "anchor_054.png",
+      "to_map": [
+        [
+          2.800558091130545,
+          0.016192053555041247,
+          -123.85998739830181
+        ],
+        [
+          -0.016192053555041247,
+          2.800558091130545,
+          538.4895886297774
+        ]
+      ],
+      "source_time": 54,
+      "source_method": "map_contours",
+      "confidence": 0.8810654892426462,
+      "inliers": 10
+    },
+    {
+      "image": "anchor_056.png",
+      "to_map": [
+        [
+          2.8368794326241136,
+          0.0,
+          -156.02836879432624
+        ],
+        [
+          0.0,
+          2.8368794326241136,
+          521.985815602837
+        ]
+      ],
+      "source_time": 56,
+      "source_method": "inspected_global_contours",
+      "automated_wall_gate_passed": false,
+      "contour_score": 0.4366218149662018,
+      "wall_recall": 0.5607038123167155,
+      "wall_precision": 0.5153886280646844
+    },
+    {
+      "image": "anchor_058.png",
+      "to_map": [
+        [
+          2.810739134267145,
+          0.014751811458879553,
+          -85.75795207650798
+        ],
+        [
+          -0.014751811458879553,
+          2.810739134267145,
+          515.738816322371
+        ]
+      ],
+      "source_time": 58,
+      "source_method": "map_contours",
+      "confidence": 0.7696714498356085,
+      "inliers": 17
+    },
+    {
+      "image": "anchor_060.png",
+      "to_map": [
+        [
+          2.7972027972027975,
+          0.0,
+          -33.56643356643357
+        ],
+        [
+          0.0,
+          2.7972027972027975,
+          458.7412587412588
+        ]
+      ],
+      "source_time": 60,
+      "source_method": "inspected_global_contours",
+      "automated_wall_gate_passed": false,
+      "contour_score": 0.47041305899620056,
+      "wall_recall": 0.6517436380772855,
+      "wall_precision": 0.5397064358298833
+    },
+    {
+      "image": "anchor_062.png",
+      "to_map": [
+        [
+          2.8163290373420673,
+          -0.00896447751858457,
+          -20.78274844614441
+        ],
+        [
+          0.00896447751858457,
+          2.8163290373420673,
+          375.72784144125046
+        ]
+      ],
+      "source_time": 62,
+      "source_method": "map_contours",
+      "confidence": 0.8224483497920998,
+      "inliers": 17
+    },
+    {
+      "image": "anchor_064.png",
+      "to_map": [
+        [
+          2.7972027972027975,
+          0.0,
+          -2.7972027972027975
+        ],
+        [
+          0.0,
+          2.7972027972027975,
+          436.3636363636364
+        ]
+      ],
+      "source_time": 64,
+      "source_method": "inspected_global_contours",
+      "automated_wall_gate_passed": false,
+      "contour_score": 0.610722005367279,
+      "wall_recall": 0.7228412256267409,
+      "wall_precision": 0.781055900621118
+    },
+    {
+      "image": "anchor_066.png",
+      "to_map": [
+        [
+          2.7972027972027975,
+          0.0,
+          30.76923076923077
+        ],
+        [
+          0.0,
+          2.7972027972027975,
+          405.5944055944056
+        ]
+      ],
+      "source_time": 66,
+      "source_method": "inspected_global_contours",
+      "automated_wall_gate_passed": false,
+      "contour_score": 0.5716676712036133,
+      "wall_recall": 0.7447447447447447,
+      "wall_precision": 0.5295238095238095
+    },
+    {
+      "image": "anchor_068.png",
+      "to_map": [
+        [
+          2.8169014084507045,
+          0.0,
+          104.22535211267606
+        ],
+        [
+          0.0,
+          2.8169014084507045,
+          428.16901408450707
+        ]
+      ],
+      "source_time": 68,
+      "source_method": "inspected_global_contours",
+      "automated_wall_gate_passed": false,
+      "contour_score": 0.5781351923942566,
+      "wall_recall": 0.7165775401069518,
+      "wall_precision": 0.6395881006864989
+    },
+    {
+      "image": "anchor_070.png",
+      "to_map": [
+        [
+          2.8169014084507045,
+          0.0,
+          143.66197183098592
+        ],
+        [
+          0.0,
+          2.8169014084507045,
+          453.5211267605634
+        ]
+      ],
+      "source_time": 70,
+      "source_method": "inspected_global_contours",
+      "automated_wall_gate_passed": false,
+      "contour_score": 0.6074278354644775,
+      "wall_recall": 0.73806275579809,
+      "wall_precision": 0.724502750740584
+    },
+    {
+      "image": "anchor_072.png",
+      "to_map": [
+        [
+          2.790705715122163,
+          0.0031428500639534185,
+          92.73134634782832
+        ],
+        [
+          -0.0031428500639534185,
+          2.790705715122163,
+          419.82092006878884
+        ]
+      ],
+      "source_time": 72,
+      "source_method": "map_contours",
+      "confidence": 0.7892290848686199,
+      "inliers": 15
+    },
+    {
+      "image": "anchor_076.png",
+      "to_map": [
+        [
+          2.8169014084507045,
+          0.0,
+          47.887323943661976
+        ],
+        [
+          0.0,
+          2.8169014084507045,
+          554.9295774647887
+        ]
+      ],
+      "source_time": 76,
+      "source_method": "inspected_global_contours",
+      "automated_wall_gate_passed": false,
+      "contour_score": 0.5699958801269531,
+      "wall_recall": 0.7549407114624506,
+      "wall_precision": 0.708994708994709
+    },
+    {
+      "image": "anchor_078.png",
+      "to_map": [
+        [
+          2.8169014084507045,
+          0.0,
+          146.47887323943664
+        ],
+        [
+          0.0,
+          2.8169014084507045,
+          563.3802816901409
+        ]
+      ],
+      "source_time": 78,
+      "source_method": "inspected_global_contours",
+      "automated_wall_gate_passed": false,
+      "contour_score": 0.5854113101959229,
+      "wall_recall": 0.6803874092009685,
+      "wall_precision": 0.7483361064891847
+    },
+    {
+      "image": "anchor_080.png",
+      "to_map": [
+        [
+          2.7972027972027975,
+          0.0,
+          173.42657342657344
+        ],
+        [
+          0.0,
+          2.7972027972027975,
+          500.6993006993007
+        ]
+      ],
+      "source_time": 80,
+      "source_method": "inspected_global_contours",
+      "automated_wall_gate_passed": false,
+      "contour_score": 0.5912184119224548,
+      "wall_recall": 0.7369274422375355,
+      "wall_precision": 0.7350689127105666
+    },
+    {
+      "image": "anchor_082.png",
+      "to_map": [
+        [
+          2.8169014084507045,
+          0.0,
+          121.12676056338029
+        ],
+        [
+          0.0,
+          2.8169014084507045,
+          501.4084507042254
+        ]
+      ],
+      "source_time": 82,
+      "source_method": "inspected_global_contours",
+      "automated_wall_gate_passed": false,
+      "contour_score": 0.6100162267684937,
+      "wall_recall": 0.7412031782065834,
+      "wall_precision": 0.6961439588688946
+    },
+    {
+      "image": "anchor_084.png",
+      "to_map": [
+        [
+          2.8121355928745397,
+          0.0033046424311009063,
+          171.55661568412086
+        ],
+        [
+          -0.0033046424311009063,
+          2.8121355928745397,
+          479.0072190258765
+        ]
+      ],
+      "source_time": 84,
+      "source_method": "map_contours",
+      "confidence": 0.8209115791074281,
+      "inliers": 14
+    },
+    {
+      "image": "anchor_088.png",
+      "to_map": [
+        [
+          2.8055531120816806,
+          0.023227942535617246,
+          163.3739954647483
+        ],
+        [
+          -0.023227942535617246,
+          2.8055531120816806,
+          353.88990103424214
+        ]
+      ],
+      "source_time": 88,
+      "source_method": "map_contours",
+      "confidence": 0.8495935185991812,
+      "inliers": 8
+    },
+    {
+      "image": "anchor_090.png",
+      "to_map": [
+        [
+          2.7892681377408803,
+          0.016761457186949998,
+          175.24657236091664
+        ],
+        [
+          -0.016761457186949998,
+          2.7892681377408803,
+          330.1005384627146
+        ]
+      ],
+      "source_time": 90,
+      "source_method": "map_contours",
+      "confidence": 0.7665326216203201,
+      "inliers": 16
+    },
+    {
+      "image": "anchor_092.png",
+      "to_map": [
+        [
+          2.801673222986685,
+          -0.014109178442535278,
+          263.0119484986302
+        ],
+        [
+          0.014109178442535278,
+          2.801673222986685,
+          338.1321452198449
+        ]
+      ],
+      "source_time": 92,
+      "source_method": "map_contours",
+      "confidence": 0.7557011561507305,
+      "inliers": 12
+    },
+    {
+      "image": "anchor_094.png",
+      "to_map": [
+        [
+          2.7982886186377574,
+          -0.009386872321261156,
+          278.03244305994366
+        ],
+        [
+          0.009386872321261156,
+          2.7982886186377574,
+          418.79849004930225
+        ]
+      ],
+      "source_time": 94,
+      "source_method": "map_contours",
+      "confidence": 0.771546464974438,
+      "inliers": 10
+    },
+    {
+      "image": "anchor_096.png",
+      "to_map": [
+        [
+          2.8428831237423497,
+          0.009808785492389125,
+          365.9113812967654
+        ],
+        [
+          -0.009808785492389125,
+          2.8428831237423497,
+          589.0129403857828
+        ]
+      ],
+      "source_time": 96,
+      "source_method": "map_contours",
+      "confidence": 0.8562358693040325,
+      "inliers": 8
+    },
+    {
+      "image": "anchor_098.png",
+      "to_map": [
+        [
+          2.825412972441273,
+          -0.0010841924898740978,
+          288.60359807602157
+        ],
+        [
+          0.0010841924898740978,
+          2.825412972441273,
+          606.5262778429552
+        ]
+      ],
+      "source_time": 98,
+      "source_method": "map_contours",
+      "confidence": 0.8244166593290482,
+      "inliers": 12
+    },
+    {
+      "image": "anchor_100.png",
+      "to_map": [
+        [
+          2.857142857142857,
+          0.0,
+          351.42857142857144
+        ],
+        [
+          0.0,
+          2.857142857142857,
+          580.0
+        ]
+      ],
+      "source_time": 100,
+      "source_method": "inspected_global_contours",
+      "automated_wall_gate_passed": false,
+      "contour_score": 0.5738925337791443,
+      "wall_recall": 0.6931034482758621,
+      "wall_precision": 0.7461928934010152
+    },
+    {
+      "image": "anchor_102.png",
+      "to_map": [
+        [
+          2.7845284174530303,
+          -0.05181735035838473,
+          449.626730677616
+        ],
+        [
+          0.05181735035838473,
+          2.7845284174530303,
+          590.3807765236293
+        ]
+      ],
+      "source_time": 102,
+      "source_method": "map_contours",
+      "confidence": 0.8092730978260871,
+      "inliers": 6
+    },
+    {
+      "image": "anchor_104.png",
+      "to_map": [
+        [
+          2.8169014084507045,
+          0.0,
+          321.1267605633803
+        ],
+        [
+          0.0,
+          2.8169014084507045,
+          501.4084507042254
+        ]
+      ],
+      "source_time": 104,
+      "source_method": "inspected_global_contours",
+      "automated_wall_gate_passed": false,
+      "contour_score": 0.49921661615371704,
+      "wall_recall": 0.6933916423712342,
+      "wall_precision": 0.5567685589519651
+    },
+    {
+      "image": "anchor_106.png",
+      "to_map": [
+        [
+          2.7972027972027975,
+          0.0,
+          358.0419580419581
+        ],
+        [
+          0.0,
+          2.7972027972027975,
+          467.13286713286715
+        ]
+      ],
+      "source_time": 106,
+      "source_method": "inspected_global_contours",
+      "automated_wall_gate_passed": false,
+      "contour_score": 0.5339647531509399,
+      "wall_recall": 0.7170795306388527,
+      "wall_precision": 0.6293193717277487
+    },
+    {
+      "image": "anchor_108.png",
+      "to_map": [
+        [
+          2.7972027972027975,
+          0.0,
+          391.6083916083916
+        ],
+        [
+          0.0,
+          2.7972027972027975,
+          386.013986013986
+        ]
+      ],
+      "source_time": 108,
+      "source_method": "inspected_global_contours",
+      "automated_wall_gate_passed": false,
+      "contour_score": 0.5457244515419006,
+      "wall_recall": 0.7423529411764705,
+      "wall_precision": 0.6676747311827957
+    },
+    {
+      "image": "anchor_110.png",
+      "to_map": [
+        [
+          2.8169014084507045,
+          0.0,
+          405.63380281690144
+        ],
+        [
+          0.0,
+          2.8169014084507045,
+          408.4507042253521
+        ]
+      ],
+      "source_time": 110,
+      "source_method": "inspected_global_contours",
+      "automated_wall_gate_passed": false,
+      "contour_score": 0.45002448558807373,
+      "wall_recall": 0.7388211382113821,
+      "wall_precision": 0.52
+    },
+    {
+      "image": "anchor_112.png",
+      "to_map": [
+        [
+          2.805133791771952,
+          0.002271744929974927,
+          388.62031516314727
+        ],
+        [
+          -0.002271744929974927,
+          2.805133791771952,
+          388.9591139308584
+        ]
+      ],
+      "source_time": 112,
+      "source_method": "map_contours",
+      "confidence": 0.9422782475246064,
+      "inliers": 12
+    },
+    {
+      "image": "anchor_114.png",
+      "to_map": [
+        [
+          2.8169014084507045,
+          0.0,
+          416.90140845070425
+        ],
+        [
+          0.0,
+          2.8169014084507045,
+          450.7042253521127
+        ]
+      ],
+      "source_time": 114,
+      "source_method": "inspected_global_contours",
+      "automated_wall_gate_passed": false,
+      "contour_score": 0.5051530003547668,
+      "wall_recall": 0.6922767497988737,
+      "wall_precision": 0.6597724922440538
+    },
+    {
+      "image": "anchor_116.png",
+      "to_map": [
+        [
+          2.7972027972027975,
+          0.0,
+          514.6853146853147
+        ],
+        [
+          0.0,
+          2.7972027972027975,
+          472.72727272727275
+        ]
+      ],
+      "source_time": 116,
+      "source_method": "inspected_global_contours",
+      "automated_wall_gate_passed": false,
+      "contour_score": 0.4498341381549835,
+      "wall_recall": 0.6236714975845411,
+      "wall_precision": 0.5305804440981691
+    },
+    {
+      "image": "anchor_120.png",
+      "to_map": [
+        [
+          2.8169014084507045,
+          0.0,
+          540.8450704225353
+        ],
+        [
+          0.0,
+          2.8169014084507045,
+          515.4929577464789
+        ]
+      ],
+      "source_time": 120,
+      "source_method": "inspected_global_contours",
+      "automated_wall_gate_passed": false,
+      "contour_score": 0.46516352891921997,
+      "wall_recall": 0.6017142857142858,
+      "wall_precision": 0.5312791783380019
+    },
+    {
+      "image": "anchor_122.png",
+      "to_map": [
+        [
+          2.8169014084507045,
+          0.0,
+          594.3661971830986
+        ],
+        [
+          0.0,
+          2.8169014084507045,
+          532.3943661971831
+        ]
+      ],
+      "source_time": 122,
+      "source_method": "inspected_global_contours",
+      "automated_wall_gate_passed": false,
+      "contour_score": 0.43803155422210693,
+      "wall_recall": 0.5486033519553073,
+      "wall_precision": 0.5575356415478615
+    },
+    {
+      "image": "anchor_126.png",
+      "to_map": [
+        [
+          2.7972027972027975,
+          0.0,
+          606.993006993007
+        ],
+        [
+          0.0,
+          2.7972027972027975,
+          411.1888111888112
+        ]
+      ],
+      "source_time": 126,
+      "source_method": "inspected_global_contours",
+      "automated_wall_gate_passed": false,
+      "contour_score": 0.43609845638275146,
+      "wall_recall": 0.6114551083591331,
+      "wall_precision": 0.5320623916811091
+    },
+    {
+      "image": "anchor_128.png",
+      "to_map": [
+        [
+          2.8127170625670512,
+          -0.013792069824758656,
+          609.9360683347679
+        ],
+        [
+          0.013792069824758656,
+          2.8127170625670512,
+          445.1590163277161
+        ]
+      ],
+      "source_time": 128,
+      "source_method": "map_contours",
+      "confidence": 0.8074600137850181,
+      "inliers": 12
+    },
+    {
+      "image": "anchor_130.png",
+      "to_map": [
+        [
+          2.8169014084507045,
+          0.0,
+          569.0140845070423
+        ],
+        [
+          0.0,
+          2.8169014084507045,
+          292.9577464788733
+        ]
+      ],
+      "source_time": 130,
+      "source_method": "inspected_global_contours",
+      "automated_wall_gate_passed": false,
+      "contour_score": 0.5121448636054993,
+      "wall_recall": 0.6819585355094839,
+      "wall_precision": 0.6307811892732219
+    },
+    {
+      "image": "anchor_132.png",
+      "to_map": [
+        [
+          2.8368794326241136,
+          0.0,
+          499.290780141844
+        ],
+        [
+          0.0,
+          2.8368794326241136,
+          246.8085106382979
+        ]
+      ],
+      "source_time": 132,
+      "source_method": "inspected_global_contours",
+      "automated_wall_gate_passed": false,
+      "contour_score": 0.5177735686302185,
+      "wall_recall": 0.7153912295786758,
+      "wall_precision": 0.6123175507297971
+    },
+    {
+      "image": "anchor_134.png",
+      "to_map": [
+        [
+          2.7972027972027975,
+          0.0,
+          408.39160839160843
+        ],
+        [
+          0.0,
+          2.7972027972027975,
+          271.32867132867136
+        ]
+      ],
+      "source_time": 134,
+      "source_method": "inspected_global_contours",
+      "automated_wall_gate_passed": false,
+      "contour_score": 0.54288649559021,
+      "wall_recall": 0.7573156457276629,
+      "wall_precision": 0.6474025974025974
+    },
+    {
+      "image": "anchor_136.png",
+      "to_map": [
+        [
+          2.8169014084507045,
+          0.0,
+          461.9718309859155
+        ],
+        [
+          0.0,
+          2.8169014084507045,
+          253.5211267605634
+        ]
+      ],
+      "source_time": 136,
+      "source_method": "inspected_global_contours",
+      "automated_wall_gate_passed": false,
+      "contour_score": 0.537790060043335,
+      "wall_recall": 0.7301587301587301,
+      "wall_precision": 0.6234028244788165
+    },
+    {
+      "image": "anchor_138.png",
+      "to_map": [
+        [
+          2.7972027972027975,
+          0.0,
+          475.5244755244755
+        ],
+        [
+          0.0,
+          2.7972027972027975,
+          181.8181818181818
+        ]
+      ],
+      "source_time": 138,
+      "source_method": "inspected_global_contours",
+      "automated_wall_gate_passed": false,
+      "contour_score": 0.5408255457878113,
+      "wall_recall": 0.7274959083469722,
+      "wall_precision": 0.6475738781466618
+    },
+    {
+      "image": "anchor_142.png",
+      "to_map": [
+        [
+          2.8354258153499434,
+          0.004605398446820079,
+          589.8856831580496
+        ],
+        [
+          -0.004605398446820079,
+          2.8354258153499434,
+          171.23416952930899
+        ]
+      ],
+      "source_time": 142,
+      "source_method": "map_contours",
+      "confidence": 0.7109803915100162,
+      "inliers": 14
+    },
+    {
+      "image": "anchor_144.png",
+      "to_map": [
+        [
+          2.8169014084507045,
+          0.0,
+          622.5352112676056
+        ],
+        [
+          0.0,
+          2.8169014084507045,
+          214.08450704225353
+        ]
+      ],
+      "source_time": 144,
+      "source_method": "inspected_global_contours",
+      "automated_wall_gate_passed": false,
+      "contour_score": 0.587813138961792,
+      "wall_recall": 0.6272727272727273,
+      "wall_precision": 0.735144312393888
+    },
+    {
+      "image": "anchor_146.png",
+      "to_map": [
+        [
+          2.7777777777777777,
+          0.0,
+          577.7777777777778
+        ],
+        [
+          0.0,
+          2.7777777777777777,
+          150.0
+        ]
+      ],
+      "source_time": 146,
+      "source_method": "inspected_global_contours",
+      "automated_wall_gate_passed": false,
+      "contour_score": 0.4105934500694275,
+      "wall_recall": 0.5778850372970601,
+      "wall_precision": 0.5136741973840666
+    },
+    {
+      "image": "anchor_148.png",
+      "to_map": [
+        [
+          2.8169014084507045,
+          0.0,
+          476.056338028169
+        ],
+        [
+          0.0,
+          2.8169014084507045,
+          135.21126760563382
+        ]
+      ],
+      "source_time": 148,
+      "source_method": "inspected_global_contours",
+      "automated_wall_gate_passed": false,
+      "contour_score": 0.5194282531738281,
+      "wall_recall": 0.706601466992665,
+      "wall_precision": 0.6155221745350501
+    },
+    {
+      "image": "anchor_150.png",
+      "to_map": [
+        [
+          2.7777777777777777,
+          0.0,
+          613.8888888888889
+        ],
+        [
+          0.0,
+          2.7777777777777777,
+          175.0
+        ]
+      ],
+      "source_time": 150,
+      "source_method": "global_contours",
+      "confidence": 0.8917355371900827,
+      "inliers": 696
+    },
+    {
+      "image": "anchor_154.png",
+      "to_map": [
+        [
+          2.8169014084507045,
+          0.0,
+          594.3661971830986
+        ],
+        [
+          0.0,
+          2.8169014084507045,
+          50.70422535211268
+        ]
+      ],
+      "source_time": 154,
+      "source_method": "global_contours",
+      "confidence": 0.8925000000000001,
+      "inliers": 924
+    }
+  ]
+}

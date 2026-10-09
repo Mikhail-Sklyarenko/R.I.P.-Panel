@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import logging
 import subprocess
 import sys
 import time
@@ -17,6 +18,8 @@ _STDERR_READ_LIMIT = 8192
 _STDERR_TAIL_EMIT = 200
 _PROCESS: subprocess.Popen[Any] | None = None
 _PROCESS_STDERR_FILE: IO[str] | None = None
+_PROCESS_STOP_FILE: Path | None = None
+COOPERATIVE_STOP_SEC = 4.0
 _STDERR_TAIL_OFFSET: dict[str, int] = {}
 
 
@@ -340,9 +343,29 @@ def _apply_child_env_from_ctx(ctx: dict[str, Any], child_env: dict[str, str]) ->
         pack_cfg = getattr(config, "csgobot_nav_pack", "") or ""
         if pack_cfg.strip():
             nav_pack = pack_cfg.strip()
+    if os.environ.get("CSGOBOT_NAV_MODE") == "expanded_roam":
+        nav_enabled = True
+        nav_pack = "auto"
+        child_env["CSGOBOT_NAV_MODE"] = "expanded_roam"
     if nav_enabled:
         child_env["CSGOBOT_NAV"] = "1"
         child_env["CSGOBOT_NAV_PACK"] = nav_pack
+    if ctx.get("wingman_gsi_path"):
+        child_env["CSGOBOT_GAME_MODE"] = "wingman"
+        child_env["CSGOBOT_WINGMAN_GSI"] = str(ctx["wingman_gsi_path"])
+        child_env["CSGOBOT_TARGET_MODE"] = "team"
+        child_env["CSGOBOT_NAV"] = "1"
+        child_env["CSGOBOT_NAV_PACK"] = "inferno_visual"
+    else:
+        child_env.pop("CSGOBOT_GAME_MODE",None)
+        child_env.pop("CSGOBOT_WINGMAN_GSI",None)
+    if ctx.get("fleet_admission_file") and ctx.get("fleet_stop_file"):
+        child_env["CSGOBOT_ADMISSION_FILE"] = str(ctx["fleet_admission_file"])
+        child_env["CSGOBOT_STOP_FILE"] = str(ctx["fleet_stop_file"])
+        child_env["CSGOBOT_ATTEMPT_ID"] = str(ctx.get("fleet_attempt_id", ""))
+    else:
+        for key in ("CSGOBOT_ADMISSION_FILE", "CSGOBOT_STOP_FILE", "CSGOBOT_ATTEMPT_ID"):
+            child_env.pop(key, None)
     hwnd = ctx.get("hwnd") or ctx.get("cs2_hwnd")
     if hwnd is not None:
         try:
@@ -352,6 +375,8 @@ def _apply_child_env_from_ctx(ctx: dict[str, Any], child_env: dict[str, str]) ->
 
 
 def _nav_env_summary(ctx: dict[str, Any]) -> str | None:
+    if os.environ.get("CSGOBOT_NAV_MODE") == "expanded_roam":
+        return "csgobot: visual navigation / expanded_roam / automatic map selection; worker validates visual assets"
     config = _panel_config(ctx)
     nav_on = os.environ.get("CSGOBOT_NAV", "").strip().lower() in ("1", "true", "yes", "on")
     pack_id = os.environ.get("CSGOBOT_NAV_PACK", "").strip() or "auto"
@@ -378,7 +403,7 @@ def _nav_env_summary(ctx: dict[str, Any]) -> str | None:
     err = info.get("errors") or info.get("error") or "preflight failed"
     if isinstance(err, list):
         err = "; ".join(str(e) for e in err[:2])
-    return f"csgobot: nav preflight failed — {err} (macro patrol fallback)"
+    return f"csgobot: nav preflight failed — {err} (navigation unavailable; no macro fallback)"
 
 
 def _aim_env_summary(ctx: dict[str, Any]) -> str:
@@ -429,6 +454,12 @@ def _finalize_process(
             emit(EventType.COMBAT_FALLBACK, detail)
         return False
 
+    if ctx.get("wingman_gsi_path"):
+        if "wingman: match_finished" in stderr_text:
+            return True
+        if emit:
+            emit(EventType.COMBAT_FALLBACK, f"Wingman stopped without confirmed match end — log: {log_path}")
+        return False
     min_runtime = _min_runtime_sec()
     if elapsed < min_runtime:
         detail = f"csgobot: early exit ({elapsed:.1f}s) — see csgobot log"
@@ -448,13 +479,17 @@ _PROCESS_PRELOADED = False
 
 def _spawn_subprocess(ctx: dict[str, Any]) -> bool:
     """Start csgobot child process if not already running."""
-    global _PROCESS, _PROCESS_STDERR_FILE, _PROCESS_PRELOADED
+    global _PROCESS, _PROCESS_STDERR_FILE, _PROCESS_PRELOADED, _PROCESS_STOP_FILE
 
     if _PROCESS is not None and _PROCESS.poll() is None:
         return True
 
     if _PROCESS is not None:
         stop_ai()
+
+    _PROCESS_STOP_FILE = Path(ctx["fleet_stop_file"]) if ctx.get("fleet_stop_file") else None
+    if _PROCESS_STOP_FILE is not None:
+        _PROCESS_STOP_FILE.unlink(missing_ok=True)
 
     run_py = _run_py()
     py = python_executable()
@@ -520,6 +555,20 @@ def preload_ai(ctx: dict[str, Any]) -> bool:
     return True
 
 
+def _make_match_recovery(ctx, deadline):
+    if ctx.get("wingman_gsi_path"):return None
+    from config.loader import load_config
+    from modules.dm_runner.navigate import DmNavigator
+    from modules.dm_runner.recovery import MatchRecovery
+    config=_panel_config(ctx) or load_config()
+    if sys.platform!='win32' or config.test_mode:return None
+    emit=ctx.get('emit')
+    return MatchRecovery(DmNavigator(config=config,session_id=_session_id(ctx),
+        login=str(ctx.get('login','')),hwnd=ctx.get('hwnd'),
+        should_stop=lambda: bool(ctx.get('stop_requested')) or time.monotonic()>=deadline,
+        on_nav_progress=lambda msg: emit(EventType.FARMING,msg) if emit else None))
+
+
 def start_ai(ctx: dict[str, Any]) -> bool:
     """
     Запуск subprocess; блок до завершения/таймаута.
@@ -537,6 +586,7 @@ def start_ai(ctx: dict[str, Any]) -> bool:
     if py is None:
         return False
 
+    if ctx.get("wingman_gsi_path") and ctx.get("stop_requested"):return False
     if not preloaded:
         obs_ok, obs_detail = check_obs_virtual_camera()
         if not obs_ok:
@@ -576,6 +626,7 @@ def start_ai(ctx: dict[str, Any]) -> bool:
                 f"csgobot: CUDA ok — {cuda_info.get('device')}",
             )
 
+        if ctx.get("wingman_gsi_path") and ctx.get("stop_requested"):return False
         if not _spawn_subprocess(ctx):
             return False
     else:
@@ -604,20 +655,45 @@ def start_ai(ctx: dict[str, Any]) -> bool:
     farming_interval = 120.0
     next_farm = time.monotonic() + farming_interval
 
-    while _PROCESS.poll() is None and time.monotonic() < deadline:
+    try:
+        recovery=_make_match_recovery(ctx,deadline) if _PROCESS is not None and _PROCESS.poll() is None else None
+    except Exception as exc:
+        stop_ai()
+        if emit:emit(EventType.COMBAT_FALLBACK,f'csgobot: lifecycle initialization failed: {exc}')
+        return False
+
+    while _PROCESS is not None and _PROCESS.poll() is None and time.monotonic() < deadline:
         if ctx.get("stop_requested"):
             stop_ai()
             return True
+        if recovery is not None:
+            try:
+                action=recovery.observe(time.monotonic())
+                if action:
+                    if emit:emit(EventType.FARMING,f'csgobot: match recovery ({action})')
+                    stop_ai()
+                    recovery.recover(action)
+                    if ctx.get('stop_requested') or time.monotonic()>=deadline:return True
+                    if not _spawn_subprocess(ctx):return False
+                    started_at=time.monotonic()
+                    if emit:emit(EventType.FARMING,'csgobot: match recovered; combat restarted')
+            except Exception as exc:
+                stop_ai()
+                if ctx.get('stop_requested') or time.monotonic()>=deadline:return True
+                if emit:emit(EventType.COMBAT_FALLBACK,f'csgobot: match recovery failed: {exc}')
+                return False
         _ingest_nav_metrics_from_stderr(sid, ctx)
         if emit and time.monotonic() >= next_farm:
             emit(EventType.FARMING, "csgobot: farming")
             next_farm = time.monotonic() + farming_interval
         time.sleep(0.5)
 
+    if _PROCESS is None:
+        return bool(ctx.get("stop_requested"))
     if _PROCESS.poll() is None:
         stop_ai()
         if emit:
-            emit(EventType.COMBAT_FALLBACK, "csgobot: timeout → simple")
+            emit(EventType.COMBAT_FALLBACK, "csgobot: combat runtime limit reached")
         return False
 
     proc = _PROCESS
@@ -630,6 +706,14 @@ def stop_ai() -> None:
     if _PROCESS is None:
         _close_stderr_log_file()
         return
+    fleet = _PROCESS_STOP_FILE is not None
+    if fleet and _PROCESS.poll() is None:
+        # Cooperative first: the worker's finally blocks release every key it holds.
+        try:
+            _PROCESS_STOP_FILE.write_text("stop", encoding="utf-8")
+            _PROCESS.wait(timeout=COOPERATIVE_STOP_SEC)
+        except (OSError, subprocess.TimeoutExpired):
+            pass
     if _PROCESS.poll() is None:
         _PROCESS.terminate()
         try:
@@ -639,4 +723,9 @@ def stop_ai() -> None:
             _PROCESS.wait(timeout=3.0)
     _PROCESS = None
     _PROCESS_PRELOADED = False
+    try:
+        from modules.ui_nav.actions import release_all_inputs
+        release_all_inputs()
+    except Exception:
+        logging.getLogger(__name__).exception('Could not release inputs after stopping child')
     _close_stderr_log_file()

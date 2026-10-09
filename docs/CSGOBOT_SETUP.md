@@ -15,7 +15,7 @@ dir vendor\csgobot\run.py
 Файлы `*.pt` **не хранятся** в репозитории. На **farm PC** датасет **не** скачивается.
 
 ```bat
-EnsureWeights.bat
+tools/training/EnsureWeights.bat
 ```
 
 Registry: `resources/csgobot/weights_registry.json` (active version, URL, sha256).  
@@ -119,12 +119,12 @@ Env без правки `run.py`: `CS2_SENSITIVITY`, `CSGOBOT_X360`, `CSGOBOT_SM
 
 **Roadmap:** `docs/COMBAT_ROADMAP.md` — следующие: **E1** → **A2** (strafes) → **L2–L4**.
 
-**Model lifecycle (farm vs train):** `docs/PRODUCT_MODEL_LIFECYCLE.md` — ферма = `EnsureWeights.bat`; датасет/train только на train PC.  
-**Auto-capture (CT data):** `docs/AUTO_CAPTURE.md` — collector PC: `EnableAutoCapture.bat` → farm → `BuildOurCs2FromRaw.bat`.  
-**Hard negatives (texture FP):** `docs/HARD_NEGATIVES.md` — `ImportEmptyYoloSplits.bat` / `EnableHardNegCapture.bat` / `EnableFpGuard.bat` → `BuildProductWithHardNegatives.bat`.  
+**Model lifecycle (farm vs train):** `docs/PRODUCT_MODEL_LIFECYCLE.md` — ферма = `tools/training/EnsureWeights.bat`; датасет/train только на train PC.  
+**Auto-capture (CT data):** `docs/AUTO_CAPTURE.md` — collector PC: `tools/training/EnableAutoCapture.bat` → farm → `tools/training/BuildOurCs2FromRaw.bat`.  
+**Hard negatives (texture FP):** `docs/HARD_NEGATIVES.md` — `tools/training/ImportEmptyYoloSplits.bat` / `tools/training/EnableHardNegCapture.bat` / `tools/training/EnableFpGuard.bat` → `tools/training/BuildProductWithHardNegatives.bat`.  
 **Dataset strategy (CT detect):** `docs/CS2_DATASET_STRATEGY.md`.  
 **Dataset runbook:** `docs/CS2_DATASET_PIPELINE.md`.  
-**TRAIN only:** `BootstrapDataset.bat` → `TrainProductModel.bat` → `scripts/promote_weights.py` (не на farm PC).
+**TRAIN only:** `tools/training/BootstrapDataset.bat` → `tools/training/TrainProductModel.bat` → `scripts/promote_weights.py` (не на farm PC).
 
 **Fire (PR-6d):** default `CSGOBOT_SHOOT_MODE=hold` (зажим LMB). Альтернативы: `burst`, `tap`. См. `docs/AIM_TUNING.md`.
 

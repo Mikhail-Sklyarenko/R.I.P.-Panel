@@ -10,8 +10,8 @@ Work under `vendor/csgobot/yolov8/datasets/`.
 - `sources/<name>/` - YOLO-formatted normalized sources.
 - `product_v1/` / `product_v1_bootstrap/` - merged + split output dataset.
 
-**TRAIN machine only:** `BootstrapDataset.bat` — downloads external dataset, builds, audits, writes manifest.  
-**Farm fleet:** do **not** run this. Use `EnsureWeights.bat` (~50 MB `.pt`). See `docs/PRODUCT_MODEL_LIFECYCLE.md`.
+**TRAIN machine only:** `tools/training/BootstrapDataset.bat` — downloads external dataset, builds, audits, writes manifest.  
+**Farm fleet:** do **not** run this. Use `tools/training/EnsureWeights.bat` (~50 MB `.pt`). See `docs/PRODUCT_MODEL_LIFECYCLE.md`.
 
 ## 1) Download a public source (optional bootstrap)
 
@@ -103,7 +103,7 @@ Gate expectations:
 ## 6) Train (TRAIN machine only)
 
 ```bat
-TrainProductModel.bat
+tools/training/TrainProductModel.bat
 ```
 
 Or:
@@ -124,7 +124,7 @@ python scripts/promote_weights.py path/to/best.pt \
 
 1. Host the `.pt` (GitHub Release / CDN).
 2. Add artifact + set `active` in `resources/csgobot/weights_registry.json`.
-3. Farm PCs: `git pull` && `EnsureWeights.bat`.
+3. Farm PCs: `git pull` && `tools/training/EnsureWeights.bat`.
 
 ## 8) Release criteria before setting registry `active`
 

@@ -1,0 +1,8 @@
+{
+  "map_id": "de_nuke_lower",
+  "radar_size_px": 1024,
+  "coordinate_system": "radar_pixels",
+  "display_name": "Nuke lower",
+  "radar_sha256": "040c958f141d0365ca9125388bc20228b0df0ac6abd1fe78d743ecfa1be4bb64",
+  "landmarks": {}
+}

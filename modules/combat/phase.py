@@ -34,11 +34,12 @@ def run_combat_phase(ctx: dict[str, Any] | None = None) -> dict[str, Any]:
     )
     worker.start()
 
-    outcome = watch(ctx)
-
-    ctx["stop_requested"] = True
-    stop_combat()
-    worker.join(timeout=20.0)
+    try:
+        outcome = watch(ctx)
+    finally:
+        ctx["stop_requested"] = True
+        stop_combat()
+        worker.join(timeout=20.0)
 
     if emit:
         emit(EventType.COMBAT_STOPPED, f"combat phase: {outcome.value}")

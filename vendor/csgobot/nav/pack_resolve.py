@@ -8,6 +8,9 @@ from nav.paths import resolve_nav_pack_path
 NAV_PACK_BY_SCRIPT: dict[str, str] = {
     "dust2": "dust2_dm",
     "mirage": "mirage_dm",
+    "inferno": "inferno_visual",
+    "vertigo": "vertigo_visual",
+    "cache": "cache_visual",
     "generic_dm": "generic_dm",
 }
 
@@ -28,6 +31,8 @@ def measured_runtime_pack(pack_id: str, explicit_pack: str) -> str:
     """Auto Dust2 uses the shipped measured route; explicit choices stay explicit."""
     if pack_id == "dust2_dm" and is_auto_pack(explicit_pack):
         return "dust2_visual_mvp"
+    if pack_id == "mirage_dm" and is_auto_pack(explicit_pack):
+        return "mirage_visual"
     return pack_id
 
 

@@ -34,6 +34,7 @@ class PoseResult:
     place_id: Optional[str] = None
     # Only independently measured map poses carry an observation timestamp.
     observed_at: Optional[float] = None
+    layer_id: Optional[str] = None
 
     @staticmethod
     def invalid() -> PoseResult:

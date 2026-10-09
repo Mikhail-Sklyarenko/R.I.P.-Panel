@@ -1,0 +1,9 @@
+{
+  "map_id": "de_nuke_ramp",
+  "layer_id": "ramp",
+  "runtime_ready": true,
+  "live_validated": false,
+  "clearance_px": 3,
+  "grid_step": 2,
+  "version": "wingman-nuke-5"
+}

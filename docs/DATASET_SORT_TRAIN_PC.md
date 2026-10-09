@@ -21,10 +21,10 @@ vendor\csgobot\yolov8\datasets\product_v1_bootstrap   (~5473 images, ~4GB)
 ### Option B — from USB RAR on Train PC
 
 ```bat
-ExtractDatasetArchives.bat
+tools/training/ExtractDatasetArchives.bat
 ```
 
-Then copy only `hard_negatives` from Mac if you already ran sort there, **or** use `hard_negatives.rar` from USB + run `RunSortDatasetExport.bat` after extracting `captures.rar`.
+Then copy only `hard_negatives` from Mac if you already ran sort there, **or** use `hard_negatives.rar` from USB + run `tools/training/RunSortDatasetExport.bat` after extracting `captures.rar`.
 
 Verify bootstrap:
 
@@ -58,14 +58,14 @@ These list poisoned files — **never merge into train**.
 
 ```bat
 cd /d C:\Users\FermK\Downloads\R.I.P.-Panel
-EnsureWeights.bat
-BuildProductWithHardNegatives.bat
+tools/training/EnsureWeights.bat
+tools/training/BuildProductWithHardNegatives.bat
 ```
 
 Must show: `our_cs2 empty/missing — building bootstrap + hn only`
 
 ```bat
-TrainProductModel.bat --data vendor\csgobot\yolov8\datasets\product_data_hn.yaml --name product_golden_v1
+tools/training/TrainProductModel.bat --data vendor\csgobot\yolov8\datasets\product_data_hn.yaml --name product_golden_v1
 ```
 
 After soak:
@@ -74,7 +74,7 @@ After soak:
 copy /Y vendor\csgobot\yolov8\runs\detect\product_golden_v1\weights\best.pt vendor\csgobot\yolov8\cs2_yolov8m_640_augmented_v4.pt
 ```
 
-Test **without** `EnableFpGuard.bat`.
+Test **without** `tools/training/EnableFpGuard.bat`.
 
 ## Optional: re-run sort on Train PC (full bootstrap)
 
@@ -82,7 +82,7 @@ If you copied `dataset_staging` from USB rars:
 
 ```bat
 cd /d C:\Users\FermK\Downloads\R.I.P.-Panel
-RunSortDatasetExport.bat
+tools/training/RunSortDatasetExport.bat
 ```
 
 Then Build → Train again.

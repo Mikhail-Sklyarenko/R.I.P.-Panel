@@ -24,6 +24,7 @@ if (-not (Test-Path $icon)) {
 
 Write-Host "Running PyInstaller..."
 & $py -m PyInstaller build\farm_panel.spec --noconfirm --clean --icon $icon
+if ($LASTEXITCODE -ne 0) { throw "PyInstaller failed; refusing to package stale EXE" }
 
 $Dist = Join-Path $Root "dist\FarmPanel"
 if (-not (Test-Path $Dist)) {
@@ -33,7 +34,7 @@ if (-not (Test-Path $Dist)) {
 function Copy-Tree($Src, $Dest) {
     if (Test-Path $Src) {
         New-Item -ItemType Directory -Force -Path $Dest | Out-Null
-        Copy-Item -Path $Src -Destination $Dest -Recurse -Force
+        Copy-Item -Path (Join-Path $Src "*") -Destination $Dest -Recurse -Force
     }
 }
 
@@ -46,12 +47,14 @@ New-Item -ItemType Directory -Force -Path $LooterDest | Out-Null
 Copy-Item (Join-Path $LooterSrc "looter_core.js") $LooterDest -Force
 Copy-Item (Join-Path $LooterSrc "package.json") $LooterDest -Force
 
-$CsgobotReadme = Join-Path $Root "vendor\csgobot\README.md"
-if (Test-Path $CsgobotReadme) {
-    $CsgobotDest = Join-Path $Dist "vendor\csgobot"
-    New-Item -ItemType Directory -Force -Path $CsgobotDest | Out-Null
-    Copy-Item $CsgobotReadme $CsgobotDest -Force
-}
+# Ship worker source/resources; environments, models and user data stay local.
+$CsgobotSrc = Join-Path $Root "vendor\csgobot"
+$CsgobotDest = Join-Path $Dist "vendor\csgobot"
+& robocopy $CsgobotSrc $CsgobotDest /E /XD venv .venv __pycache__ .git data datasets runs /XF *.pyc *.pt /NFL /NDL /NJH /NJS
+if ($LASTEXITCODE -ge 8) { throw "Failed to copy csgobot worker" }
+# Studio is launched from the panel as a separate diagnostic process.
+& robocopy (Join-Path $Root "scripts") (Join-Path $Dist "scripts") /E /XD __pycache__ /XF *.pyc /NFL /NDL /NJH /NJS
+if ($LASTEXITCODE -ge 8) { throw "Failed to copy diagnostic scripts" }
 
 New-Item -ItemType Directory -Force -Path (Join-Path $Dist "data") | Out-Null
 Copy-Item (Join-Path $Root "build\README_RUN.txt") $Dist -Force
@@ -72,6 +75,12 @@ if (-not (Test-Path $Rcedit)) {
 Write-Host "Applying EXE file icon..."
 & $Rcedit $ExePath --set-icon $icon
 
+$DocsDest = Join-Path $Dist "docs"
+New-Item -ItemType Directory -Force -Path $DocsDest | Out-Null
+Copy-Item (Join-Path $Root "docs\WINGMAN_FLEET_MVP.md") $DocsDest -Force -ErrorAction SilentlyContinue
+Copy-Item (Join-Path $Root "docs\PROJECT_GUIDE.md") $DocsDest -Force -ErrorAction SilentlyContinue
+
 Write-Host "Done: $ExePath"
 Write-Host 'If Explorer still shows the old icon: close Explorer, reopen the folder, or log off/on.'
 Write-Host 'Next: cd vendor\looter; npm install (in dist or source tree)'
+Write-Host 'Wingman Inferno fleet (4 PCs): see docs/WINGMAN_FLEET_MVP.md — open TCP 8790 on the coordinator PC.'

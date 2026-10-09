@@ -13,6 +13,7 @@ from modules.ui_nav.window import wait_for_cs2_hwnd
 
 
 def test_wait_for_cs2_hwnd_retries_until_found(monkeypatch) -> None:
+    monkeypatch.setattr("modules.ui_nav.cs2_modal_dismiss.dismiss_cs2_modals", lambda *a, **k: None)
     monkeypatch.setattr("sys.platform", "win32")
     progress: list[str] = []
     with patch(
@@ -29,6 +30,7 @@ def test_wait_for_cs2_hwnd_retries_until_found(monkeypatch) -> None:
 
 
 def test_wait_for_cs2_hwnd_timeout(monkeypatch) -> None:
+    monkeypatch.setattr("modules.ui_nav.cs2_modal_dismiss.dismiss_cs2_modals", lambda *a, **k: None)
     monkeypatch.setattr("sys.platform", "win32")
     with patch(
         "modules.ui_nav.window.find_cs2_hwnd",
@@ -80,6 +82,7 @@ def test_launcher_emits_cs2_ok_after_window_wait(
     mock_wait_menu.return_value = MainMenuWaitResult(strict_ok=True, attempts=1)
     mock_move.return_value = MoveResult(moved=[], width=360, height=270)
     mock_cs2.return_value = MagicMock(poll=MagicMock(return_value=None))
+    monkeypatch.setattr("modules.ui_nav.cs2_modal_dismiss.dismiss_cs2_modals", lambda *a, **k: None)
     monkeypatch.setattr("sys.platform", "win32")
 
     progress: list[str] = []

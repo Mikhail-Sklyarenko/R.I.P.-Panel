@@ -1,0 +1,523 @@
+{
+  "map_id": "de_vertigo_lower",
+  "version": 1,
+  "source_video": "2026-09-13 16-56-44.mp4",
+  "source_sha256": "2b9c697a55843c468b428181e6c49fcda7bc78823a9ac6d4b79da8c371527d7e",
+  "map_sha256": "8ef02a92243f83964c7806c41923134f12012fd9a49a44e268f7c0d89c783226",
+  "calibration_method": "Whole-map contour anchors plus visually inspected contour overlays; even-second frames only, separate layer atlases; not independent live validation",
+  "live_validated": false,
+  "references": [
+    {
+      "image": "anchor_022.png",
+      "to_map": [
+        [
+          2.8169014084507045,
+          0.0,
+          -104.22535211267606
+        ],
+        [
+          0.0,
+          2.8169014084507045,
+          183.09859154929578
+        ]
+      ],
+      "source_time": 22,
+      "source_method": "visually_inspected_contour_alignment",
+      "automated_wall_gate_passed": false,
+      "contour_score": 0.380482017993927,
+      "layer_id": "lower"
+    },
+    {
+      "image": "anchor_024.png",
+      "to_map": [
+        [
+          2.8169014084507045,
+          0.0,
+          -25.35211267605634
+        ],
+        [
+          0.0,
+          2.8169014084507045,
+          140.84507042253523
+        ]
+      ],
+      "source_time": 24,
+      "source_method": "global_contours",
+      "layer_id": "lower"
+    },
+    {
+      "image": "anchor_026.png",
+      "to_map": [
+        [
+          2.8169014084507045,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          2.8169014084507045,
+          152.11267605633805
+        ]
+      ],
+      "source_time": 26,
+      "source_method": "global_contours",
+      "layer_id": "lower"
+    },
+    {
+      "image": "anchor_028.png",
+      "to_map": [
+        [
+          2.8169014084507045,
+          0.0,
+          -45.07042253521127
+        ],
+        [
+          0.0,
+          2.8169014084507045,
+          230.98591549295776
+        ]
+      ],
+      "source_time": 28,
+      "source_method": "global_contours",
+      "layer_id": "lower"
+    },
+    {
+      "image": "anchor_030.png",
+      "to_map": [
+        [
+          2.8169014084507045,
+          0.0,
+          -61.971830985915496
+        ],
+        [
+          0.0,
+          2.8169014084507045,
+          321.1267605633803
+        ]
+      ],
+      "source_time": 30,
+      "source_method": "global_contours",
+      "layer_id": "lower"
+    },
+    {
+      "image": "anchor_032.png",
+      "to_map": [
+        [
+          2.8169014084507045,
+          0.0,
+          19.71830985915493
+        ],
+        [
+          0.0,
+          2.8169014084507045,
+          400.0
+        ]
+      ],
+      "source_time": 32,
+      "source_method": "visually_inspected_contour_alignment",
+      "automated_wall_gate_passed": false,
+      "contour_score": 0.4352096617221832,
+      "layer_id": "lower"
+    },
+    {
+      "image": "anchor_034.png",
+      "to_map": [
+        [
+          2.8169014084507045,
+          0.0,
+          39.43661971830986
+        ],
+        [
+          0.0,
+          2.8169014084507045,
+          349.29577464788736
+        ]
+      ],
+      "source_time": 34,
+      "source_method": "global_contours",
+      "layer_id": "lower"
+    },
+    {
+      "image": "anchor_036.png",
+      "to_map": [
+        [
+          2.8169014084507045,
+          0.0,
+          92.95774647887325
+        ],
+        [
+          0.0,
+          2.8169014084507045,
+          253.5211267605634
+        ]
+      ],
+      "source_time": 36,
+      "source_method": "global_contours",
+      "layer_id": "lower"
+    },
+    {
+      "image": "anchor_038.png",
+      "to_map": [
+        [
+          2.8169014084507045,
+          0.0,
+          56.33802816901409
+        ],
+        [
+          0.0,
+          2.8169014084507045,
+          188.73239436619718
+        ]
+      ],
+      "source_time": 38,
+      "source_method": "visually_inspected_contour_alignment",
+      "automated_wall_gate_passed": false,
+      "contour_score": 0.45018938183784485,
+      "layer_id": "lower"
+    },
+    {
+      "image": "anchor_040.png",
+      "to_map": [
+        [
+          2.8169014084507045,
+          0.0,
+          8.450704225352114
+        ],
+        [
+          0.0,
+          2.8169014084507045,
+          233.80281690140845
+        ]
+      ],
+      "source_time": 40,
+      "source_method": "global_contours",
+      "layer_id": "lower"
+    },
+    {
+      "image": "anchor_042.png",
+      "to_map": [
+        [
+          2.8169014084507045,
+          0.0,
+          47.887323943661976
+        ],
+        [
+          0.0,
+          2.8169014084507045,
+          214.08450704225353
+        ]
+      ],
+      "source_time": 42,
+      "source_method": "visually_inspected_contour_alignment",
+      "automated_wall_gate_passed": false,
+      "contour_score": 0.45873045921325684,
+      "layer_id": "lower"
+    },
+    {
+      "image": "anchor_044.png",
+      "to_map": [
+        [
+          2.8169014084507045,
+          0.0,
+          121.12676056338029
+        ],
+        [
+          0.0,
+          2.8169014084507045,
+          169.01408450704227
+        ]
+      ],
+      "source_time": 44,
+      "source_method": "global_contours",
+      "layer_id": "lower"
+    },
+    {
+      "image": "anchor_046.png",
+      "to_map": [
+        [
+          2.8169014084507045,
+          0.0,
+          219.71830985915494
+        ],
+        [
+          0.0,
+          2.8169014084507045,
+          177.46478873239437
+        ]
+      ],
+      "source_time": 46,
+      "source_method": "global_contours",
+      "layer_id": "lower"
+    },
+    {
+      "image": "anchor_048.png",
+      "to_map": [
+        [
+          2.8169014084507045,
+          0.0,
+          290.14084507042253
+        ],
+        [
+          0.0,
+          2.8169014084507045,
+          200.0
+        ]
+      ],
+      "source_time": 48,
+      "source_method": "global_contours",
+      "layer_id": "lower"
+    },
+    {
+      "image": "anchor_050.png",
+      "to_map": [
+        [
+          2.8169014084507045,
+          0.0,
+          256.3380281690141
+        ],
+        [
+          0.0,
+          2.8169014084507045,
+          284.50704225352115
+        ]
+      ],
+      "source_time": 50,
+      "source_method": "global_contours",
+      "layer_id": "lower"
+    },
+    {
+      "image": "anchor_052.png",
+      "to_map": [
+        [
+          2.8169014084507045,
+          0.0,
+          267.6056338028169
+        ],
+        [
+          0.0,
+          2.8169014084507045,
+          377.46478873239437
+        ]
+      ],
+      "source_time": 52,
+      "source_method": "visually_inspected_contour_alignment",
+      "automated_wall_gate_passed": false,
+      "contour_score": 0.49851301312446594,
+      "layer_id": "lower"
+    },
+    {
+      "image": "anchor_056.png",
+      "to_map": [
+        [
+          2.8169014084507045,
+          0.0,
+          301.40845070422534
+        ],
+        [
+          0.0,
+          2.8169014084507045,
+          447.887323943662
+        ]
+      ],
+      "source_time": 56,
+      "source_method": "global_contours",
+      "layer_id": "lower"
+    },
+    {
+      "image": "anchor_058.png",
+      "to_map": [
+        [
+          2.8169014084507045,
+          0.0,
+          318.3098591549296
+        ],
+        [
+          0.0,
+          2.8169014084507045,
+          450.7042253521127
+        ]
+      ],
+      "source_time": 58,
+      "source_method": "visually_inspected_contour_alignment",
+      "automated_wall_gate_passed": false,
+      "contour_score": 0.42972347140312195,
+      "layer_id": "lower"
+    },
+    {
+      "image": "anchor_070.png",
+      "to_map": [
+        [
+          2.8169014084507045,
+          0.0,
+          247.88732394366198
+        ],
+        [
+          0.0,
+          2.8169014084507045,
+          273.23943661971833
+        ]
+      ],
+      "source_time": 70,
+      "source_method": "visually_inspected_contour_alignment",
+      "automated_wall_gate_passed": false,
+      "contour_score": 0.3416680097579956,
+      "layer_id": "lower",
+      "floor_evidence": "Opaque/composited radar appearance favours lower by >=0.3 after scene-gradient removal"
+    },
+    {
+      "image": "anchor_072.png",
+      "to_map": [
+        [
+          2.8169014084507045,
+          0.0,
+          287.32394366197184
+        ],
+        [
+          0.0,
+          2.8169014084507045,
+          338.02816901408454
+        ]
+      ],
+      "source_time": 72,
+      "source_method": "visually_inspected_contour_alignment",
+      "automated_wall_gate_passed": false,
+      "contour_score": 0.3424206078052521,
+      "layer_id": "lower",
+      "floor_evidence": "Opaque/composited radar appearance favours lower by >=0.3 after scene-gradient removal"
+    },
+    {
+      "image": "anchor_074.png",
+      "to_map": [
+        [
+          2.8169014084507045,
+          0.0,
+          349.29577464788736
+        ],
+        [
+          0.0,
+          2.8169014084507045,
+          422.53521126760563
+        ]
+      ],
+      "source_time": 74,
+      "source_method": "visually_inspected_contour_alignment",
+      "automated_wall_gate_passed": false,
+      "contour_score": 0.34074273705482483,
+      "layer_id": "lower",
+      "floor_evidence": "Opaque/composited radar appearance favours lower by >=0.3 after scene-gradient removal"
+    },
+    {
+      "image": "anchor_106.png",
+      "to_map": [
+        [
+          2.8169014084507045,
+          0.0,
+          163.38028169014086
+        ],
+        [
+          0.0,
+          2.8169014084507045,
+          312.67605633802816
+        ]
+      ],
+      "source_time": 106,
+      "source_method": "global_contours",
+      "layer_id": "lower"
+    },
+    {
+      "image": "anchor_108.png",
+      "to_map": [
+        [
+          2.8169014084507045,
+          0.0,
+          135.21126760563382
+        ],
+        [
+          0.0,
+          2.8169014084507045,
+          230.98591549295776
+        ]
+      ],
+      "source_time": 108,
+      "source_method": "global_contours",
+      "layer_id": "lower"
+    },
+    {
+      "image": "anchor_110.png",
+      "to_map": [
+        [
+          2.8169014084507045,
+          0.0,
+          228.16901408450704
+        ],
+        [
+          0.0,
+          2.8169014084507045,
+          180.2816901408451
+        ]
+      ],
+      "source_time": 110,
+      "source_method": "global_contours",
+      "layer_id": "lower"
+    },
+    {
+      "image": "anchor_112.png",
+      "to_map": [
+        [
+          2.8169014084507045,
+          0.0,
+          267.6056338028169
+        ],
+        [
+          0.0,
+          2.8169014084507045,
+          214.08450704225353
+        ]
+      ],
+      "source_time": 112,
+      "source_method": "global_contours",
+      "layer_id": "lower"
+    },
+    {
+      "image": "anchor_114.png",
+      "to_map": [
+        [
+          2.8169014084507045,
+          0.0,
+          284.50704225352115
+        ],
+        [
+          0.0,
+          2.8169014084507045,
+          346.4788732394366
+        ]
+      ],
+      "source_time": 114,
+      "source_method": "visually_inspected_contour_alignment",
+      "automated_wall_gate_passed": false,
+      "contour_score": 0.39639630913734436,
+      "layer_id": "lower"
+    },
+    {
+      "image": "anchor_116.png",
+      "to_map": [
+        [
+          2.8169014084507045,
+          0.0,
+          349.29577464788736
+        ],
+        [
+          0.0,
+          2.8169014084507045,
+          422.53521126760563
+        ]
+      ],
+      "source_time": 116,
+      "source_method": "visually_inspected_contour_alignment",
+      "automated_wall_gate_passed": false,
+      "contour_score": 0.34537944197654724,
+      "layer_id": "lower",
+      "floor_evidence": "Opaque/composited radar appearance favours lower by >=0.3 after scene-gradient removal"
+    }
+  ]
+}

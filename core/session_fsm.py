@@ -255,6 +255,13 @@ def run_session(
         f"session_fsm: start ({session_mode.value})",
     )
 
+    # Reject before Steam/CS2 or any DM-specific hook can run.
+    from config.schema import GameMode
+    if session_mode is not SessionMode.LAUNCH_ONLY and load_config().game_mode == GameMode.WINGMAN:
+        from modules.wingman.readiness import live_unavailable_reason
+        ctx.emit(EventType.SESSION_FAILED, live_unavailable_reason())
+        return ctx.state
+
     if session_mode is SessionMode.LAUNCH_ONLY:
         hooks = (_hook_launcher, _hook_cleanup)
     else:

@@ -140,7 +140,7 @@ class AimConfig:
     adaptive_smoothing: bool = True
 
     # Lead aim (velocity prediction for moving targets)
-    lead_aim_enabled: bool = True
+    lead_aim_enabled: bool = False
     lead_ms: float = 80.0
     lead_ema_alpha: float = 0.35
     lead_max_px: float = 120.0
@@ -163,8 +163,8 @@ class AimConfig:
     # PR-A1 (Aim L1.3-style): high-rate mouse thread + target tracking
     # mouse_hz=0 → legacy one mouse apply per YOLO frame
     mouse_hz: float = 120.0
-    mouse_step_max_delta: int = 20  # per high-rate tick; 0 = use mouse_max_delta
-    mouse_coast: bool = True  # extrapolate aim point between detections
+    mouse_step_max_delta: int = 32  # per high-rate tick; 0 = use mouse_max_delta
+    mouse_coast: bool = False  # extrapolate aim point between detections
     mouse_coast_max_sec: float = 0.10
     # PR-A1.1: soft-settle (stop hunting bbox noise on target)
     aim_settle_enabled: bool = True
@@ -195,8 +195,8 @@ class AimConfig:
     burst_size: int = 7
     burst_shot_interval_sec: float = 0.05
     burst_gap_sec: float = 0.10
-    hold_max_sec: float = 0.8
-    hold_repress_gap_sec: float = 0.05
+    hold_max_sec: float = 0.22
+    hold_repress_gap_sec: float = 0.18
     hold_release_grace_sec: float = 0.08
     shoot_humanize_jitter_sec: float = 0.01
 

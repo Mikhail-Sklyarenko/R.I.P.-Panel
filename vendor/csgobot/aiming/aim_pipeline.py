@@ -79,8 +79,9 @@ def process_aim_frame(
     fov_mouse: FOVMouseMovement,
     pipeline: AimPipelineState,
     fps_value: float,
+    reproject=None,
 ) -> AimFrameResult:
-    smooth_x, smooth_y = pipeline.smoother.update(raw_x, raw_y, now)
+    smooth_x, smooth_y = pipeline.smoother.update(raw_x, raw_y, now, reproject=reproject)
     lead = pipeline.velocity_lead.predict(smooth_x, smooth_y, now)
 
     smoothing = aim_config.smoothing_factor

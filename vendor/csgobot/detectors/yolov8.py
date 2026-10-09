@@ -62,6 +62,10 @@ class YOLOv8Detector(BaseDetector):
         else:
             self.half_precision = half_precision
 
+        from ultralytics.utils import DEFAULT_CFG_DICT
+        from .precision import inference_precision
+        self._precision_args = inference_precision(self.half_precision, DEFAULT_CFG_DICT)
+
         self.imgsz = imgsz
         self.max_det = max_det
 
@@ -105,7 +109,7 @@ class YOLOv8Detector(BaseDetector):
         results = self.model.predict(
             source=image,
             verbose=verbose,
-            half=self.half_precision,
+            **self._precision_args,
             conf=self.confidence_threshold,
             iou=self.iou_threshold,
             imgsz=self.imgsz,

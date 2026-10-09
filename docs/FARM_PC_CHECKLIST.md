@@ -85,10 +85,10 @@ See `docs/NAV_IMPLEMENTATION.md`.
 
 ## 5. YOLO weights (~52 MB, not the dataset)
 
-**Farm PCs download only the production `.pt`.** Never run `BootstrapDataset.bat` here (multi-GB training data).
+**Farm PCs download only the production `.pt`.** Never run `tools/training/BootstrapDataset.bat` here (multi-GB training data).
 
 ```bat
-EnsureWeights.bat
+tools/training/EnsureWeights.bat
 ```
 
 This reads `resources/csgobot/weights_registry.json`, downloads the active artifact, and verifies sha256.

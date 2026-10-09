@@ -11,14 +11,14 @@ This does **not** depend on already-good CT detect. Capture uses timers + team=T
 |----|-----|
 | **Collector farm** (1–2 PCs) | `CSGOBOT_AUTO_CAPTURE=1` while farming |
 | **Other farm PCs** | capture OFF (default) |
-| **Train PC** | `BuildOurCs2FromRaw.bat` → merge → `TrainProductModel.bat` |
+| **Train PC** | `tools/training/BuildOurCs2FromRaw.bat` → merge → `tools/training/TrainProductModel.bat` |
 
-Fleet still only downloads `.pt` via `EnsureWeights.bat`.
+Fleet still only downloads `.pt` via `tools/training/EnsureWeights.bat`.
 
 ## Enable on a collector PC
 
 ```bat
-EnableAutoCapture.bat
+tools/training/EnableAutoCapture.bat
 call data\capture_collector.env.bat
 FarmPanel.bat
 ```
@@ -62,9 +62,9 @@ Map crates/walls false positives: see **`docs/HARD_NEGATIVES.md`**.
 Quick path:
 
 ```bat
-EnableFpGuard.bat          REM raise conf now
-EnableHardNegCapture.bat   REM walk empty map → empty labels
-BuildHardNegativesFromRaw.bat
+tools/training/EnableFpGuard.bat          REM raise conf now
+tools/training/EnableHardNegCapture.bat   REM walk empty map → empty labels
+tools/training/BuildHardNegativesFromRaw.bat
 ```
 
 ## Promote to our_cs2
@@ -72,20 +72,20 @@ BuildHardNegativesFromRaw.bat
 On machine that has the captures (or after copying `data/captures`):
 
 ```bat
-BuildOurCs2FromRaw.bat
+tools/training/BuildOurCs2FromRaw.bat
 ```
 
 Accepts empty labels up to 15% (prefers `empty_scene`).  
-Hard-neg-only promote: `BuildHardNegativesFromRaw.bat` → `sources/hard_negatives/`.
+Hard-neg-only promote: `tools/training/BuildHardNegativesFromRaw.bat` → `sources/hard_negatives/`.
 ## Then train
 
 Merge `our_cs2` with public bootstrap (see `docs/CS2_DATASET_PIPELINE.md`), then:
 
 ```bat
-TrainProductModel.bat
+tools/training/TrainProductModel.bat
 ```
 
-Soak → `scripts/promote_weights.py` → registry → fleet `EnsureWeights.bat`.
+Soak → `scripts/promote_weights.py` → registry → fleet `tools/training/EnsureWeights.bat`.
 
 ## Quality notes
 

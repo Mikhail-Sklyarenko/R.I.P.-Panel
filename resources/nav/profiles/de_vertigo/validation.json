@@ -1,0 +1,90 @@
+{
+  "engine": "visual-nav-multimap-9",
+  "code_sha256": "bdc96b7ef08d4b73f1e7baaf2d11fb13151bebf272e0c4bc0df5435d96a4f515",
+  "profile_sha256": "0929ad5b1e03de35724a3f4c0f1553b520abbebb22eaeeadb10dfce9a1f3d3c0",
+  "profile_path": "/Users/mihailsklarenko/FSM_PANEL v.3.0.1/farm-panel-prototype/resources/nav/profiles/de_vertigo",
+  "tests_passed": 98,
+  "rebuild_files_identical": 75,
+  "preflight_packs": [
+    "dust2_dm",
+    "generic_dm",
+    "inferno_visual",
+    "mirage_dm",
+    "vertigo_visual"
+  ],
+  "video": "2026-09-13 16-56-44.mp4",
+  "video_sha256": "2b9c697a55843c468b428181e6c49fcda7bc78823a9ac6d4b79da8c371527d7e",
+  "samples": 1370,
+  "accepted": 1098,
+  "accepted_pct": 80.15,
+  "fresh_at_processing_completion": 1043,
+  "accepted_layers": {
+    "upper": 684,
+    "lower": 414
+  },
+  "ground_coverage": {
+    "inside_clearance": 956,
+    "boundary_exit_available": 56,
+    "outside_floor": 86
+  },
+  "longest_localization_gap_sec": 2.5,
+  "reasons": {
+    "no_player_icon": 22,
+    "confirming_position": 48,
+    "measured_global_contours": 1007,
+    "measured_pose_within_deadline": 48,
+    "measured_fixed_anchor": 43,
+    "waiting_visual_anchor": 202
+  },
+  "processing_ms": {
+    "median": 170.66,
+    "p90": 263.53,
+    "p99": 340.41
+  },
+  "discovery": [
+    {
+      "t": 9,
+      "winner": "de_vertigo",
+      "scores": {
+        "de_vertigo": 0.8649969078540508
+      },
+      "expected_layer": "upper",
+      "detected_layer": "upper"
+    },
+    {
+      "t": 25,
+      "winner": "de_vertigo",
+      "scores": {
+        "de_vertigo": 0.8883064516129033
+      },
+      "expected_layer": "lower",
+      "detected_layer": "lower"
+    },
+    {
+      "t": 77,
+      "winner": "de_vertigo",
+      "scores": {
+        "de_vertigo": 0.85
+      },
+      "expected_layer": "upper",
+      "detected_layer": "upper"
+    },
+    {
+      "t": 109,
+      "winner": "de_vertigo",
+      "scores": {
+        "de_vertigo": 0.85
+      },
+      "expected_layer": "lower",
+      "detected_layer": "lower"
+    }
+  ],
+  "live_validated": false,
+  "full_map_ready": false,
+  "limitations": [
+    "Video provided for calibration, not an independent recording. Coverage is not independently measured accuracy.",
+    "No game input was sent in replay; successful traversal, aim interaction and random-spawn behavior still need Windows live validation.",
+    "Ladder climbing, jumps, props/spawns above floor and transient obstacles are not certified.",
+    "Some verification jobs ran concurrently: latency is not an isolated Windows performance benchmark."
+  ]
+}

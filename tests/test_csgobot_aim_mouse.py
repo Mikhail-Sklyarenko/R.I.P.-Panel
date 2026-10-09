@@ -228,3 +228,81 @@ def test_legacy_hz_zero_does_not_start_thread() -> None:
     ctrl.start(lambda dx, dy: None)
     assert ctrl._thread is None
     ctrl.stop()
+
+
+def test_one_camera_frame_cannot_apply_same_vertical_correction_repeatedly():
+    pieces=[]
+    ctrl=_ctrl(mouse_hz=120,mouse_step_max_delta=35,mouse_coast=False,
+               aim_settle_enabled=False,aim_dead_zone_high=0,aim_dead_zone_low=0,aim_near_px=0)
+    required=abs(_fov().get_move(640,300,smoothing=1).mouse_y)
+    ctrl.start(lambda dx,dy:pieces.append((dx,dy)))
+    try:
+        captured=time.monotonic()
+        ctrl.set_target(640,300,smoothing=1,now=captured)
+        time.sleep(.32)
+        assert pieces and all(dy<=0 for _,dy in pieces)
+        assert sum(abs(dy) for _,dy in pieces)<=required+1
+        count=len(pieces);time.sleep(.05)
+        assert len(pieces)==count
+    finally:ctrl.stop()
+
+
+def test_rejected_mouse_output_is_not_subtracted_from_target():
+    ctrl = _ctrl(mouse_hz=120, aim_settle_enabled=False)
+    ctrl.start(lambda dx, dy: False)
+    try:
+        ctrl.set_target(740, 300, smoothing=1, now=time.monotonic())
+        time.sleep(.05)
+        assert not ctrl._sent
+        assert not ctrl.consume_applied()
+    finally:
+        ctrl.stop()
+
+
+def test_camera_motion_is_not_target_velocity():
+    ctrl = _ctrl(mouse_hz=0, mouse_coast=True, aim_settle_enabled=False)
+    ctrl.set_target(800, 380, smoothing=1, now=10)
+    ctrl._sent.append((10.02, 80, 12))
+    x, y = ctrl.project_point(800, 380, 10, 10.05)
+    ctrl.set_target(x, y, smoothing=1, now=10.05)
+    assert abs(ctrl._vx) < 1e-6
+    assert abs(ctrl._vy) < 1e-6
+
+
+def test_settled_point_rebases_without_reapplying_old_correction():
+    ctrl = _ctrl(mouse_hz=0)
+    ctrl.set_target(660, 360, smoothing=1, now=10)
+    ctrl._sent.append((10.02, 80, 0))
+    with ctrl._lock:
+        ctrl._enter_settle_locked(660, 360)
+    x, y = ctrl.project_point(660, 360, 10, 10.05)
+    ctrl.set_target(x, y, smoothing=1, now=10.05)
+    assert abs(ctrl._target_x - x) < 1e-6
+    assert abs(ctrl.project_point(ctrl._target_x, ctrl._target_y, 10.05)[0] - x) < 1e-6
+
+
+def test_capture_projection_excludes_later_mouse_commands():
+    ctrl = _ctrl(mouse_hz=0)
+    ctrl._sent.extend([(10.02, 80, 0), (10.08, 100, 0)])
+    at_capture = ctrl.project_point(800, 360, 10, 10.05)
+    latest = ctrl.project_point(800, 360, 10)
+    assert latest[0] < at_capture[0] < 800
+
+
+def test_out_of_order_detection_cannot_replace_current_target():
+    ctrl = _ctrl(mouse_hz=0)
+    ctrl.set_target(700, 360, smoothing=1, now=10)
+    ctrl.set_target(900, 360, smoothing=1, now=9.9)
+    assert ctrl._target_x == 700
+
+
+def test_camera_compensated_smoothing_does_not_lag_stationary_world_target():
+    from aiming.aim_point_smoother import AimPointSmoother
+    ctrl = _ctrl(mouse_hz=0)
+    smoother = AimPointSmoother()
+    smoother.update(800, 380, 10, reproject=ctrl.project_point)
+    ctrl._sent.append((10.02, 80, 12))
+    measured = ctrl.project_point(800, 380, 10, 10.05)
+    result = smoother.update(*measured, 10.05, reproject=ctrl.project_point)
+    assert abs(result[0] - measured[0]) < 1e-6
+    assert abs(result[1] - measured[1]) < 1e-6

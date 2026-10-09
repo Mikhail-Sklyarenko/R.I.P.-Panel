@@ -1,0 +1,83 @@
+{
+  "engine": "visual-nav-multimap-16",
+  "code_sha256": "0105b9419ed3c4ebb7b2eb1fb7252b36119f01b89d96d0fe803414c49f032f9d",
+  "profile_sha256": "02e3bc24948dd6841abfb6c15885bee04d4449a6e10a9cbc65e9486952574b7c",
+  "profile_path": "/Users/mihailsklarenko/FSM_PANEL v.3.0.1/farm-panel-prototype/resources/nav/profiles/de_inferno",
+  "source_video": "2026-09-15 15-25-10.mp4",
+  "source_log_engine": "visual-nav-multimap-8",
+  "automated_tests_passed": 205,
+  "contour_development_replay": {
+    "samples": 250,
+    "interval_seconds": 1,
+    "before_accepted": 172,
+    "after_accepted": 211,
+    "lost_previous_matches": 0,
+    "changed_previous_coordinates": 0,
+    "note": "Same-source development check on JPEG 96 re-encodings; tests tune the gates on this recording. Counts measure accepted contour registrations, not independent accuracy, successful walking, or the complete asynchronous sensor pipeline."
+  },
+  "ct_stop": {
+    "seconds": [
+      118,
+      140
+    ],
+    "samples": 23,
+    "before_accepted": 0,
+    "after_accepted": 17,
+    "remaining_rejected_seconds": [
+      127,
+      128,
+      129,
+      130,
+      131,
+      132
+    ],
+    "note": "Remaining sampled frames show the console over the radar. No predicted motion is permitted through an unreadable frame."
+  },
+  "red_door_stop": {
+    "seconds": [
+      185,
+      195
+    ],
+    "samples": 11,
+    "before_accepted": 0,
+    "after_accepted": 11,
+    "measured_map_position_px": [
+      492,
+      859
+    ],
+    "use_key": "e",
+    "pulses_per_approach": 1,
+    "pulse_seconds": 0.12,
+    "bounded_opening_grace_seconds": 0.9,
+    "confirmation": "Measured crossing of calibrated door plane; not a declaration that the game accepted E."
+  },
+  "negative_map_check": {
+    "samples": 79,
+    "maps": [
+      "de_cache",
+      "de_dust2",
+      "de_mirage",
+      "de_vertigo"
+    ],
+    "false_acceptances": 0,
+    "note": "Selected existing atlas crops at calibrated zoom; not exhaustive."
+  },
+  "synthetic_controller": {
+    "door_delay_seconds": 0.35,
+    "single_pulse_and_crossing_passed": true,
+    "pause_and_lease_expiry_release_passed": true,
+    "note": "Intercepted inputs and synthetic door physics; no Windows or CS2 input was sent."
+  },
+  "capture_size": [
+    1280,
+    720
+  ],
+  "live_validated": false,
+  "full_map_ready": false,
+  "unchanged_walkable_mask": true,
+  "limits": [
+    "Door reach and timing need Windows/CS2 confirmation.",
+    "Opposite-side door appearance is not demonstrated by this video.",
+    "No claim of perfect traversal over all Inferno spawns or dynamic obstacles."
+  ]
+}

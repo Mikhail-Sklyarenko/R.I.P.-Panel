@@ -20,12 +20,17 @@ class AimPointSmoother:
         self.config = config or AimSmoothConfig()
         self._x: float | None = None
         self._y: float | None = None
+        self._t: float | None = None
 
     def reset(self) -> None:
         self._x = None
         self._y = None
+        self._t = None
 
-    def update(self, x: float, y: float, _now: float = 0.0) -> tuple[float, float]:
+    def update(self, x: float, y: float, _now: float = 0.0, *, reproject=None) -> tuple[float, float]:
+        if self._t is not None and self._x is not None and reproject is not None:
+            self._x, self._y = reproject(self._x, self._y, self._t, _now)
+        self._t = _now
         if not self.config.enabled:
             return x, y
 

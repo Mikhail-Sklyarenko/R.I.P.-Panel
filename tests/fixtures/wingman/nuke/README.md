@@ -1,0 +1,1 @@
+Frames from user walkthrough 2026-09-23 19-53-22.mp4. HUD + central door crop preserved losslessly, remaining pixels black. 8,116,118 overlap calibration; 43 is a nearby held-out timestamp, not an independent traversal. 48/88 closed doors; 49/89 open. 123/135 circle detector failures; 139/209 menus. No live bot validation.

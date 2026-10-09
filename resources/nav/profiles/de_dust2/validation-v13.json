@@ -1,0 +1,63 @@
+{
+  "engine": "visual-nav-multimap-13",
+  "code_sha256": "3bc9760eac730cf6798db80e6e56ccd3d459f259f5892d4660db57a5e814a9f6",
+  "profile_sha256": "c2bce2a4bbc8377166d74123427862da9173ad010c7ffdde10000f02ad25010e",
+  "profile_path": "/Users/mihailsklarenko/FSM_PANEL v.3.0.1/farm-panel-prototype/resources/nav/profiles/de_dust2",
+  "source_video": "2026-09-19 13-16-36.mp4",
+  "source_video_seconds": 284.6667,
+  "source_log_engine": "visual-nav-multimap-12",
+  "source_log_metrics": {
+    "uptime_seconds": 300.1,
+    "wait_pose_seconds": 64.3,
+    "pose_valid_percent": 77.1,
+    "w_held_percent": 58.0
+  },
+  "automated_tests": {
+    "unique_passed": 146,
+    "runs_passed": [
+      92,
+      59
+    ],
+    "note": "Five tests overlap between runs; the second run includes the sixth v13 test."
+  },
+  "synthetic_open_corridor": {
+    "ticks": 120,
+    "tick_seconds": 0.05,
+    "dropout_count": 10,
+    "dropout_seconds": 0.4,
+    "baseline_moving_ticks": 40,
+    "updated_moving_ticks": 120,
+    "baseline_stops": 10,
+    "updated_stops": 0,
+    "updated_collisions": 0,
+    "note": "Synthetic planar motion, not live CS2 or whole-map validation."
+  },
+  "sensing_replay": {
+    "start_seconds": 30,
+    "duration_seconds": 60,
+    "samples": 600,
+    "accepted": 409,
+    "heading_hint_frames": 528,
+    "invalid_position_with_heading_frames": 130,
+    "reasons": {
+      "confirming_position": 26,
+      "measured_global_contours": 269,
+      "measured_fixed_anchor": 63,
+      "measured_pose_within_deadline": 25,
+      "waiting_visual_anchor": 154,
+      "measured_hud_atlas_contours": 52,
+      "no_player_icon": 11
+    },
+    "note": "Coverage is not accuracy. Replay does not apply controller inputs. Latency is not compared because tests ran concurrently."
+  },
+  "continuity_max_seconds": 0.75,
+  "motion_envelope_px_per_second": 120,
+  "capture_watchdog_seconds": 0.25,
+  "live_validated": false,
+  "full_map_ready": false,
+  "limitations": [
+    "120 radar pixels/second is an engineering motion-envelope assumption, not a validated universal physics bound.",
+    "Movement still stops after long localization loss, loss of capture, combat pause, or unverified path.",
+    "No Windows CS2 live traversal was executed in this environment."
+  ]
+}

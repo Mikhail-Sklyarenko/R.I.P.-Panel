@@ -69,7 +69,7 @@ def detect_map_hud(
     use_ocr_fallback: bool = True,
 ) -> tuple[Optional[MapScriptId], Optional[DetectSource]]:
     """
-    Return (map_script, source) when dust2/mirage is recognized; (None, None) otherwise.
+    Return (map_script, source) when a supported map is recognized; (None, None) otherwise.
     """
     frame = _fit_frame(img, regions.base_width, regions.base_height)
     threshold = regions.template_threshold
@@ -119,7 +119,7 @@ class MapDetectState:
     @classmethod
     def from_script(cls, script: str) -> MapDetectState:
         name = script.strip().lower() or "generic_dm"
-        if name not in ("dust2", "mirage", "generic_dm"):
+        if name not in ("dust2", "mirage", "inferno", "vertigo", "cache", "generic_dm"):
             name = "generic_dm"
         return cls(confirmed_script=name)
 

@@ -1,0 +1,43 @@
+# Wingman fleet menu map for CS2 @ 1280×720 Russian HUD.
+# Clicks are starting points; observers still require named labels / GSI
+# before any action. Recalibrate from a live screenshot if Valve moves the UI.
+meta:
+  base_width: 1280
+  base_height: 720
+  locale: ru
+  mode: wingman
+  map: de_inferno
+
+clicks:
+  play: {x: 663, y: 20}
+  mode_wingman: {x: 760, y: 90}
+  map_inferno: {x: 520, y: 310}
+  start_search: {x: 1125, y: 691}
+  cancel_search: {x: 640, y: 430}
+  accept_match: {x: 560, y: 390}
+  leave_lobby: {x: 80, y: 688}
+  invite_open: {x: 1210, y: 90}
+  invite_search: {x: 1100, y: 140}
+  invite_first: {x: 1100, y: 210}
+  accept_invite: {x: 700, y: 400}
+  add_friend: {x: 180, y: 70}
+  friend_code_field: {x: 420, y: 210}
+  send_friend: {x: 640, y: 280}
+  accept_friend: {x: 700, y: 360}
+  dismiss_modal: {x: 640, y: 400}
+
+labels:
+  play: {box: [633, 12, 685, 30]}
+  wingman: {box: [720, 78, 820, 102]}
+  inferno: {box: [470, 290, 580, 330]}
+  searching: {box: [560, 240, 720, 290]}
+  confirm: {box: [500, 330, 780, 380]}
+  invite: {box: [520, 300, 760, 360]}
+
+probes:
+  searching:
+    - {x: 640, y: 360, rgb: [200, 200, 200], tolerance: 70}
+  start_ready:
+    - {x: 1125, y: 691, rgb: [90, 160, 70], tolerance: 80}
+  modal:
+    - {x: 640, y: 360, rgb: [30, 32, 40], tolerance: 40}

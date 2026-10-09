@@ -1,0 +1,57 @@
+{
+  "identity": {
+    "engine": "visual-nav-multimap-7",
+    "code_sha256": "c303082737925bba498cb6413e42851afd76bc665615cd9fa137ec7d1cba3a3b",
+    "profile_sha256": "06bab692a4a97b84ea384bc15ee52404bb8f7decd44d2c6dbf977b9731743d3b",
+    "profile_path": "/Users/mihailsklarenko/FSM_PANEL v.3.0.1/farm-panel-prototype/resources/nav/profiles/de_inferno"
+  },
+  "tests_passed": 54,
+  "startup_checks": [
+    {
+      "scenario": "stationary Inferno video frame, unknown map/Dust2 bootstrap, discovery during combat ownership then combat release; fake input only",
+      "events": [
+        {
+          "event": "map_confirmed",
+          "seconds": 12.222771833000479,
+          "map": "de_inferno"
+        },
+        {
+          "event": "movement",
+          "seconds": 13.589323083000636,
+          "keys": [
+            "a",
+            "s"
+          ],
+          "reason": "follow_verified_route"
+        }
+      ],
+      "first_valid_pose_sec": 13.161160625000775,
+      "max_discovery_poll_ms": 470.84095900027023,
+      "passed": true
+    },
+    {
+      "scenario": "stationary Inferno video frame, unknown map/Dust2 bootstrap, discovery during combat ownership then combat release; fake input only",
+      "events": [
+        {
+          "event": "map_confirmed",
+          "seconds": 10.608764749999864,
+          "map": "de_inferno"
+        },
+        {
+          "event": "movement",
+          "seconds": 26.171158416999788,
+          "keys": [
+            "a",
+            "s"
+          ],
+          "reason": "follow_verified_route"
+        }
+      ],
+      "first_valid_pose_sec": 11.591673166999499,
+      "max_discovery_poll_ms": 0.6734999997206614,
+      "passed": true
+    }
+  ],
+  "live_validated": false,
+  "caveat": "Mouse and keyboard output intercepted; frozen video cannot reflect issued camera turns. This proves startup/control output, not actual traversal or live timing."
+}

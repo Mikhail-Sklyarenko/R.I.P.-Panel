@@ -1,0 +1,115 @@
+{
+  "engine": "visual-nav-multimap-18",
+  "code_sha256": "ec1457ab91c924443122c3119d451d18504ac905bb1add477ef1e2f6b5e74eee",
+  "profile_sha256": "34b0b48e0c4ed18ff78b8c123560f7c4844eb9c6a23f18c82185d3dd87915e30",
+  "profile_path": "/Users/mihailsklarenko/FSM_PANEL v.3.0.1/farm-panel-prototype/resources/nav/profiles/de_cache",
+  "source_video": "2026-09-15 17-45-05.mp4",
+  "source_sha256": "0b647bf5c5cbebda0c95d2eb7668044a13b3be8aa9fd368afecbf3448849f6c3",
+  "recorded_engine": "visual-nav-multimap-10",
+  "live_validated": false,
+  "independent_accuracy_validated": false,
+  "scope": "Ground routes preserved; separately identified roof north drop",
+  "sampling": "Every two seconds, 2 through 244; standalone current-frame contour/heading/floor checks, no tracker fallback",
+  "samples": 122,
+  "results": {
+    "no_heading": 7,
+    "accepted": 101,
+    "no_icon": 5,
+    "no_registration": 9
+  },
+  "roof_frames_accepted": 42,
+  "ground_frames_accepted": 59,
+  "wrong_roof_labels_on_59_ground_frames": 0,
+  "calibration_seconds": [
+    10,
+    20,
+    210
+  ],
+  "evidence_limit": "Label templates and geometry developed on this same recording. 101/122 is replay coverage, not independent localization accuracy or live traversal success. Simulated movement uses the annotated 2D surface and does not validate CS2 drop physics.",
+  "unresolved": [
+    {
+      "second": 2,
+      "reason": "no_heading"
+    },
+    {
+      "second": 24,
+      "reason": "no_heading"
+    },
+    {
+      "second": 26,
+      "reason": "no_icon"
+    },
+    {
+      "second": 28,
+      "reason": "no_registration"
+    },
+    {
+      "second": 46,
+      "reason": "no_heading"
+    },
+    {
+      "second": 62,
+      "reason": "no_heading"
+    },
+    {
+      "second": 64,
+      "reason": "no_heading"
+    },
+    {
+      "second": 78,
+      "reason": "no_registration"
+    },
+    {
+      "second": 98,
+      "reason": "no_heading"
+    },
+    {
+      "second": 100,
+      "reason": "no_heading"
+    },
+    {
+      "second": 104,
+      "reason": "no_registration"
+    },
+    {
+      "second": 106,
+      "reason": "no_registration"
+    },
+    {
+      "second": 116,
+      "reason": "no_registration"
+    },
+    {
+      "second": 118,
+      "reason": "no_icon"
+    },
+    {
+      "second": 148,
+      "reason": "no_icon"
+    },
+    {
+      "second": 152,
+      "reason": "no_registration"
+    },
+    {
+      "second": 168,
+      "reason": "no_registration"
+    },
+    {
+      "second": 174,
+      "reason": "no_registration"
+    },
+    {
+      "second": 176,
+      "reason": "no_icon"
+    },
+    {
+      "second": 198,
+      "reason": "no_registration"
+    },
+    {
+      "second": 244,
+      "reason": "no_icon"
+    }
+  ]
+}

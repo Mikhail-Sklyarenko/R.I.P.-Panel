@@ -13,18 +13,18 @@ This matches upstream csgobot: heavy data outside git; runtime ships weights onl
 
 ```bat
 git pull
-EnsureWeights.bat
+tools/training/EnsureWeights.bat
 FarmPanel.bat
 ```
 
 - Registry: `resources/csgobot/weights_registry.json` (active version, URL, sha256).
 - Tool: `scripts/ensure_weights.py` (download + size + sha256 check).
-- **Do not** run `BootstrapDataset.bat` or `TrainProductModel.bat` on farm boxes.
+- **Do not** run `tools/training/BootstrapDataset.bat` or `tools/training/TrainProductModel.bat` on farm boxes.
 
 ### Collector farm PC (1–2 machines only)
 
 ```bat
-EnableAutoCapture.bat
+tools/training/EnableAutoCapture.bat
 call data\capture_collector.env.bat
 FarmPanel.bat
 ```
@@ -34,13 +34,13 @@ See `docs/AUTO_CAPTURE.md`.
 
 ## Train PC (once per model generation)
 
-1. `BootstrapDataset.bat` — build `product_v1_bootstrap` + audit + manifest.  
-2. Optional: collector captures → `BuildOurCs2FromRaw.bat` → merge `sources/our_cs2`.  
-2b. Texture FP: `ImportEmptyYoloSplits.bat` (bootstrap empties) and/or `EnableHardNegCapture.bat` → `BuildHardNegativesFromRaw.bat` → `BuildProductWithHardNegatives.bat` (`docs/HARD_NEGATIVES.md`).  
-3. `TrainProductModel.bat` — fine-tune from current production `.pt`.  
+1. `tools/training/BootstrapDataset.bat` — build `product_v1_bootstrap` + audit + manifest.  
+2. Optional: collector captures → `tools/training/BuildOurCs2FromRaw.bat` → merge `sources/our_cs2`.  
+2b. Texture FP: `tools/training/ImportEmptyYoloSplits.bat` (bootstrap empties) and/or `tools/training/EnableHardNegCapture.bat` → `tools/training/BuildHardNegativesFromRaw.bat` → `tools/training/BuildProductWithHardNegatives.bat` (`docs/HARD_NEGATIVES.md`).  
+3. `tools/training/TrainProductModel.bat` — fine-tune from current production `.pt`.  
 4. `python scripts/promote_weights.py runs/.../best.pt --version v0.2.0-ctfix --filename ...`  
 5. Host the `.pt` (GitHub Release / CDN), put real `url` in registry, set `active`.  
-6. Soak on **1–2** farm PCs → then `git pull && EnsureWeights.bat` on the fleet.
+6. Soak on **1–2** farm PCs → then `git pull && tools/training/EnsureWeights.bat` on the fleet.
 
 ## Release gates (before setting `active`)
 

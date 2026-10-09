@@ -1,25 +1,19 @@
-"""CS2 UI: detectors, actions, artifacts (solo DM coords)."""
+"""CS2 UI helpers, loaded independently from the panel lifecycle."""
+from importlib import import_module
 
-from modules.ui_nav.artifacts import ArtifactStore
-from modules.ui_nav.coords import NavCoords, load_nav_coords
-from modules.ui_nav.detectors import (
-    InDmWaitResult,
-    ScreenState,
-    detect_state,
-    wait_for_in_dm,
-    wait_for_state,
-)
-from modules.ui_nav.driver import NavDriver, create_driver
+_EXPORTS = {
+    "ArtifactStore": "artifacts",
+    "NavCoords": "coords", "load_nav_coords": "coords",
+    "InDmWaitResult": "detectors", "ScreenState": "detectors",
+    "detect_state": "detectors", "wait_for_in_dm": "detectors",
+    "wait_for_state": "detectors", "NavDriver": "driver", "create_driver": "driver",
+}
+__all__ = list(_EXPORTS)
 
-__all__ = [
-    "ArtifactStore",
-    "NavCoords",
-    "NavDriver",
-    "ScreenState",
-    "create_driver",
-    "InDmWaitResult",
-    "detect_state",
-    "load_nav_coords",
-    "wait_for_in_dm",
-    "wait_for_state",
-]
+
+def __getattr__(name):
+    if name not in _EXPORTS:
+        raise AttributeError(name)
+    value = getattr(import_module(f"{__name__}.{_EXPORTS[name]}"), name)
+    globals()[name] = value
+    return value

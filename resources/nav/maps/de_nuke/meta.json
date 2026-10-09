@@ -1,0 +1,8 @@
+{
+  "map_id": "de_nuke",
+  "radar_size_px": 1024,
+  "coordinate_system": "radar_pixels",
+  "display_name": "Nuke upper",
+  "radar_sha256": "6230346d3ce969006062fbd02220b083245f621ef366ce26a42dc27a80120bd0",
+  "landmarks": {}
+}

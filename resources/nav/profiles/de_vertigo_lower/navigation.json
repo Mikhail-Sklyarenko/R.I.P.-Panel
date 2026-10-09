@@ -1,0 +1,13 @@
+{
+  "map_id": "de_vertigo_lower",
+  "version": "vertigo-layered-2",
+  "clearance_px": 4,
+  "grid_step": 2,
+  "initial_hud_scale": 0.355,
+  "layer_id": "lower",
+  "experimental": true,
+  "live_validated": false,
+  "full_map_ready": false,
+  "scope": "Layer-separated roaming with explicitly annotated ramp/stairs connections; no ladder climbing",
+  "map_sha256": "8ef02a92243f83964c7806c41923134f12012fd9a49a44e268f7c0d89c783226"
+}

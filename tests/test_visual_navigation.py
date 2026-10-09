@@ -100,6 +100,38 @@ def test_stale_or_missing_pose_releases_all_keys():
     assert not keys
 
 
+def test_relocalizing_after_successful_plan_has_no_failure_backoff():
+    c, keys, _ = make_controller(np.full((200, 200), 255, np.uint8))
+    c.tick(pose(.2, .2, 0, 1), now=1, paused=False)
+    c.tick(Pose.invalid(), now=1.1, paused=False)
+    result = c.tick(pose(.2, .2, 0, 1.2), now=1.2, paused=False)
+    assert result.reason == "follow_verified_route" and "w" in keys
+    c._lease.release()  # Background expiration can happen without a tick.
+    c.tick(pose(.2, .2, 0, 5), now=5, paused=False)
+    result = c.tick(pose(.2, .2, 0, 5.05), now=5.05, paused=False)
+    assert not result.stuck_event and "w" in keys
+
+
+def test_route_rejoins_reachable_goal_after_long_pose_loss():
+    mask = np.full((200, 200), 255, np.uint8)
+    mask[:, 98:102] = 0
+    c, keys, _ = make_controller(mask)
+    route = pack()
+    route.strategy = 'route_cycle'
+    route.goals = (SimpleNamespace(id='across_wall', x=.55, y=.5, arrive_radius=.01),
+                   SimpleNamespace(id='reachable', x=.15, y=.5, arrive_radius=.01))
+    c.reload_pack(route)
+    c.tick(pose(.45, .5, 180, 1), now=1, paused=False)
+    assert c.goal_id == 'reachable'
+    c.tick(Pose.invalid(), now=2, paused=False)
+    assert not keys
+    c.tick(pose(.75, .5, 180, 3.2), now=3.2, paused=False)
+    assert c.goal_id == 'across_wall'
+    assert c.walkable.visible((.75, .5), c.face_target())
+    result = c.tick(pose(.001, .5, 0, 4), now=4, paused=False)
+    assert result.reason == 'pose_outside_verified_ground' and not keys
+
+
 def test_wall_stop_cannot_be_rearmed_by_ticks_or_fake_flow():
     c, keys, _ = make_controller(np.full((200, 200), 255, np.uint8))
     stopped = False
@@ -194,6 +226,61 @@ def test_registration_rejects_blank_and_unrelated_frames(tmp_path):
     assert loc.register(noise, mask) is None
 
 
+def test_live_references_are_bounded_and_cannot_chain(tmp_path):
+    from nav.visual_localizer import Registration
+    rgb = texture()
+    loc = Localizer("test", map_rgb=rgb, profile_dir=tmp_path)
+    mask = np.full(rgb.shape[:2], 255, np.uint8)
+    for i in range(12):
+        matrix = np.array([[1., 0., 20.*i], [0., 1., 0.]])
+        loc._remember_observation(rgb, mask, Registration(matrix, .9, 30, .1, "radar"), 1.+i*2)
+    assert len(loc._live_anchors) == 8
+    assert len(loc.references) == len(loc._reference_images) == 9
+    before = tuple(loc._live_anchors)
+    loc._remember_observation(rgb, mask, Registration(matrix, .99, 50, .1, "observed:1"), 100.)
+    assert tuple(loc._live_anchors) == before
+
+
+def test_tracker_cannot_override_ambiguous_global_registration(tmp_path):
+    loc = Localizer('test', map_rgb=texture(), profile_dir=tmp_path)
+    def ambiguous(*args):
+        loc.reason = 'ambiguous_map_match'
+        return None
+    loc.register = ambiguous
+    loc._tracker.track = lambda *args: pytest.fail('Must not override an ambiguous map match')
+    result = loc.locate(texture(), np.full((500, 500), 255, np.uint8), (250, 250),
+                        pose(.5, .5, 0, 1), now=1.)
+    assert not result.valid
+
+
+def test_smooth_camera_and_10hz_controller_reach_l_corridor_goal():
+    from nav.camera_servo import CameraServo
+    mask = np.zeros((240, 240), np.uint8)
+    mask[150:220, 20:220] = 255
+    mask[20:220, 150:220] = 255
+    c, keys, mouse = make_controller(mask, goal=(.78, .18))
+    clock = [1.]
+    c._camera = CameraServo(lambda dx, dy: mouse.append(dx/10.), 3600, clock=lambda: clock[0])
+    x, y, yaw = .2, .78, 180.
+    for tick in range(7200):
+        clock[0] = 1+tick/120
+        if tick % 12 == 0:
+            result = c.tick(pose(x, y, yaw, clock[0]), now=clock[0], paused=False)
+        c._camera.advance()
+        yaw += sum(mouse)
+        mouse.clear()
+        direction = int('w' in keys)-int('s' in keys)
+        speed = 24 if 'shift' in keys else 48
+        nx = x + direction*math.cos(math.radians(yaw))*speed/120/239
+        ny = y + direction*math.sin(math.radians(yaw))*speed/120/239
+        assert c.walkable.visible((x, y), (nx, ny))
+        x, y = nx, ny
+        if result.state.value == 'at_goal':
+            break
+    c.close()
+    assert result.state.value == 'at_goal', (result.reason, x, y, yaw)
+
+
 def test_visual_filter_never_holds_last_pose():
     module = importlib.import_module("nav.pose_filter")
     cfg = importlib.import_module("nav.calibration").PoseFilterConfig(.35, .8, .35)
@@ -257,10 +344,10 @@ def test_blocked_path_recovers_only_along_observed_ground():
     assert r.state.value == "blocked" and not keys
 
 
-def test_pause_releases_walk_modifier_and_reacquires_heading():
+def test_pause_releases_movement_and_reacquires_heading():
     c, keys, mouse = make_controller(np.full((200, 200), 255, np.uint8))
     c.tick(pose(.7, .2, 0, 1), now=1, paused=False)
-    assert keys == {"w", "shift"}
+    assert keys == {"w"}
     c.tick(pose(.7, .2, 0, 1.1), now=1.1, paused=True)
     assert not keys
     c.tick(pose(.7, .2, 180, 1.2), now=1.2, paused=False)

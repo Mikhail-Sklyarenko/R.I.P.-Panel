@@ -1,0 +1,15 @@
+{
+  "vendor/csgobot/main.py": "c442bdf5d7a9e752e59b77dccb085bd0702cc546df850c6d7128c3edff14c31c",
+  "vendor/csgobot/run.py": "e19b6f87a69642b1acb7af00972a3e31ec917919648cccf04a5d7385a0a88bfa",
+  "vendor/csgobot/config.py": "b15049bc98e02ab1f66fd36dbdee80fccf625591bd8f358e63a124606906cfef",
+  "vendor/csgobot/nav/release.py": "c9cbccc7b03739d01a8c591dd7ba900bf86438bdfd83e7d3cbf8b10082510127",
+  "vendor/csgobot/aiming/aim_mouse_controller.py": "384d2aaa72d84d563bb0062d0ea75fea67a11abbc8e7da77a3e5ab703316017d",
+  "vendor/csgobot/aiming/aim_pipeline.py": "9c3228f42b8aec44b1c4c93a16668388946421234bb887ece65aa9680856aaae",
+  "vendor/csgobot/aiming/aim_point_smoother.py": "8700b1b085c4d4a1b01ea9071698382da29544232e230cb36ad2c6b3dd7ec2c9",
+  "vendor/csgobot/aiming/combat_aim.py": "6a6ccd93710a4f064c850edc8fb1f7ac77749f30d259d21903d4ebc8903781a4",
+  "vendor/csgobot/aiming/combat_contact.py": "90460ca23b87003ebab91f14d0d9ab07205e191f439c034da27e6c0f017c894e",
+  "tests/test_csgobot_aim.py": "ba04f5d87753fd80129abc7a952ed2a90b471d4547e4e07378704d8b51982616",
+  "tests/test_csgobot_aim_mouse.py": "cb11aac9776bc93a35379107ac94a02833cdd8fc08e0bf90d96caef00b53f1f0",
+  "tests/test_csgobot_combat_contact.py": "d406a811b475dcc5ee4981d9598641af5c73ffaa022dd4e441c18d672ccac7ca",
+  "docs/COMBAT_V22.md": "c40ee3d58fffba90f5480b24c411eb9cbbfab49be176574518f9334be8f2e5a7"
+}

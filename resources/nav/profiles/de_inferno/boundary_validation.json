@@ -1,0 +1,58 @@
+{
+  "engine": "visual-nav-multimap-8",
+  "code_sha256": "61645677c80c5d81cda75f17a46b75469a753fa101f0e2a7dedabf289379a68c",
+  "profile_sha256": "06bab692a4a97b84ea384bc15ee52404bb8f7decd44d2c6dbf977b9731743d3b",
+  "profile_path": "/Users/mihailsklarenko/FSM_PANEL v.3.0.1/farm-panel-prototype/resources/nav/profiles/de_inferno",
+  "video": "2026-09-14 12-52-14.mp4",
+  "tests_passed": 69,
+  "before": {
+    "samples": 1570,
+    "accepted": 565,
+    "accepted_pct": 35.99,
+    "fresh_at_processing_completion": 532,
+    "reasons": {
+      "no_player_icon": 86,
+      "waiting_visual_anchor": 879,
+      "confirming_position": 39,
+      "measured_global_contours": 484,
+      "measured_pose_within_deadline": 24,
+      "measured_fixed_anchor": 49,
+      "measured_atlas_frame": 8,
+      "ambiguous_icon_heading": 1
+    },
+    "longest_localization_gap_sec": 25.0,
+    "recorded_code_sha256": "9a187276e0fd58e7edd41be5af16c182cb66e70298a97198b3d4a8707c51dba7",
+    "matcher_override_sha256": "631e11f7f7e4fbc77ed237f9bb51e27d744d0c324bdb35c9ae8533e98351913e"
+  },
+  "after": {
+    "samples": 1570,
+    "accepted": 1291,
+    "accepted_pct": 82.23,
+    "fresh_at_processing_completion": 1251,
+    "reasons": {
+      "no_player_icon": 86,
+      "waiting_visual_anchor": 153,
+      "confirming_position": 39,
+      "measured_global_contours": 1230,
+      "measured_pose_within_deadline": 29,
+      "measured_fixed_anchor": 24,
+      "measured_atlas_frame": 8,
+      "ambiguous_icon_heading": 1
+    },
+    "longest_localization_gap_sec": 3.6,
+    "recorded_code_sha256": "9a187276e0fd58e7edd41be5af16c182cb66e70298a97198b3d4a8707c51dba7",
+    "matcher_sha256": "b36d6865c24701bd7ef709007a186eb8a48e88cb716acfd06a8a4af7562aaedf"
+  },
+  "accepted_positions": {
+    "inside_clearance": 1243,
+    "boundary_exit_available": 48,
+    "outside_without_exit": 0
+  },
+  "live_validated": false,
+  "limits": [
+    "Replay uses the diagnostic recording, including two frames used to design the regression fix; it is not a post-fix live traversal.",
+    "Coverage is not independently measured positional accuracy. Inputs are not sent and cannot affect the video.",
+    "Replays ran concurrently; timings are not an isolated performance benchmark.",
+    "Replays were recorded before changing the engine label from 7 to 8. Baseline injected the saved v7 matcher in memory; its matcher_override_sha256 identifies executed old code. recorded_code_sha256 hashes the on-disk sources, not the injected override. Runtime identity above is the packaged version."
+  ]
+}

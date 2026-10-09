@@ -16,17 +16,23 @@ def observe_heading(rgb, body):
         return None
     cx, cy = float(xs.mean()), float(ys.mean())
     values = rgb.astype(np.int16)
-    pale = (values.min(axis=2) >= 175) & ((values.max(axis=2) - values.min(axis=2)) <= 80)
+    minimum = values.min(axis=2)
+    chroma = values.max(axis=2)-minimum
     nearby = cv2.dilate(np.uint8(body), np.ones((7, 7), np.uint8)) > 0
     yy, xx = np.ogrid[:body.shape[0], :body.shape[1]]
     radius = math.sqrt(len(xs) / math.pi) + 4
-    tips = pale & nearby & ~body & ((xx-cx)**2 + (yy-cy)**2 <= radius**2)
-    ty, tx = np.where(tips)
-    if len(tx) < 2:
-        return None
-    dx, dy = float(tx.mean()) - cx, float(ty.mean()) - cy
-    distance = math.hypot(dx, dy)
-    spread = float(np.mean(np.hypot(tx - cx, ty - cy)))
-    if distance < 2. or distance / max(spread, 1.) < .8:
-        return None
-    return math.degrees(math.atan2(dy, dx)), min(1., distance / max(spread, 1.))
+    attached = nearby & ~body & ((xx-cx)**2 + (yy-cy)**2 <= radius**2)
+    # Bright sky can satisfy the broad pale threshold and dilute the tip's
+    # direction. Prefer its distinct near-white core on the CURRENT image.
+    # If neither mask has coherent support, never invent a heading.
+    for pale, required in (((minimum>=210)&(chroma<=45),3),
+                           ((minimum>=175)&(chroma<=80),2)):
+        ty, tx = np.where(pale & attached)
+        if len(tx) < required:
+            continue
+        dx, dy = float(tx.mean())-cx, float(ty.mean())-cy
+        distance = math.hypot(dx,dy)
+        spread = float(np.mean(np.hypot(tx-cx,ty-cy)))
+        if distance >= 2. and distance/max(spread,1.) >= .8:
+            return math.degrees(math.atan2(dy,dx)), min(1.,distance/max(spread,1.))
+    return None

@@ -8,6 +8,10 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+# Direct script execution puts tools/, not its parent, on the import path.
+# The panel launches this file by absolute path, independently of its cwd.
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 WEIGHTS = ROOT / "yolov8" / "cs2_yolov8m_640_augmented_v4.pt"
 
 

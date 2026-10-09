@@ -68,7 +68,7 @@ Why: domain match beats volume. Our issue is domain shift + class robustness for
   - Both team perspectives.
 
 ### Labeling workflow
-1. **Preferred (product):** farm auto-capture (`docs/AUTO_CAPTURE.md`) + soft labels + `BuildOurCs2FromRaw.bat`.
+1. **Preferred (product):** farm auto-capture (`docs/AUTO_CAPTURE.md`) + soft labels + `tools/training/BuildOurCs2FromRaw.bat`.
 2. Optional: auto-label refresh with newer weights on raw shards.
 3. Human correction is **not required** for MVP; soak gates replace manual QC.
 4. Second pass QC on sampled shards is optional for major releases.
@@ -117,24 +117,24 @@ Why: domain match beats volume. Our issue is domain shift + class robustness for
   - split checksums,
   - class counts.
 - **Fleet policy:** farm PCs receive only versioned `.pt` via
-  `resources/csgobot/weights_registry.json` + `EnsureWeights.bat`.
+  `resources/csgobot/weights_registry.json` + `tools/training/EnsureWeights.bat`.
   Never distribute `hf_raw/` / `product_v1_*` to the farm fleet.
 
 ## 5) Immediate execution plan
 
 **Train machine (once):**
 
-1. `BootstrapDataset.bat` → `product_v1_bootstrap` + manifest.
+1. `tools/training/BootstrapDataset.bat` → `product_v1_bootstrap` + manifest.
 2. Audit must pass (`audit_dataset.py` / pipeline gate).
 3. Optional: merge `sources/our_cs2` CT-heavy captures → rebuild product set.
-4. `TrainProductModel.bat` (fine-tune from current production weights).
+4. `tools/training/TrainProductModel.bat` (fine-tune from current production weights).
 5. `scripts/promote_weights.py` → host `.pt` → update registry `active`.
-6. Soak 1–2 farm PCs → roll `EnsureWeights.bat` to fleet.
+6. Soak 1–2 farm PCs → roll `tools/training/EnsureWeights.bat` to fleet.
 
 **Farm machines (always):**
 
 1. `git pull`
-2. `EnsureWeights.bat` (~50 MB)
+2. `tools/training/EnsureWeights.bat` (~50 MB)
 3. Run panel — no dataset download.
 
 Canonical product doc: `docs/PRODUCT_MODEL_LIFECYCLE.md`.  

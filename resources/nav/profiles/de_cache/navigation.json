@@ -1,0 +1,18 @@
+{
+  "map_id": "de_cache",
+  "version": "cache-visual-2",
+  "map_sha256": "02bd3c96cc52b551d7f364dc1f5e0e61dceabe5b4564481888add743cd74893e",
+  "clearance_px": 4,
+  "grid_step": 2,
+  "initial_hud_scale": 0.355,
+  "experimental": true,
+  "live_validated": false,
+  "full_map_ready": false,
+  "scope": "Connected ground routes plus separately identified mid roof with one-way north drop",
+  "limitations": [
+    "Closed squeaky door is excluded; route via A main",
+    "No vent crouching, jump boosts or autonomous ladder ascent",
+    "Recording replay is not independent live traversal validation",
+    "Roof label recognition calibrated for Russian HUD 1280x720; north drop needs live validation"
+  ]
+}

@@ -1,135 +1,44 @@
-"""DM team-pick loop."""
-
-from __future__ import annotations
-
-from unittest.mock import MagicMock, patch
-
+"""Recorded-state sequences: no actions until UI/spawn is stable."""
+from types import SimpleNamespace
+from unittest.mock import Mock
 import pytest
-
-from modules.dm_runner.team_join import wait_team_select_done
+from modules.dm_runner import team_join as m
 from modules.ui_nav.coords import load_nav_coords
 from modules.ui_nav.errors import UiNavTimeoutError
 
 
-def _mock_clock(start: float = 0.0, step: float = 0.4, limit: float = 9.0):
-    t = start
-
-    def tick() -> float:
-        nonlocal t
-        current = t
-        t = min(t + step, limit)
-        return current
-
-    return tick
-
-
-def test_wait_team_select_clicks_then_clears() -> None:
-    coords = load_nav_coords("1280x720")
-    driver = MagicMock()
-    driver.capture.return_value = object()
-    clock = _mock_clock()
-    team_flags = iter([True, True, False, False, False, False, False, False, False, False])
-
-    with patch(
-        "modules.dm_runner.team_join.detect_probe_key",
-        side_effect=lambda *_a, **_k: next(team_flags, False),
-    ):
-        with patch(
-            "modules.dm_runner.team_join.past_team_select_screen",
-            side_effect=[False, False, False, True, True],
-        ):
-            with patch("modules.dm_runner.team_join.time.sleep"):
-                with patch(
-                    "modules.dm_runner.team_join.time.monotonic",
-                    side_effect=clock,
-                ):
-                    clicks = wait_team_select_done(
-                        driver,
-                        coords,
-                        timeout_sec=10.0,
-                        click_retry_sec=0.0,
-                        on_progress=None,
-                    )
-
-    assert clicks >= 2
-    assert driver.click.call_count >= 2
+def run_sequence(monkeypatch, states, *, callback=None):
+    clock=[0.];frames=iter(states);current=['loading'];events=[]
+    def capture():
+        current[0]=next(frames,'loading');return current[0]
+    monkeypatch.setattr(m.time,'monotonic',lambda:clock[0])
+    monkeypatch.setattr(m.time,'sleep',lambda dt:clock.__setitem__(0,clock[0]+dt))
+    monkeypatch.setattr(m,'past_team_select_screen',lambda img,c:img=='spawn')
+    monkeypatch.setattr(m,'detect_probe_key',lambda img,*a,**k:img=='team')
+    driver=SimpleNamespace(capture=capture,click=lambda p:events.append((clock[0],current[0])))
+    result=m.wait_team_select_done(driver,load_nav_coords('1280x720'),timeout_sec=30,
+        on_team_random_clicked=callback)
+    return result,events
 
 
-def test_console_buy_fires_once_after_team_visible_click() -> None:
-    coords = load_nav_coords("1280x720")
-    driver = MagicMock()
-    driver.capture.return_value = object()
-    clock = _mock_clock()
-    buy = MagicMock()
-    team_flags = iter([True, True, False, False, False, False, False, False, False, False])
-    past_flags = iter([False] * 8 + [True] * 10)
-
-    with patch(
-        "modules.dm_runner.team_join.detect_probe_key",
-        side_effect=lambda *_a, **_k: next(team_flags, False),
-    ):
-        with patch(
-            "modules.dm_runner.team_join.past_team_select_screen",
-            side_effect=lambda *_a, **_k: next(past_flags, True),
-        ):
-            with patch("modules.dm_runner.team_join.time.sleep"):
-                with patch(
-                    "modules.dm_runner.team_join.time.monotonic",
-                    side_effect=clock,
-                ):
-                    wait_team_select_done(
-                        driver,
-                        coords,
-                        timeout_sec=10.0,
-                        click_retry_sec=0.0,
-                        on_team_random_clicked=buy,
-                    )
-
-    buy.assert_called_once()
+def test_slow_load_clicks_only_stable_team_and_buy_after_spawn(monkeypatch):
+    buys=[]
+    count,events=run_sequence(monkeypatch,['loading']*70+['team']*3+['loading']*8+['spawn']*3,callback=lambda:buys.append(True))
+    assert count==1 and events[0][0]>=18 and events[0][1]=='team'
+    assert buys==[True]
 
 
-def test_no_blind_click_after_team_overlay_seen() -> None:
-    coords = load_nav_coords("1280x720")
-    driver = MagicMock()
-    driver.capture.return_value = object()
-    clock = _mock_clock()
-    team_flags = iter([True, False, False, False, False, False, False, False, False, False])
-    past_flags = iter([False] * 8 + [True] * 10)
-
-    with patch(
-        "modules.dm_runner.team_join.detect_probe_key",
-        side_effect=lambda *_a, **_k: next(team_flags, False),
-    ):
-        with patch(
-            "modules.dm_runner.team_join.past_team_select_screen",
-            side_effect=lambda *_a, **_k: next(past_flags, True),
-        ):
-            with patch("modules.dm_runner.team_join.time.sleep"):
-                with patch(
-                    "modules.dm_runner.team_join.time.monotonic",
-                    side_effect=clock,
-                ):
-                    clicks = wait_team_select_done(
-                        driver,
-                        coords,
-                        timeout_sec=10.0,
-                        click_retry_sec=0.0,
-                    )
-
-    assert clicks == 1
-    assert driver.click.call_count == 1
+def test_transient_team_match_never_clicks(monkeypatch):
+    count,events=run_sequence(monkeypatch,['team','loading','team','loading']+['spawn']*3)
+    assert count==0 and not events
 
 
-def test_wait_team_select_timeout() -> None:
-    coords = load_nav_coords("1280x720")
-    driver = MagicMock()
+def test_loading_timeout_never_clicks_or_buys(monkeypatch):
+    buy=Mock()
+    with pytest.raises(UiNavTimeoutError):run_sequence(monkeypatch,['loading']*150,callback=buy)
+    buy.assert_not_called()
 
-    with patch(
-        "modules.dm_runner.team_join.detect_probe_key",
-        return_value=True,
-    ):
-        with patch("modules.dm_runner.team_join.past_team_select_screen", return_value=False):
-            with patch("modules.dm_runner.team_join.time.monotonic", side_effect=[0.0, 0.1, 100.0]):
-                with patch("modules.dm_runner.team_join.time.sleep"):
-                    with pytest.raises(UiNavTimeoutError):
-                        wait_team_select_done(driver, coords, timeout_sec=5.0, click_retry_sec=0.0)
+
+def test_spawn_confirmation_resets_when_loading_returns(monkeypatch):
+    count,events=run_sequence(monkeypatch,['spawn']*2+['loading']*10+['team']*3+['spawn']*3)
+    assert count==1

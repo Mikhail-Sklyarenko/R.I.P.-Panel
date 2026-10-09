@@ -1,0 +1,741 @@
+{
+  "map_id": "de_vertigo",
+  "version": 1,
+  "source_video": "2026-09-13 16-56-44.mp4",
+  "source_sha256": "2b9c697a55843c468b428181e6c49fcda7bc78823a9ac6d4b79da8c371527d7e",
+  "map_sha256": "e3107998fbb47c1d9b3b5da0521007d2f9b71a809de382cb10f5690647618fb0",
+  "calibration_method": "Whole-map contour anchors plus visually inspected contour overlays; even-second frames only, separate layer atlases; not independent live validation",
+  "live_validated": false,
+  "references": [
+    {
+      "image": "anchor_002.png",
+      "to_map": [
+        [
+          2.8169014084507045,
+          0.0,
+          228.16901408450704
+        ],
+        [
+          0.0,
+          2.8169014084507045,
+          -95.77464788732395
+        ]
+      ],
+      "source_time": 2,
+      "source_method": "visually_inspected_contour_alignment",
+      "automated_wall_gate_passed": false,
+      "contour_score": 0.4828743040561676,
+      "layer_id": "upper"
+    },
+    {
+      "image": "anchor_004.png",
+      "to_map": [
+        [
+          2.8169014084507045,
+          0.0,
+          118.30985915492958
+        ],
+        [
+          0.0,
+          2.8169014084507045,
+          -98.59154929577466
+        ]
+      ],
+      "source_time": 4,
+      "source_method": "visually_inspected_contour_alignment",
+      "automated_wall_gate_passed": false,
+      "contour_score": 0.5103248357772827,
+      "layer_id": "upper"
+    },
+    {
+      "image": "anchor_006.png",
+      "to_map": [
+        [
+          2.8169014084507045,
+          0.0,
+          112.67605633802818
+        ],
+        [
+          0.0,
+          2.8169014084507045,
+          -19.71830985915493
+        ]
+      ],
+      "source_time": 6,
+      "source_method": "global_contours",
+      "layer_id": "upper"
+    },
+    {
+      "image": "anchor_008.png",
+      "to_map": [
+        [
+          2.8169014084507045,
+          0.0,
+          87.32394366197184
+        ],
+        [
+          0.0,
+          2.8169014084507045,
+          19.71830985915493
+        ]
+      ],
+      "source_time": 8,
+      "source_method": "global_contours",
+      "layer_id": "upper"
+    },
+    {
+      "image": "anchor_010.png",
+      "to_map": [
+        [
+          2.8169014084507045,
+          0.0,
+          123.94366197183099
+        ],
+        [
+          0.0,
+          2.8169014084507045,
+          -16.901408450704228
+        ]
+      ],
+      "source_time": 10,
+      "source_method": "global_contours",
+      "layer_id": "upper"
+    },
+    {
+      "image": "anchor_012.png",
+      "to_map": [
+        [
+          2.8169014084507045,
+          0.0,
+          45.07042253521127
+        ],
+        [
+          0.0,
+          2.8169014084507045,
+          -81.69014084507043
+        ]
+      ],
+      "source_time": 12,
+      "source_method": "global_contours",
+      "layer_id": "upper"
+    },
+    {
+      "image": "anchor_014.png",
+      "to_map": [
+        [
+          2.8169014084507045,
+          0.0,
+          -67.60563380281691
+        ],
+        [
+          0.0,
+          2.8169014084507045,
+          -87.32394366197184
+        ]
+      ],
+      "source_time": 14,
+      "source_method": "visually_inspected_contour_alignment",
+      "automated_wall_gate_passed": false,
+      "contour_score": 0.5071303844451904,
+      "layer_id": "upper"
+    },
+    {
+      "image": "anchor_016.png",
+      "to_map": [
+        [
+          2.8169014084507045,
+          0.0,
+          -169.01408450704227
+        ],
+        [
+          0.0,
+          2.8169014084507045,
+          -33.802816901408455
+        ]
+      ],
+      "source_time": 16,
+      "source_method": "visually_inspected_contour_alignment",
+      "automated_wall_gate_passed": false,
+      "contour_score": 0.4164299964904785,
+      "layer_id": "upper"
+    },
+    {
+      "image": "anchor_018.png",
+      "to_map": [
+        [
+          2.8169014084507045,
+          0.0,
+          -109.85915492957747
+        ],
+        [
+          0.0,
+          2.8169014084507045,
+          25.35211267605634
+        ]
+      ],
+      "source_time": 18,
+      "source_method": "visually_inspected_contour_alignment",
+      "automated_wall_gate_passed": false,
+      "contour_score": 0.4599669277667999,
+      "layer_id": "upper"
+    },
+    {
+      "image": "anchor_020.png",
+      "to_map": [
+        [
+          2.8169014084507045,
+          0.0,
+          -140.84507042253523
+        ],
+        [
+          0.0,
+          2.8169014084507045,
+          84.50704225352113
+        ]
+      ],
+      "source_time": 20,
+      "source_method": "visually_inspected_contour_alignment",
+      "automated_wall_gate_passed": false,
+      "contour_score": 0.46548372507095337,
+      "layer_id": "upper"
+    },
+    {
+      "image": "anchor_060.png",
+      "to_map": [
+        [
+          2.8169014084507045,
+          0.0,
+          422.53521126760563
+        ],
+        [
+          0.0,
+          2.8169014084507045,
+          408.4507042253521
+        ]
+      ],
+      "source_time": 60,
+      "source_method": "visually_inspected_contour_alignment",
+      "automated_wall_gate_passed": false,
+      "contour_score": 0.5037132501602173,
+      "layer_id": "upper"
+    },
+    {
+      "image": "anchor_062.png",
+      "to_map": [
+        [
+          2.8169014084507045,
+          0.0,
+          414.08450704225356
+        ],
+        [
+          0.0,
+          2.8169014084507045,
+          335.2112676056338
+        ]
+      ],
+      "source_time": 62,
+      "source_method": "global_contours",
+      "layer_id": "upper"
+    },
+    {
+      "image": "anchor_064.png",
+      "to_map": [
+        [
+          2.8169014084507045,
+          0.0,
+          261.9718309859155
+        ],
+        [
+          0.0,
+          2.8169014084507045,
+          292.9577464788733
+        ]
+      ],
+      "source_time": 64,
+      "source_method": "global_contours",
+      "layer_id": "upper"
+    },
+    {
+      "image": "anchor_066.png",
+      "to_map": [
+        [
+          2.8169014084507045,
+          0.0,
+          183.09859154929578
+        ],
+        [
+          0.0,
+          2.8169014084507045,
+          346.4788732394366
+        ]
+      ],
+      "source_time": 66,
+      "source_method": "global_contours",
+      "layer_id": "upper"
+    },
+    {
+      "image": "anchor_068.png",
+      "to_map": [
+        [
+          2.8169014084507045,
+          0.0,
+          230.98591549295776
+        ],
+        [
+          0.0,
+          2.8169014084507045,
+          388.7323943661972
+        ]
+      ],
+      "source_time": 68,
+      "source_method": "global_contours",
+      "layer_id": "upper"
+    },
+    {
+      "image": "anchor_076.png",
+      "to_map": [
+        [
+          2.8169014084507045,
+          0.0,
+          402.81690140845075
+        ],
+        [
+          0.0,
+          2.8169014084507045,
+          343.6619718309859
+        ]
+      ],
+      "source_time": 76,
+      "source_method": "global_contours",
+      "layer_id": "upper"
+    },
+    {
+      "image": "anchor_078.png",
+      "to_map": [
+        [
+          2.8169014084507045,
+          0.0,
+          453.5211267605634
+        ],
+        [
+          0.0,
+          2.8169014084507045,
+          439.4366197183099
+        ]
+      ],
+      "source_time": 78,
+      "source_method": "visually_inspected_contour_alignment",
+      "automated_wall_gate_passed": false,
+      "contour_score": 0.4329909682273865,
+      "layer_id": "upper"
+    },
+    {
+      "image": "anchor_080.png",
+      "to_map": [
+        [
+          2.8169014084507045,
+          0.0,
+          453.5211267605634
+        ],
+        [
+          0.0,
+          2.8169014084507045,
+          445.07042253521126
+        ]
+      ],
+      "source_time": 80,
+      "source_method": "visually_inspected_contour_alignment",
+      "automated_wall_gate_passed": false,
+      "contour_score": 0.4280623197555542,
+      "layer_id": "upper"
+    },
+    {
+      "image": "anchor_082.png",
+      "to_map": [
+        [
+          2.8169014084507045,
+          0.0,
+          405.63380281690144
+        ],
+        [
+          0.0,
+          2.8169014084507045,
+          323.943661971831
+        ]
+      ],
+      "source_time": 82,
+      "source_method": "global_contours",
+      "layer_id": "upper"
+    },
+    {
+      "image": "anchor_084.png",
+      "to_map": [
+        [
+          2.8169014084507045,
+          0.0,
+          292.9577464788733
+        ],
+        [
+          0.0,
+          2.8169014084507045,
+          301.40845070422534
+        ]
+      ],
+      "source_time": 84,
+      "source_method": "global_contours",
+      "layer_id": "upper"
+    },
+    {
+      "image": "anchor_086.png",
+      "to_map": [
+        [
+          2.8169014084507045,
+          0.0,
+          259.1549295774648
+        ],
+        [
+          0.0,
+          2.8169014084507045,
+          200.0
+        ]
+      ],
+      "source_time": 86,
+      "source_method": "global_contours",
+      "layer_id": "upper"
+    },
+    {
+      "image": "anchor_088.png",
+      "to_map": [
+        [
+          2.8169014084507045,
+          0.0,
+          236.61971830985917
+        ],
+        [
+          0.0,
+          2.8169014084507045,
+          104.22535211267606
+        ]
+      ],
+      "source_time": 88,
+      "source_method": "global_contours",
+      "layer_id": "upper"
+    },
+    {
+      "image": "anchor_090.png",
+      "to_map": [
+        [
+          2.8169014084507045,
+          0.0,
+          112.67605633802818
+        ],
+        [
+          0.0,
+          2.8169014084507045,
+          64.7887323943662
+        ]
+      ],
+      "source_time": 90,
+      "source_method": "global_contours",
+      "layer_id": "upper"
+    },
+    {
+      "image": "anchor_092.png",
+      "to_map": [
+        [
+          2.8169014084507045,
+          0.0,
+          22.535211267605636
+        ],
+        [
+          0.0,
+          2.8169014084507045,
+          98.59154929577466
+        ]
+      ],
+      "source_time": 92,
+      "source_method": "global_contours",
+      "layer_id": "upper"
+    },
+    {
+      "image": "anchor_094.png",
+      "to_map": [
+        [
+          2.8169014084507045,
+          0.0,
+          104.22535211267606
+        ],
+        [
+          0.0,
+          2.8169014084507045,
+          166.19718309859155
+        ]
+      ],
+      "source_time": 94,
+      "source_method": "global_contours",
+      "layer_id": "upper"
+    },
+    {
+      "image": "anchor_096.png",
+      "to_map": [
+        [
+          2.8169014084507045,
+          0.0,
+          53.521126760563384
+        ],
+        [
+          0.0,
+          2.8169014084507045,
+          239.43661971830988
+        ]
+      ],
+      "source_time": 96,
+      "source_method": "global_contours",
+      "layer_id": "upper"
+    },
+    {
+      "image": "anchor_098.png",
+      "to_map": [
+        [
+          2.8169014084507045,
+          0.0,
+          -28.169014084507044
+        ],
+        [
+          0.0,
+          2.8169014084507045,
+          281.69014084507046
+        ]
+      ],
+      "source_time": 98,
+      "source_method": "global_contours",
+      "layer_id": "upper"
+    },
+    {
+      "image": "anchor_100.png",
+      "to_map": [
+        [
+          2.8169014084507045,
+          0.0,
+          -16.901408450704228
+        ],
+        [
+          0.0,
+          2.8169014084507045,
+          276.056338028169
+        ]
+      ],
+      "source_time": 100,
+      "source_method": "global_contours",
+      "layer_id": "upper"
+    },
+    {
+      "image": "anchor_102.png",
+      "to_map": [
+        [
+          2.8169014084507045,
+          0.0,
+          67.60563380281691
+        ],
+        [
+          0.0,
+          2.8169014084507045,
+          236.61971830985917
+        ]
+      ],
+      "source_time": 102,
+      "source_method": "global_contours",
+      "layer_id": "upper"
+    },
+    {
+      "image": "anchor_104.png",
+      "to_map": [
+        [
+          2.8169014084507045,
+          0.0,
+          160.56338028169014
+        ],
+        [
+          0.0,
+          2.8169014084507045,
+          301.40845070422534
+        ]
+      ],
+      "source_time": 104,
+      "source_method": "global_contours",
+      "layer_id": "upper"
+    },
+    {
+      "image": "anchor_118.png",
+      "to_map": [
+        [
+          2.8169014084507045,
+          0.0,
+          439.4366197183099
+        ],
+        [
+          0.0,
+          2.8169014084507045,
+          349.29577464788736
+        ]
+      ],
+      "source_time": 118,
+      "source_method": "global_contours",
+      "layer_id": "upper"
+    },
+    {
+      "image": "anchor_120.png",
+      "to_map": [
+        [
+          2.8169014084507045,
+          0.0,
+          476.056338028169
+        ],
+        [
+          0.0,
+          2.8169014084507045,
+          264.7887323943662
+        ]
+      ],
+      "source_time": 120,
+      "source_method": "visually_inspected_contour_alignment",
+      "automated_wall_gate_passed": false,
+      "contour_score": 0.5116838812828064,
+      "layer_id": "upper"
+    },
+    {
+      "image": "anchor_122.png",
+      "to_map": [
+        [
+          2.8169014084507045,
+          0.0,
+          495.77464788732397
+        ],
+        [
+          0.0,
+          2.8169014084507045,
+          143.66197183098592
+        ]
+      ],
+      "source_time": 122,
+      "source_method": "visually_inspected_contour_alignment",
+      "automated_wall_gate_passed": false,
+      "contour_score": 0.4437604248523712,
+      "layer_id": "upper"
+    },
+    {
+      "image": "anchor_124.png",
+      "to_map": [
+        [
+          2.8169014084507045,
+          0.0,
+          391.54929577464793
+        ],
+        [
+          0.0,
+          2.8169014084507045,
+          78.87323943661973
+        ]
+      ],
+      "source_time": 124,
+      "source_method": "visually_inspected_contour_alignment",
+      "automated_wall_gate_passed": false,
+      "contour_score": 0.48028162121772766,
+      "layer_id": "upper"
+    },
+    {
+      "image": "anchor_126.png",
+      "to_map": [
+        [
+          2.8169014084507045,
+          0.0,
+          360.5633802816902
+        ],
+        [
+          0.0,
+          2.8169014084507045,
+          107.04225352112677
+        ]
+      ],
+      "source_time": 126,
+      "source_method": "global_contours",
+      "layer_id": "upper"
+    },
+    {
+      "image": "anchor_128.png",
+      "to_map": [
+        [
+          2.8169014084507045,
+          0.0,
+          287.32394366197184
+        ],
+        [
+          0.0,
+          2.8169014084507045,
+          -28.169014084507044
+        ]
+      ],
+      "source_time": 128,
+      "source_method": "visually_inspected_contour_alignment",
+      "automated_wall_gate_passed": false,
+      "contour_score": 0.4928801357746124,
+      "layer_id": "upper"
+    },
+    {
+      "image": "anchor_130.png",
+      "to_map": [
+        [
+          2.8169014084507045,
+          0.0,
+          222.53521126760563
+        ],
+        [
+          0.0,
+          2.8169014084507045,
+          -81.69014084507043
+        ]
+      ],
+      "source_time": 130,
+      "source_method": "visually_inspected_contour_alignment",
+      "automated_wall_gate_passed": false,
+      "contour_score": 0.49532216787338257,
+      "layer_id": "upper"
+    },
+    {
+      "image": "anchor_132.png",
+      "to_map": [
+        [
+          2.8169014084507045,
+          0.0,
+          194.3661971830986
+        ],
+        [
+          0.0,
+          2.8169014084507045,
+          25.35211267605634
+        ]
+      ],
+      "source_time": 132,
+      "source_method": "global_contours",
+      "layer_id": "upper"
+    },
+    {
+      "image": "anchor_134.png",
+      "to_map": [
+        [
+          2.8169014084507045,
+          0.0,
+          191.5492957746479
+        ],
+        [
+          0.0,
+          2.8169014084507045,
+          11.267605633802818
+        ]
+      ],
+      "source_time": 134,
+      "source_method": "global_contours",
+      "layer_id": "upper"
+    }
+  ]
+}

@@ -6,7 +6,7 @@ import sys
 
 import customtkinter as ctk
 
-from config.schema import BotMode
+from config.schema import BotMode, GameMode
 from panel.controller import PanelController
 from panel.icon import apply_window_icon
 from panel.nav_radar_editor import NavRadarEditor
@@ -215,12 +215,14 @@ class PanelView:
         tabs.add("Config #2")
         tabs.add("Config #3")
         tabs.add("Nav Fleet")
+        tabs.add("Wingman")
         tabs.add("Nav Packs")
         self._build_config1(tabs.tab("Config #1"))
         self._config2_frame = tabs.tab("Config #2")
         self._build_config2(self._config2_frame)
         self._build_config3(tabs.tab("Config #3"))
         self._build_nav_fleet(tabs.tab("Nav Fleet"))
+        self._build_wingman_fleet(tabs.tab("Wingman"))
         self._build_nav_packs(tabs.tab("Nav Packs"))
         return row + 1
 
@@ -347,6 +349,17 @@ class PanelView:
         )
         self._add_entry(parent, "fsm_logpass_path", cfg.fsm_logpass_path)
         self._add_entry(parent, "fsm_mafiles_dir", cfg.fsm_mafiles_dir)
+        self._vars["game_mode"] = ctk.StringVar(
+            value="Deathmatch" if cfg.game_mode == GameMode.DEATHMATCH else "Напарники Inferno")
+        ctk.CTkLabel(parent, text="Режим игры").pack(anchor="w", padx=8, pady=(4, 0))
+        ctk.CTkOptionMenu(parent, values=["Deathmatch", "Напарники Inferno"],
+                         variable=self._vars["game_mode"]).pack(fill="x", padx=8, pady=2)
+        ctk.CTkButton(parent, text="Проверить HUD Напарников",
+                      command=self._open_wingman_monitor).pack(fill="x", padx=8, pady=2)
+        ctk.CTkButton(parent, text="Тест Напарников — текущий матч",
+                      command=self.ctrl.start_wingman_test).pack(fill="x", padx=8, pady=2)
+        ctk.CTkButton(parent, text="Остановить тест Напарников",
+                      command=self.ctrl.stop_wingman_test).pack(fill="x", padx=8, pady=2)
         self._vars["bot_mode"] = ctk.StringVar(
             value=cfg.bot_mode.value if hasattr(cfg.bot_mode, "value") else str(cfg.bot_mode)
         )
@@ -361,16 +374,11 @@ class PanelView:
             "csgobot_require_cuda",
             getattr(cfg, "csgobot_require_cuda", False),
         )
-        self._add_switch(
-            parent,
-            "csgobot_nav_enabled",
-            getattr(cfg, "csgobot_nav_enabled", True),
-        )
-        self._add_entry(
-            parent,
-            "csgobot_nav_pack",
-            getattr(cfg, "csgobot_nav_pack", "auto"),
-        )
+        # Keep saved compatibility values without exposing obsolete farm controls.
+        self._vars["csgobot_nav_enabled"] = ctk.BooleanVar(value=True)
+        self._vars["csgobot_nav_pack"] = ctk.StringVar(value="auto")
+        ctk.CTkLabel(parent, text="DM: Dust2 / Mirage / Inferno / Vertigo / Cache\nНапарники (флот): только Inferno. Nuke скрыт до стабилизации Inferno.",
+                     wraplength=320).pack(fill="x", padx=8, pady=6)
         self._add_entry(
             parent,
             "nav_fleet_push_url",
@@ -424,6 +432,125 @@ class PanelView:
             command=self.ctrl.import_fleet_inbox_metrics,
         ).pack(fill="x", padx=8, pady=(0, 8))
         self.ctrl.bind_nav_metrics_widget(self._nav_metrics_log)
+
+    def _build_wingman_fleet(self, parent: ctk.CTkFrame) -> None:
+        from core.wingman_fleet.roster import SLOT_LAYOUT
+        parent = ctk.CTkScrollableFrame(parent)
+        parent.pack(fill="both", expand=True, padx=2, pady=2)
+        cfg = self.ctrl.config
+        ctk.CTkLabel(
+            parent,
+            text="Флот Напарников / Inferno — координатор на одном из 4 ПК",
+            font=ctk.CTkFont(weight="bold"),
+        ).pack(anchor="w", padx=8, pady=(8, 4))
+        self._fleet_status = ctk.CTkTextbox(parent, height=140, state="disabled")
+        self._fleet_status.pack(fill="x", padx=8, pady=4)
+        self.ctrl.bind_fleet_widget(self._fleet_status)
+        row = ctk.CTkFrame(parent, fg_color="transparent")
+        row.pack(fill="x", padx=8, pady=2)
+        for text, cmd in (
+            ("Координатор", self._fleet_start_coordinator),
+            ("Агент", self._fleet_start_agent),
+            ("Старт цикла", self.ctrl.start_fleet_run),
+            ("Стоп", self.ctrl.stop_fleet_run),
+        ):
+            ctk.CTkButton(row, text=text, command=cmd, width=90).pack(side="left", padx=2)
+        self._add_entry(parent, "wingman_fleet_url", getattr(cfg, "wingman_fleet_url", ""))
+        self._add_entry(parent, "wingman_fleet_port", str(getattr(cfg, "wingman_fleet_port", 8790)))
+        self._add_entry(parent, "wingman_fleet_token", getattr(cfg, "wingman_fleet_token", ""), show="*")
+        self._add_entry(parent, "wingman_fleet_agent_id", getattr(cfg, "wingman_fleet_agent_id", ""))
+        self._add_entry(parent, "wingman_fleet_expected_steamid64",
+                        getattr(cfg, "wingman_fleet_expected_steamid64", ""))
+        self._vars["wingman_fleet_role"] = ctk.StringVar(
+            value=getattr(cfg.wingman_fleet_role, "value", str(cfg.wingman_fleet_role))
+        )
+        ctk.CTkOptionMenu(parent, values=["coordinator", "agent"],
+                         variable=self._vars["wingman_fleet_role"]).pack(fill="x", padx=8, pady=2)
+        self._add_switch(parent, "wingman_fleet_autostart", bool(getattr(cfg, "wingman_fleet_autostart", False)))
+        roster = self.ctrl._fleet().roster()
+        self._fleet_slots: dict[int, dict[str, ctk.StringVar]] = {}
+        for slot, pair_id, role in SLOT_LAYOUT:
+            e = roster.slots.get(slot) or {}
+            box = ctk.CTkFrame(parent)
+            box.pack(fill="x", padx=8, pady=2)
+            ctk.CTkLabel(box, text=f"{slot} {role.value} {pair_id}", width=120).pack(side="left")
+            vars_ = {
+                "agent_id": ctk.StringVar(value=e.get("agent_id", "")),
+                "steam_id64": ctk.StringVar(value=e.get("steam_id64", "")),
+                "display_name": ctk.StringVar(value=e.get("display_name", "")),
+                "friend_code": ctk.StringVar(value=e.get("friend_code", "")),
+            }
+            self._fleet_slots[slot] = vars_
+            for key, width in (("agent_id", 70), ("steam_id64", 140), ("display_name", 80), ("friend_code", 70)):
+                ctk.CTkEntry(box, textvariable=vars_[key], width=width).pack(side="left", padx=2)
+        ctk.CTkButton(parent, text="Сохранить слоты и конфиг", command=self._save_fleet).pack(
+            fill="x", padx=8, pady=4
+        )
+        ops = ctk.CTkFrame(parent, fg_color="transparent")
+        ops.pack(fill="x", padx=8, pady=2)
+        ctk.CTkButton(ops, text="Пара 1 повтор", width=110,
+                      command=lambda: self.ctrl.fleet_pair_action("pair-1", "retry")).pack(side="left", padx=2)
+        ctk.CTkButton(ops, text="Пара 2 повтор", width=110,
+                      command=lambda: self.ctrl.fleet_pair_action("pair-2", "retry")).pack(side="left", padx=2)
+        ctk.CTkButton(ops, text="Пересоздать лобби 1", width=140,
+                      command=lambda: self.ctrl.fleet_pair_action("pair-1", "recreate")).pack(side="left", padx=2)
+        ctk.CTkButton(ops, text="Пересоздать лобби 2", width=140,
+                      command=lambda: self.ctrl.fleet_pair_action("pair-2", "recreate")).pack(side="left", padx=2)
+        extra = ctk.CTkFrame(parent, fg_color="transparent")
+        extra.pack(fill="x", padx=8, pady=2)
+        for text, cmd in (
+            ("Скриншот", "screenshot"),
+            ("Рестарт CS2", "restart_cs2"),
+            ("Рестарт Steam", "restart_steam"),
+        ):
+            ctk.CTkButton(extra, text=text, width=120,
+                          command=lambda c=cmd: self._fleet_local_command(c)).pack(side="left", padx=2)
+
+    def _fleet_start_coordinator(self) -> None:
+        try:
+            self._save_fleet()
+            self.ctrl.start_fleet_coordinator()
+        except Exception as exc:
+            self.ctrl.append_log(f"fleet: {exc}")
+
+    def _fleet_start_agent(self) -> None:
+        try:
+            self._save_fleet()
+            self.ctrl.start_fleet_agent()
+        except Exception as extra:
+            self.ctrl.append_log(f"fleet: {extra}")
+
+    def _fleet_local_command(self, command: str) -> None:
+        agent_id = self._vars["wingman_fleet_agent_id"].get().strip()
+        if not agent_id:
+            self.ctrl.append_log("fleet: задайте wingman_fleet_agent_id")
+            return
+        try:
+            self.ctrl.fleet_agent_command(agent_id, command)
+        except Exception as extra:
+            self.ctrl.append_log(f"fleet: {extra}")
+
+    def _save_fleet(self) -> None:
+        from config.schema import FleetRole
+        updates = {
+            "wingman_fleet_url": self._vars["wingman_fleet_url"].get().strip(),
+            "wingman_fleet_port": int(self._vars["wingman_fleet_port"].get() or "8790"),
+            "wingman_fleet_token": self._vars["wingman_fleet_token"].get().strip(),
+            "wingman_fleet_agent_id": self._vars["wingman_fleet_agent_id"].get().strip(),
+            "wingman_fleet_expected_steamid64": self._vars["wingman_fleet_expected_steamid64"].get().strip(),
+            "wingman_fleet_role": FleetRole(self._vars["wingman_fleet_role"].get()),
+            "wingman_fleet_autostart": bool(self._vars["wingman_fleet_autostart"].get()),
+        }
+        self.ctrl.save_config_from_ui(updates)
+        for slot, vars_ in getattr(self, "_fleet_slots", {}).items():
+            agent = vars_["agent_id"].get().strip()
+            steam = vars_["steam_id64"].get().strip()
+            name = vars_["display_name"].get().strip()
+            if agent and steam and name:
+                try:
+                    self.ctrl.save_fleet_slot(slot, agent, steam, name, vars_["friend_code"].get().strip())
+                except Exception as exc:
+                    self.ctrl.append_log(f"fleet slot {slot}: {exc}")
 
     def _build_nav_packs(self, parent: ctk.CTkFrame) -> None:
         ctk.CTkLabel(
@@ -483,6 +610,9 @@ class PanelView:
             command=self._validate_nav_pack,
         ).pack(fill="x", padx=8, pady=(0, 8))
 
+        ctk.CTkButton(left, text="Navigation Studio — маршруты и проходы",
+                      command=self._open_nav_studio).pack(fill="x", padx=8, pady=(0, 8))
+
         self._nav_radar = NavRadarEditor(
             right,
             display_size=300,
@@ -498,6 +628,14 @@ class PanelView:
     def _start_nav_collector(self) -> None:
         self.ctrl.start_nav_fleet_collector()
         self.ctrl.refresh_nav_metrics_dashboard()
+
+    def _open_nav_studio(self) -> None:
+        try:
+            from panel.nav_studio_launcher import launch_studio
+            launch_studio()
+            self.ctrl.append_log("Navigation Studio: открывается локальный центр подготовки маршрутов")
+        except Exception as exc:
+            self.ctrl.append_log(f"Navigation Studio: {exc}")
 
     def _on_nav_radar_click(self, target: str, x: float, y: float) -> None:
         if target == "goal1":
@@ -696,6 +834,14 @@ class PanelView:
             }
         )
 
+    def _open_wingman_monitor(self) -> None:
+        from panel.wingman_monitor import WingmanMonitor
+        current = getattr(self, "_wingman_monitor", None)
+        if current is not None and not current.closed:
+            current.window.lift()
+            return
+        self._wingman_monitor = WingmanMonitor(self.root)
+
     def _save_config3(self) -> None:
         self.ctrl.save_config_from_ui(
             {
@@ -712,6 +858,8 @@ class PanelView:
                 ),
                 "fsm_logpass_path": self._vars["fsm_logpass_path"].get().strip(),
                 "fsm_mafiles_dir": self._vars["fsm_mafiles_dir"].get().strip(),
+                "game_mode": (GameMode.DEATHMATCH if self._vars["game_mode"].get() == "Deathmatch"
+                              else GameMode.WINGMAN),
                 "bot_mode": BotMode(self._vars["bot_mode"].get()),
                 "csgobot_require_cuda": bool(
                     self._vars["csgobot_require_cuda"].get()
@@ -755,5 +903,7 @@ class PanelView:
         self.ctrl.get_lvl_selected()
 
     def on_close(self) -> None:
+        self.ctrl.stop_wingman_test()
+        self.ctrl.stop_fleet()
         w, h = self.root.winfo_width(), self.root.winfo_height()
         self.ctrl.save_config_from_ui({"panel_geometry": f"{w}x{h}"})

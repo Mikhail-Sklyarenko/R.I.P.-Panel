@@ -104,5 +104,10 @@ def test_no_gpl_import_in_panel() -> None:
 
     for mod in (panel.app, panel.controller, panel.ui):
         src = open(mod.__file__, encoding="utf-8").read()
-        assert "csgobot" not in src
+        import ast
+        for node in ast.walk(ast.parse(src)):
+            names=([node.module or ''] if isinstance(node,ast.ImportFrom) else
+                   [a.name for a in node.names] if isinstance(node,ast.Import) else [])
+            assert not any(n.split('.')[0] in {'csgobot','nav','aiming','vendor'} for n in names)
+        # The panel may call its own subprocess adapter modules.combat.csgobot_ai.
         assert "vendor.csgobot" not in src

@@ -1,0 +1,249 @@
+{
+  "experimental": true,
+  "full_map_ready": false,
+  "live_validated": false,
+  "reason": "Stock calibration frames are not independent random-spawn validation",
+  "frames_total": 22,
+  "localized": 22,
+  "localized_inside_ground": 18,
+  "frames": [
+    {
+      "frame": "a_ramp_frame.jpg",
+      "accepted": true,
+      "reason": "measured",
+      "x": 0.8686972419315626,
+      "y": 0.16193333787243988,
+      "confidence": 0.7680304628709638,
+      "mean_update_ms": 70.83,
+      "inside_expanded_ground": true,
+      "component": 1
+    },
+    {
+      "frame": "b_doors_frame.jpg",
+      "accepted": true,
+      "reason": "measured",
+      "x": 0.2524521870341365,
+      "y": 0.22502819710390878,
+      "confidence": 0.8563205531212271,
+      "mean_update_ms": 69.92,
+      "inside_expanded_ground": false
+    },
+    {
+      "frame": "bombsite_a_frame.jpg",
+      "accepted": true,
+      "reason": "measured",
+      "x": 0.8007761950060451,
+      "y": 0.13981609413931284,
+      "confidence": 0.736507642922278,
+      "mean_update_ms": 62.97,
+      "inside_expanded_ground": false
+    },
+    {
+      "frame": "bombsite_b_frame.jpg",
+      "accepted": true,
+      "reason": "measured",
+      "x": 0.15553283694285197,
+      "y": 0.21359355343574374,
+      "confidence": 0.8262176146070461,
+      "mean_update_ms": 54.86,
+      "inside_expanded_ground": true,
+      "component": 1
+    },
+    {
+      "frame": "ct_spawn_frame.jpg",
+      "accepted": true,
+      "reason": "measured",
+      "x": 0.611418433694542,
+      "y": 0.23312563765746458,
+      "confidence": 0.8409144608660715,
+      "mean_update_ms": 66.12,
+      "inside_expanded_ground": false
+    },
+    {
+      "frame": "ledge_frame.jpg",
+      "accepted": true,
+      "reason": "measured",
+      "x": 0.5576892236801216,
+      "y": 0.3931344833317906,
+      "confidence": 0.8308273202961112,
+      "mean_update_ms": 92.44,
+      "inside_expanded_ground": true,
+      "component": 1
+    },
+    {
+      "frame": "long_a_frame.jpg",
+      "accepted": true,
+      "reason": "measured",
+      "x": 0.8668022652665991,
+      "y": 0.42368363864453296,
+      "confidence": 0.8310609029639098,
+      "mean_update_ms": 55.88,
+      "inside_expanded_ground": true,
+      "component": 1
+    },
+    {
+      "frame": "long_doors_frame.jpg",
+      "accepted": true,
+      "reason": "measured",
+      "x": 0.6809265775950788,
+      "y": 0.6267590786626624,
+      "confidence": 0.819021913240968,
+      "mean_update_ms": 64.89,
+      "inside_expanded_ground": true,
+      "component": 1
+    },
+    {
+      "frame": "long_frame.jpg",
+      "accepted": true,
+      "reason": "measured",
+      "x": 0.6118197563290121,
+      "y": 0.8048025716448113,
+      "confidence": 0.8214403917620676,
+      "mean_update_ms": 55.18,
+      "inside_expanded_ground": true,
+      "component": 1
+    },
+    {
+      "frame": "mid_doors_frame.jpg",
+      "accepted": true,
+      "reason": "measured",
+      "x": 0.45332075843447533,
+      "y": 0.2344210872685378,
+      "confidence": 0.7903766571636253,
+      "mean_update_ms": 97.93,
+      "inside_expanded_ground": true,
+      "component": 1
+    },
+    {
+      "frame": "mid_frame.jpg",
+      "accepted": true,
+      "reason": "measured",
+      "x": 0.4579627118962976,
+      "y": 0.43168731999726284,
+      "confidence": 0.8295814564001929,
+      "mean_update_ms": 86.73,
+      "inside_expanded_ground": true,
+      "component": 1
+    },
+    {
+      "frame": "mid_upper_frame.jpg",
+      "accepted": true,
+      "reason": "measured",
+      "x": 0.46012464358676525,
+      "y": 0.6067864811805455,
+      "confidence": 0.7957612466323432,
+      "mean_update_ms": 68.97,
+      "inside_expanded_ground": true,
+      "component": 1
+    },
+    {
+      "frame": "near_a_frame.jpg",
+      "accepted": true,
+      "reason": "measured",
+      "x": 0.6857873297113926,
+      "y": 0.13617860285576103,
+      "confidence": 0.7728177160533609,
+      "mean_update_ms": 65.19,
+      "inside_expanded_ground": true,
+      "component": 1
+    },
+    {
+      "frame": "outside_tunnel_frame.jpg",
+      "accepted": true,
+      "reason": "measured",
+      "x": 0.1827098770978956,
+      "y": 0.6425937920636331,
+      "confidence": 0.8415821809099011,
+      "mean_update_ms": 79.25,
+      "inside_expanded_ground": true,
+      "component": 1
+    },
+    {
+      "frame": "pit_frame.jpg",
+      "accepted": true,
+      "reason": "measured",
+      "x": 0.8650488322028747,
+      "y": 0.6137527485316174,
+      "confidence": 0.7991203839653358,
+      "mean_update_ms": 56.88,
+      "inside_expanded_ground": true,
+      "component": 1
+    },
+    {
+      "frame": "short_frame.jpg",
+      "accepted": true,
+      "reason": "measured",
+      "x": 0.6240676322429575,
+      "y": 0.3997969717819481,
+      "confidence": 0.8280978523851961,
+      "mean_update_ms": 90.19,
+      "inside_expanded_ground": true,
+      "component": 1
+    },
+    {
+      "frame": "t_ramp_frame.jpg",
+      "accepted": true,
+      "reason": "measured",
+      "x": 0.130807679512115,
+      "y": 0.7895438131199497,
+      "confidence": 0.854284648803654,
+      "mean_update_ms": 52.29,
+      "inside_expanded_ground": true,
+      "component": 1
+    },
+    {
+      "frame": "t_spawn_frame.jpg",
+      "accepted": true,
+      "reason": "measured",
+      "x": 0.22510151205870899,
+      "y": 0.8241099053562305,
+      "confidence": 0.8322307152065653,
+      "mean_update_ms": 74.32,
+      "inside_expanded_ground": true,
+      "component": 1
+    },
+    {
+      "frame": "tunnel_frame.jpg",
+      "accepted": true,
+      "reason": "measured",
+      "x": 0.39539878192946304,
+      "y": 0.3987185627866781,
+      "confidence": 0.8230460265416939,
+      "mean_update_ms": 108.68,
+      "inside_expanded_ground": true,
+      "component": 1
+    },
+    {
+      "frame": "tunnel_stairs_frame.jpg",
+      "accepted": true,
+      "reason": "measured",
+      "x": 0.3139182508619371,
+      "y": 0.46612166847037406,
+      "confidence": 0.7926476727561813,
+      "mean_update_ms": 92.35,
+      "inside_expanded_ground": false
+    },
+    {
+      "frame": "tunnel_upper_frame.jpg",
+      "accepted": true,
+      "reason": "measured",
+      "x": 0.21265547835389365,
+      "y": 0.4661366793159423,
+      "confidence": 0.8177604488661113,
+      "mean_update_ms": 92.4,
+      "inside_expanded_ground": true,
+      "component": 1
+    },
+    {
+      "frame": "under_a_frame.jpg",
+      "accepted": true,
+      "reason": "measured",
+      "x": 0.7413755645886037,
+      "y": 0.23419925979280395,
+      "confidence": 0.8225199167191809,
+      "mean_update_ms": 76.01,
+      "inside_expanded_ground": true,
+      "component": 1
+    }
+  ]
+}

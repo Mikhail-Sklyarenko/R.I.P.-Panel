@@ -10,7 +10,7 @@ from config.loader import load_config
 from config.paths import get_app_root, get_data_dir, get_fsm_import_dir, is_frozen
 from config.schema import AppConfig
 
-APP_VERSION = "0.1.0-prototype"
+APP_VERSION = "0.2.0-wingman-fleet"
 
 
 def format_startup_banner(config: AppConfig) -> list[str]:
@@ -170,7 +170,7 @@ def collect_startup_warnings(config: AppConfig | None = None) -> list[str]:
                             detail = str(errs)
                         warnings.append(
                             f"csgobot nav preflight failed: {detail} "
-                            "(will use macro patrol)"
+                            "(navigation and combat will not start until this is fixed)"
                         )
 
     if cfg.auto_collect_drop and not (cfg.trade_offer_link or "").strip():

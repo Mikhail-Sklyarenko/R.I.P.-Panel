@@ -9,10 +9,15 @@ from pathlib import Path
 
 import yaml
 
-from config.paths import get_app_root
 from modules.ui_nav.errors import UiNavError
 
 _DEFAULT_RESOLUTION = "360x270"
+
+
+def get_app_root() -> Path:
+    # Input helpers also run inside csgobot, which has its own config module.
+    from config.paths import get_app_root as resolve
+    return resolve()
 
 
 def _parse_resolution(resolution: str) -> tuple[int, int]:

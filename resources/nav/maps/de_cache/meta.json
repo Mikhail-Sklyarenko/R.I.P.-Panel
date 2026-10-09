@@ -1,0 +1,11 @@
+{
+  "map_id": "de_cache",
+  "script_id": "cache",
+  "display_name": "Cache",
+  "radar_size_px": 1024,
+  "coordinate_system": "radar_pixels",
+  "source_url": "https://raw.githubusercontent.com/MurkyYT/cs2-map-icons/main/images/radars/de_cache_radar_psd.png",
+  "radar_sha256": "02bd3c96cc52b551d7f364dc1f5e0e61dceabe5b4564481888add743cd74893e",
+  "source_sha256": "afa47fd3111f007cedfbb580f740780427531e8ce6b9dcc55a13d9104e2ed6a6",
+  "landmarks": {}
+}

@@ -1,0 +1,1 @@
+Cache recording 2026-09-13 16-59-35.mp4. Odd-second radar crops excluded from the atlas, but adjacent to its calibration frames. Expected XY transforms are regression baselines from global contour/HUD registration, not independent ground truth. No live validation.

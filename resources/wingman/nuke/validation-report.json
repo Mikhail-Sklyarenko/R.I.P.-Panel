@@ -1,0 +1,1419 @@
+{
+  "version": "wingman-nuke-1",
+  "live_validated": false,
+  "validation": [
+    {
+      "suite": "Wingman, Vertigo, perception, input, camera and navigation regressions",
+      "passed": 298,
+      "excluded": 1,
+      "exclusion": "Local HTTP listener blocked by sandbox; receiver_auth_and_lifecycle not run"
+    },
+    {
+      "suite": "After final gallery action change: Nuke, Wingman ingress, Mirage v11/v15, Inferno v16",
+      "passed": 77
+    }
+  ],
+  "registration": {
+    "frames": 68,
+    "results": {
+      "registered": 60,
+      "ambiguous_or_missing_floor": 4,
+      "no_icon": 4
+    },
+    "rows": [
+      {
+        "t": 4,
+        "reason": "registered",
+        "conf": 0.8799426934097422,
+        "layer": "lower",
+        "xy": [
+          710.8681942400674,
+          723.2289257935674
+        ]
+      },
+      {
+        "t": 8,
+        "reason": "registered",
+        "conf": 0.8924949290060853,
+        "layer": "lower",
+        "xy": [
+          711.4461416385639,
+          723.3485419559611
+        ]
+      },
+      {
+        "t": 116,
+        "reason": "registered",
+        "conf": 0.8645270628572491,
+        "layer": "upper",
+        "xy": [
+          618.6738407975946,
+          358.885899667669
+        ]
+      },
+      {
+        "t": 118,
+        "reason": "registered",
+        "conf": 0.8523284313725491,
+        "layer": "upper",
+        "xy": [
+          595.2624839948784,
+          365.30089628681185
+        ]
+      },
+      {
+        "t": 148,
+        "reason": "registered",
+        "conf": 0.8902374670184697,
+        "layer": "upper",
+        "xy": [
+          608.4868183459733,
+          391.8382087396172
+        ]
+      },
+      {
+        "t": 150,
+        "reason": "registered",
+        "conf": 0.8912634408602151,
+        "layer": "upper",
+        "xy": [
+          608.4868183459733,
+          391.8382087396172
+        ]
+      },
+      {
+        "t": 152,
+        "reason": "registered",
+        "conf": 0.8925619834710745,
+        "layer": "upper",
+        "xy": [
+          608.4868183459733,
+          391.8382087396172
+        ]
+      },
+      {
+        "t": 158,
+        "reason": "registered",
+        "conf": 0.8504960317460318,
+        "layer": "upper",
+        "xy": [
+          608.9014084507043,
+          378.1408450704226
+        ]
+      },
+      {
+        "t": 41,
+        "reason": "registered",
+        "conf": 0.85,
+        "layer": "lower",
+        "xy": [
+          688.8888888888889,
+          694.3835854633978
+        ]
+      },
+      {
+        "t": 43,
+        "reason": "registered",
+        "conf": 0.850732501356484,
+        "layer": "lower",
+        "xy": [
+          656.9447453954497,
+          648.104008667389
+        ]
+      },
+      {
+        "t": 47,
+        "reason": "ambiguous_or_missing_floor",
+        "conf": 0,
+        "layer": null
+      },
+      {
+        "t": 49,
+        "reason": "registered",
+        "conf": 0.85,
+        "layer": "lower",
+        "xy": [
+          530.9531608254176,
+          596.069439895185
+        ]
+      },
+      {
+        "t": 51,
+        "reason": "registered",
+        "conf": 0.85,
+        "layer": "lower",
+        "xy": [
+          582.9518779342723,
+          594.5715962441316
+        ]
+      },
+      {
+        "t": 53,
+        "reason": "registered",
+        "conf": 0.85,
+        "layer": "lower",
+        "xy": [
+          598.165738617753,
+          574.7133966590239
+        ]
+      },
+      {
+        "t": 55,
+        "reason": "registered",
+        "conf": 0.8830310880829016,
+        "layer": "lower",
+        "xy": [
+          615.7307481251144,
+          582.8059264678984
+        ]
+      },
+      {
+        "t": 57,
+        "reason": "registered",
+        "conf": 0.85,
+        "layer": "lower",
+        "xy": [
+          619.7476525821596,
+          597.3004694835681
+        ]
+      },
+      {
+        "t": 59,
+        "reason": "registered",
+        "conf": 0.8518582046883935,
+        "layer": "lower",
+        "xy": [
+          567.1117614779587,
+          595.024693616243
+        ]
+      },
+      {
+        "t": 61,
+        "reason": "registered",
+        "conf": 0.8854914196567863,
+        "layer": "lower",
+        "xy": [
+          607.2796328532995,
+          594.5244500712138
+        ]
+      },
+      {
+        "t": 71,
+        "reason": "registered",
+        "conf": 0.85,
+        "layer": "lower",
+        "xy": [
+          580.6531496672342,
+          481.5353660424083
+        ]
+      },
+      {
+        "t": 73,
+        "reason": "registered",
+        "conf": 0.85,
+        "layer": "lower",
+        "xy": [
+          552.2021014978761,
+          448.15560026827643
+        ]
+      },
+      {
+        "t": 75,
+        "reason": "registered",
+        "conf": 0.85,
+        "layer": "lower",
+        "xy": [
+          558.598962194218,
+          403.70644922164564
+        ]
+      },
+      {
+        "t": 77,
+        "reason": "registered",
+        "conf": 0.85,
+        "layer": "lower",
+        "xy": [
+          610.9443546525052,
+          415.6084045255137
+        ]
+      },
+      {
+        "t": 79,
+        "reason": "registered",
+        "conf": 0.8502982107355865,
+        "layer": "lower",
+        "xy": [
+          629.2005554453482,
+          473.0013886133704
+        ]
+      },
+      {
+        "t": 83,
+        "reason": "registered",
+        "conf": 0.8502299437915177,
+        "layer": "lower",
+        "xy": [
+          637.2946009389672,
+          474.911971830986
+        ]
+      },
+      {
+        "t": 85,
+        "reason": "registered",
+        "conf": 0.8600196463654225,
+        "layer": "lower",
+        "xy": [
+          676.7323943661972,
+          495.4741784037559
+        ]
+      },
+      {
+        "t": 87,
+        "reason": "registered",
+        "conf": 0.8654741624077229,
+        "layer": "lower",
+        "xy": [
+          678.2394366197184,
+          550.5985915492959
+        ]
+      },
+      {
+        "t": 89,
+        "reason": "registered",
+        "conf": 0.85,
+        "layer": "lower",
+        "xy": [
+          653.6574284416175,
+          573.5120399818265
+        ]
+      },
+      {
+        "t": 91,
+        "reason": "registered",
+        "conf": 0.85,
+        "layer": "lower",
+        "xy": [
+          651.1164548265201,
+          646.0322913088287
+        ]
+      },
+      {
+        "t": 93,
+        "reason": "registered",
+        "conf": 0.85,
+        "layer": "lower",
+        "xy": [
+          654.5589325426242,
+          663.6026686434396
+        ]
+      },
+      {
+        "t": 95,
+        "reason": "registered",
+        "conf": 0.85,
+        "layer": "lower",
+        "xy": [
+          650.6248760166634,
+          593.8901011704028
+        ]
+      },
+      {
+        "t": 97,
+        "reason": "registered",
+        "conf": 0.8764265668849393,
+        "layer": "lower",
+        "xy": [
+          638.4358784284656,
+          550.963676797628
+        ]
+      },
+      {
+        "t": 99,
+        "reason": "registered",
+        "conf": 0.85,
+        "layer": "lower",
+        "xy": [
+          591.9702120770601,
+          545.6694188117209
+        ]
+      },
+      {
+        "t": 101,
+        "reason": "registered",
+        "conf": 0.85,
+        "layer": "lower",
+        "xy": [
+          549.7575617640268,
+          531.0551835603787
+        ]
+      },
+      {
+        "t": 109,
+        "reason": "registered",
+        "conf": 0.85,
+        "layer": "lower",
+        "xy": [
+          578.4398699891658,
+          465.0776453593355
+        ]
+      },
+      {
+        "t": 111,
+        "reason": "ambiguous_or_missing_floor",
+        "conf": 0,
+        "layer": null
+      },
+      {
+        "t": 113,
+        "reason": "ambiguous_or_missing_floor",
+        "conf": 0,
+        "layer": null
+      },
+      {
+        "t": 121,
+        "reason": "registered",
+        "conf": 0.85,
+        "layer": "lower",
+        "xy": [
+          610.3761811374577,
+          402.3177036904974
+        ]
+      },
+      {
+        "t": 123,
+        "reason": "registered",
+        "conf": 0.85,
+        "layer": "lower",
+        "xy": [
+          577.3854393969451,
+          441.65840111089074
+        ]
+      },
+      {
+        "t": 125,
+        "reason": "registered",
+        "conf": 0.85,
+        "layer": "lower",
+        "xy": [
+          601.9389061642582,
+          452.71629778672036
+        ]
+      },
+      {
+        "t": 127,
+        "reason": "registered",
+        "conf": 0.85,
+        "layer": "lower",
+        "xy": [
+          574.2145178764897,
+          483.71253159985554
+        ]
+      },
+      {
+        "t": 129,
+        "reason": "registered",
+        "conf": 0.8533695652173914,
+        "layer": "lower",
+        "xy": [
+          592.5398545116855,
+          535.2731775266988
+        ]
+      },
+      {
+        "t": 131,
+        "reason": "registered",
+        "conf": 0.85,
+        "layer": "lower",
+        "xy": [
+          615.5438656032582,
+          586.9675886645173
+        ]
+      },
+      {
+        "t": 133,
+        "reason": "registered",
+        "conf": 0.8879844961240311,
+        "layer": "lower",
+        "xy": [
+          615.7153446997777,
+          578.5767234988881
+        ]
+      },
+      {
+        "t": 135,
+        "reason": "registered",
+        "conf": 0.8535232383808097,
+        "layer": "lower",
+        "xy": [
+          620.6145966709348,
+          544.5582586427657
+        ]
+      },
+      {
+        "t": 137,
+        "reason": "registered",
+        "conf": 0.85,
+        "layer": "lower",
+        "xy": [
+          631.0175660705809,
+          477.86042095268243
+        ]
+      },
+      {
+        "t": 139,
+        "reason": "no_icon"
+      },
+      {
+        "t": 141,
+        "reason": "no_icon"
+      },
+      {
+        "t": 143,
+        "reason": "no_icon"
+      },
+      {
+        "t": 171,
+        "reason": "registered",
+        "conf": 0.8533429533429534,
+        "layer": "lower",
+        "xy": [
+          604.7062864994848,
+          523.1879079354173
+        ]
+      },
+      {
+        "t": 173,
+        "reason": "registered",
+        "conf": 0.85,
+        "layer": "lower",
+        "xy": [
+          638.6953298739808,
+          546.0340993328392
+        ]
+      },
+      {
+        "t": 175,
+        "reason": "registered",
+        "conf": 0.8533292608430055,
+        "layer": "lower",
+        "xy": [
+          679.595521849043,
+          536.0780065005417
+        ]
+      },
+      {
+        "t": 177,
+        "reason": "registered",
+        "conf": 0.850826901874311,
+        "layer": "lower",
+        "xy": [
+          690.6103286384978,
+          530.1810865191147
+        ]
+      },
+      {
+        "t": 179,
+        "reason": "registered",
+        "conf": 0.8514485514485515,
+        "layer": "lower",
+        "xy": [
+          656.3380281690141,
+          582.5498445216756
+        ]
+      },
+      {
+        "t": 181,
+        "reason": "registered",
+        "conf": 0.85,
+        "layer": "lower",
+        "xy": [
+          641.4084507042254,
+          641.1267605633803
+        ]
+      },
+      {
+        "t": 183,
+        "reason": "registered",
+        "conf": 0.85,
+        "layer": "lower",
+        "xy": [
+          573.8654147104852,
+          641.1580594679187
+        ]
+      },
+      {
+        "t": 185,
+        "reason": "registered",
+        "conf": 0.85,
+        "layer": "lower",
+        "xy": [
+          521.1267605633803,
+          617.9186228482004
+        ]
+      },
+      {
+        "t": 187,
+        "reason": "ambiguous_or_missing_floor",
+        "conf": 0,
+        "layer": null
+      },
+      {
+        "t": 189,
+        "reason": "registered",
+        "conf": 0.8533692722371968,
+        "layer": "lower",
+        "xy": [
+          597.3917579551382,
+          564.0062597809077
+        ]
+      },
+      {
+        "t": 191,
+        "reason": "registered",
+        "conf": 0.85,
+        "layer": "lower",
+        "xy": [
+          614.186322755812,
+          574.3424401832683
+        ]
+      },
+      {
+        "t": 193,
+        "reason": "registered",
+        "conf": 0.8535014005602242,
+        "layer": "lower",
+        "xy": [
+          594.3049601959583,
+          522.2902633190447
+        ]
+      },
+      {
+        "t": 195,
+        "reason": "registered",
+        "conf": 0.85,
+        "layer": "lower",
+        "xy": [
+          589.5991332611052,
+          451.60707836764175
+        ]
+      },
+      {
+        "t": 197,
+        "reason": "registered",
+        "conf": 0.85,
+        "layer": "lower",
+        "xy": [
+          614.4551519644181,
+          458.85841363973316
+        ]
+      },
+      {
+        "t": 199,
+        "reason": "registered",
+        "conf": 0.85,
+        "layer": "lower",
+        "xy": [
+          605.3962328185984,
+          496.5212964534194
+        ]
+      },
+      {
+        "t": 201,
+        "reason": "registered",
+        "conf": 0.85,
+        "layer": "lower",
+        "xy": [
+          597.9476861167002,
+          445.9557344064387
+        ]
+      },
+      {
+        "t": 203,
+        "reason": "registered",
+        "conf": 0.8512944273804302,
+        "layer": "lower",
+        "xy": [
+          625.2018779342724,
+          489.23943661971833
+        ]
+      },
+      {
+        "t": 205,
+        "reason": "registered",
+        "conf": 0.85,
+        "layer": "lower",
+        "xy": [
+          622.2820066466213,
+          558.885899667669
+        ]
+      },
+      {
+        "t": 207,
+        "reason": "registered",
+        "conf": 0.85,
+        "layer": "lower",
+        "xy": [
+          595.9139452097199,
+          599.6594954341433
+        ]
+      },
+      {
+        "t": 209,
+        "reason": "no_icon"
+      }
+    ]
+  },
+  "runtime_selected_segments": {
+    "frames": 60,
+    "accepted_poses": 48,
+    "rows": [
+      {
+        "t": 43.0,
+        "valid": false,
+        "reason": "confirming_position",
+        "ms": 539.3,
+        "layer": null
+      },
+      {
+        "t": 43.08,
+        "valid": false,
+        "reason": "confirming_position",
+        "ms": 30.0,
+        "layer": null
+      },
+      {
+        "t": 43.16,
+        "valid": true,
+        "reason": "measured_global_contours",
+        "ms": 195.5,
+        "layer": "lower"
+      },
+      {
+        "t": 43.24,
+        "valid": true,
+        "reason": "measured_global_contours",
+        "ms": 219.7,
+        "layer": "lower"
+      },
+      {
+        "t": 43.32,
+        "valid": false,
+        "reason": "no_player_icon",
+        "ms": 12.9,
+        "layer": null
+      },
+      {
+        "t": 43.4,
+        "valid": false,
+        "reason": "confirming_position",
+        "ms": 149.7,
+        "layer": null
+      },
+      {
+        "t": 43.48,
+        "valid": true,
+        "reason": "measured_global_contours",
+        "ms": 169.2,
+        "layer": "lower"
+      },
+      {
+        "t": 43.56,
+        "valid": true,
+        "reason": "measured_fixed_anchor",
+        "ms": 60.0,
+        "layer": "lower"
+      },
+      {
+        "t": 43.64,
+        "valid": true,
+        "reason": "measured_fixed_anchor",
+        "ms": 57.8,
+        "layer": "lower"
+      },
+      {
+        "t": 43.72,
+        "valid": true,
+        "reason": "measured_fixed_anchor",
+        "ms": 55.3,
+        "layer": "lower"
+      },
+      {
+        "t": 43.8,
+        "valid": true,
+        "reason": "measured_fixed_anchor",
+        "ms": 51.5,
+        "layer": "lower"
+      },
+      {
+        "t": 43.88,
+        "valid": true,
+        "reason": "measured_fixed_anchor",
+        "ms": 56.2,
+        "layer": "lower"
+      },
+      {
+        "t": 123.0,
+        "valid": false,
+        "reason": "confirming_position",
+        "ms": 189.8,
+        "layer": null
+      },
+      {
+        "t": 123.08,
+        "valid": true,
+        "reason": "measured_fixed_anchor",
+        "ms": 50.6,
+        "layer": "lower"
+      },
+      {
+        "t": 123.16,
+        "valid": true,
+        "reason": "measured_fixed_anchor",
+        "ms": 56.5,
+        "layer": "lower"
+      },
+      {
+        "t": 123.24,
+        "valid": true,
+        "reason": "measured_fixed_anchor",
+        "ms": 40.4,
+        "layer": "lower"
+      },
+      {
+        "t": 123.32,
+        "valid": true,
+        "reason": "measured_fixed_anchor",
+        "ms": 94.6,
+        "layer": "lower"
+      },
+      {
+        "t": 123.4,
+        "valid": true,
+        "reason": "measured_fixed_anchor",
+        "ms": 109.1,
+        "layer": "lower"
+      },
+      {
+        "t": 123.48,
+        "valid": false,
+        "reason": "no_player_icon",
+        "ms": 82.4,
+        "layer": null
+      },
+      {
+        "t": 123.56,
+        "valid": false,
+        "reason": "confirming_position",
+        "ms": 121.6,
+        "layer": null
+      },
+      {
+        "t": 123.64,
+        "valid": true,
+        "reason": "measured_fixed_anchor",
+        "ms": 45.1,
+        "layer": "lower"
+      },
+      {
+        "t": 123.72,
+        "valid": true,
+        "reason": "measured_fixed_anchor",
+        "ms": 46.1,
+        "layer": "lower"
+      },
+      {
+        "t": 123.8,
+        "valid": true,
+        "reason": "measured_fixed_anchor",
+        "ms": 41.3,
+        "layer": "lower"
+      },
+      {
+        "t": 123.88,
+        "valid": true,
+        "reason": "measured_fixed_anchor",
+        "ms": 41.5,
+        "layer": "lower"
+      },
+      {
+        "t": 135.0,
+        "valid": false,
+        "reason": "confirming_position",
+        "ms": 101.4,
+        "layer": null
+      },
+      {
+        "t": 135.08,
+        "valid": true,
+        "reason": "measured_fixed_anchor",
+        "ms": 122.8,
+        "layer": "lower"
+      },
+      {
+        "t": 135.16,
+        "valid": true,
+        "reason": "measured_fixed_anchor",
+        "ms": 97.2,
+        "layer": "lower"
+      },
+      {
+        "t": 135.24,
+        "valid": true,
+        "reason": "measured_fixed_anchor",
+        "ms": 84.1,
+        "layer": "lower"
+      },
+      {
+        "t": 135.32,
+        "valid": true,
+        "reason": "measured_fixed_anchor",
+        "ms": 22.3,
+        "layer": "lower"
+      },
+      {
+        "t": 135.4,
+        "valid": true,
+        "reason": "measured_fixed_anchor",
+        "ms": 89.3,
+        "layer": "lower"
+      },
+      {
+        "t": 135.48,
+        "valid": true,
+        "reason": "measured_fixed_anchor",
+        "ms": 42.8,
+        "layer": "lower"
+      },
+      {
+        "t": 135.56,
+        "valid": true,
+        "reason": "measured_fixed_anchor",
+        "ms": 30.6,
+        "layer": "lower"
+      },
+      {
+        "t": 135.64,
+        "valid": true,
+        "reason": "measured_fixed_anchor",
+        "ms": 24.3,
+        "layer": "lower"
+      },
+      {
+        "t": 135.72,
+        "valid": true,
+        "reason": "measured_fixed_anchor",
+        "ms": 95.8,
+        "layer": "lower"
+      },
+      {
+        "t": 135.8,
+        "valid": true,
+        "reason": "measured_fixed_anchor",
+        "ms": 163.0,
+        "layer": "lower"
+      },
+      {
+        "t": 135.88,
+        "valid": false,
+        "reason": "confirming_position",
+        "ms": 198.2,
+        "layer": null
+      },
+      {
+        "t": 150.0,
+        "valid": false,
+        "reason": "confirming_position",
+        "ms": 222.0,
+        "layer": null
+      },
+      {
+        "t": 150.08,
+        "valid": true,
+        "reason": "measured_fixed_anchor",
+        "ms": 32.1,
+        "layer": "upper"
+      },
+      {
+        "t": 150.16,
+        "valid": true,
+        "reason": "measured_fixed_anchor",
+        "ms": 35.4,
+        "layer": "upper"
+      },
+      {
+        "t": 150.24,
+        "valid": true,
+        "reason": "measured_fixed_anchor",
+        "ms": 41.9,
+        "layer": "upper"
+      },
+      {
+        "t": 150.32,
+        "valid": true,
+        "reason": "measured_fixed_anchor",
+        "ms": 35.5,
+        "layer": "upper"
+      },
+      {
+        "t": 150.4,
+        "valid": true,
+        "reason": "measured_fixed_anchor",
+        "ms": 40.6,
+        "layer": "upper"
+      },
+      {
+        "t": 150.48,
+        "valid": true,
+        "reason": "measured_fixed_anchor",
+        "ms": 43.2,
+        "layer": "upper"
+      },
+      {
+        "t": 150.56,
+        "valid": true,
+        "reason": "measured_fixed_anchor",
+        "ms": 34.1,
+        "layer": "upper"
+      },
+      {
+        "t": 150.64,
+        "valid": true,
+        "reason": "measured_fixed_anchor",
+        "ms": 37.1,
+        "layer": "upper"
+      },
+      {
+        "t": 150.72,
+        "valid": true,
+        "reason": "measured_fixed_anchor",
+        "ms": 33.8,
+        "layer": "upper"
+      },
+      {
+        "t": 150.8,
+        "valid": true,
+        "reason": "measured_fixed_anchor",
+        "ms": 29.6,
+        "layer": "upper"
+      },
+      {
+        "t": 150.88,
+        "valid": true,
+        "reason": "measured_fixed_anchor",
+        "ms": 29.0,
+        "layer": "upper"
+      },
+      {
+        "t": 205.0,
+        "valid": false,
+        "reason": "confirming_position",
+        "ms": 142.6,
+        "layer": null
+      },
+      {
+        "t": 205.08,
+        "valid": false,
+        "reason": "confirming_position",
+        "ms": 41.1,
+        "layer": null
+      },
+      {
+        "t": 205.16,
+        "valid": true,
+        "reason": "measured_fixed_anchor",
+        "ms": 30.1,
+        "layer": "lower"
+      },
+      {
+        "t": 205.24,
+        "valid": true,
+        "reason": "measured_fixed_anchor",
+        "ms": 29.3,
+        "layer": "lower"
+      },
+      {
+        "t": 205.32,
+        "valid": true,
+        "reason": "measured_fixed_anchor",
+        "ms": 30.6,
+        "layer": "lower"
+      },
+      {
+        "t": 205.4,
+        "valid": true,
+        "reason": "measured_fixed_anchor",
+        "ms": 28.7,
+        "layer": "lower"
+      },
+      {
+        "t": 205.48,
+        "valid": true,
+        "reason": "measured_fixed_anchor",
+        "ms": 34.1,
+        "layer": "lower"
+      },
+      {
+        "t": 205.56,
+        "valid": true,
+        "reason": "measured_fixed_anchor",
+        "ms": 41.0,
+        "layer": "lower"
+      },
+      {
+        "t": 205.64,
+        "valid": true,
+        "reason": "measured_fixed_anchor",
+        "ms": 39.8,
+        "layer": "lower"
+      },
+      {
+        "t": 205.72,
+        "valid": true,
+        "reason": "measured_fixed_anchor",
+        "ms": 44.4,
+        "layer": "lower"
+      },
+      {
+        "t": 205.8,
+        "valid": true,
+        "reason": "measured_fixed_anchor",
+        "ms": 38.9,
+        "layer": "lower"
+      },
+      {
+        "t": 205.88,
+        "valid": true,
+        "reason": "measured_fixed_anchor",
+        "ms": 34.5,
+        "layer": "lower"
+      }
+    ]
+  },
+  "route_simulation": [
+    {
+      "goal": [
+        518,
+        610
+      ],
+      "reached": true,
+      "ticks": 113,
+      "collisions": 0,
+      "reason": "follow_verified_route",
+      "xy": [
+        523.6,
+        618.1
+      ]
+    },
+    {
+      "goal": [
+        568,
+        548
+      ],
+      "reached": true,
+      "ticks": 37,
+      "collisions": 0,
+      "reason": "follow_verified_route",
+      "xy": [
+        562.9,
+        556.2
+      ]
+    },
+    {
+      "goal": [
+        651,
+        552
+      ],
+      "reached": true,
+      "ticks": 39,
+      "collisions": 0,
+      "reason": "follow_verified_route",
+      "xy": [
+        640.3,
+        552.6
+      ]
+    },
+    {
+      "goal": [
+        674,
+        507
+      ],
+      "reached": true,
+      "ticks": 25,
+      "collisions": 0,
+      "reason": "follow_verified_route",
+      "xy": [
+        668.2,
+        516.1
+      ]
+    },
+    {
+      "goal": [
+        622,
+        440
+      ],
+      "reached": true,
+      "ticks": 94,
+      "collisions": 0,
+      "reason": "follow_verified_route",
+      "xy": [
+        613.0,
+        443.9
+      ]
+    },
+    {
+      "goal": [
+        547,
+        438
+      ],
+      "reached": true,
+      "ticks": 29,
+      "collisions": 0,
+      "reason": "follow_verified_route",
+      "xy": [
+        556.5,
+        439.4
+      ]
+    },
+    {
+      "goal": [
+        604,
+        572
+      ],
+      "reached": true,
+      "ticks": 70,
+      "collisions": 0,
+      "reason": "follow_verified_route",
+      "xy": [
+        602.2,
+        562.5
+      ]
+    },
+    {
+      "goal": [
+        710,
+        721
+      ],
+      "reached": true,
+      "ticks": 105,
+      "collisions": 0,
+      "reason": "follow_verified_route",
+      "xy": [
+        705.0,
+        713.2
+      ]
+    }
+  ],
+  "limits": [
+    "One walkthrough supplies both atlas calibration and replay. This is not independent accuracy validation.",
+    "Runtime replay seeks between selected segments; reacquisition frames are included.",
+    "Route simulation uses annotated 2D masks and cannot prove CS2 collision, height, door or objective behavior.",
+    "Nuke B catwalks and floor share radar projection. Directional jump recovery requires live traversal validation.",
+    "Windows input, Nuke bot planting/defusing and a full match were not executed here."
+  ],
+  "hotfix": {
+    "version": "wingman-nuke-2",
+    "passed": 305,
+    "excluded_http_receiver": 1,
+    "live_validated": false,
+    "fixes": [
+      "Synchronize measured floor while mission input is paused",
+      "Compare GSI arrival against current receiver clock"
+    ],
+    "regression": "Actual worker order from lower spawn through mission planning to movement input"
+  },
+  "navigation_fix3": {
+    "version": "wingman-nuke-3",
+    "regression_passed": 307,
+    "additional_stall_test_passed": 1,
+    "excluded_http_receiver": 1,
+    "live_validated": false,
+    "source_video": "2026-09-24 17-21-10.mp4",
+    "source_log_metrics": {
+      "stuck_events": 14,
+      "wait_pose_sec": 68,
+      "pose_valid_pct": 70.5
+    },
+    "route_simulation": [
+      {
+        "goal": [
+          518,
+          610
+        ],
+        "reached": true,
+        "ticks": 114,
+        "collisions": 0,
+        "reason": "follow_verified_route",
+        "xy": [
+          524.1,
+          618.8
+        ]
+      },
+      {
+        "goal": [
+          568,
+          548
+        ],
+        "reached": true,
+        "ticks": 37,
+        "collisions": 0,
+        "reason": "follow_verified_route",
+        "xy": [
+          562.8,
+          556.5
+        ]
+      },
+      {
+        "goal": [
+          651,
+          552
+        ],
+        "reached": true,
+        "ticks": 39,
+        "collisions": 0,
+        "reason": "follow_verified_route",
+        "xy": [
+          640.2,
+          552.6
+        ]
+      },
+      {
+        "goal": [
+          674,
+          507
+        ],
+        "reached": true,
+        "ticks": 25,
+        "collisions": 0,
+        "reason": "follow_verified_route",
+        "xy": [
+          668.1,
+          516.2
+        ]
+      },
+      {
+        "goal": [
+          622,
+          440
+        ],
+        "reached": true,
+        "ticks": 94,
+        "collisions": 0,
+        "reason": "follow_verified_route",
+        "xy": [
+          613.4,
+          443.8
+        ]
+      },
+      {
+        "goal": [
+          547,
+          438
+        ],
+        "reached": true,
+        "ticks": 29,
+        "collisions": 0,
+        "reason": "follow_verified_route",
+        "xy": [
+          556.9,
+          439.4
+        ]
+      },
+      {
+        "goal": [
+          604,
+          572
+        ],
+        "reached": true,
+        "ticks": 69,
+        "collisions": 0,
+        "reason": "follow_verified_route",
+        "xy": [
+          602.4,
+          561.9
+        ]
+      },
+      {
+        "goal": [
+          710,
+          721
+        ],
+        "reached": true,
+        "ticks": 108,
+        "collisions": 0,
+        "reason": "follow_verified_route",
+        "xy": [
+          703.4,
+          714.8
+        ]
+      }
+    ],
+    "remaining": [
+      "Live collision verification for changed masks",
+      "Decon entry and gallery heights",
+      "Visual localization dropouts",
+      "CT/defuse not covered by this six-round T recording"
+    ]
+  },
+  "navigation_fix4": {
+    "version": "wingman-nuke-4",
+    "live_validated": false,
+    "replay": {
+      "replay": {
+        "frames": 80,
+        "accepted": 48,
+        "ramp": 0
+      },
+      "replay_candidate": {
+        "frames": 80,
+        "accepted": 54,
+        "ramp": 14
+      }
+    },
+    "evidence_limit": "Short ramp replay overlaps calibration source; not independent gameplay verification. Remaining missing-pose frames require further validation.",
+    "changes": [
+      "Ordered north ramp entrance instead of guessed southern exits",
+      "Separate ramp navigation surface and calibrated references",
+      "Nuke approach radius 4 px with controller stop radius 2 px"
+    ],
+    "regression_passed": 310,
+    "targeted_final_passed": 18,
+    "excluded_http_receiver": 1,
+    "remaining": [
+      "Missing-pose frames remain on ramp replay",
+      "No live traversal validation",
+      "Gallery height interactions and decon collision geometry require further testing"
+    ],
+    "status": "candidate_not_live_validated"
+  },
+  "navigation_fix5": {
+    "version": "wingman-nuke-5",
+    "live_validated": false,
+    "regression_passed": 366,
+    "excluded_http_receiver": 1,
+    "source_video": "2026-09-24 20-15-07.mp4",
+    "replay": {
+      "frames": 90,
+      "accepted": 83,
+      "windows_seconds": [
+        214,
+        304,
+        308
+      ],
+      "window_duration_sec": 3,
+      "note": "Sequential recorded frames, 10 Hz; cold acquisition included. Not live traversal or kill-rate validation."
+    },
+    "changes": [
+      "Correct T vestibule wall and mandatory north checkpoint before west turn",
+      "Decon approach aligned at y600; fresh orange jambs supply bounded door heading cue",
+      "Upper/lower ramp geometry normalized consistently instead of rejected by y<390 gate",
+      "Closed lower garage blocks direct route; side exits remain reachable",
+      "Nuke camera 3-degree deadband and stronger movement-direction hysteresis",
+      "Wingman acquisition step 48->56, smoothing 1.4->1.25; precision step remains 16"
+    ],
+    "remaining": [
+      "Live collision and doorway crossing need Windows verification",
+      "Door frame observation may be absent when occluded or outside view",
+      "No measured live improvement to kill rate or complete-match success rate"
+    ]
+  }
+}

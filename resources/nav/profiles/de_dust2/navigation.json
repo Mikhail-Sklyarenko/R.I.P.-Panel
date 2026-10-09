@@ -11,5 +11,6 @@
   "route_pack": "dust2_visual_mvp",
   "live_validated": false,
   "mask_source": "radar floor palette intersected with inspected central lane rectangle; structures excluded",
-  "supported_start_region": "central lane only; other spawns require manual positioning"
+  "supported_start_region": "central lane only; other spawns require manual positioning",
+  "initial_hud_scale": 0.355
 }

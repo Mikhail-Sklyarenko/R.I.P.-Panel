@@ -7,13 +7,13 @@ Product goal: stop YOLO from boxing **map textures** (crates, walls, cars) as pl
 ## Strategy (automated)
 
 ```
-0. Bootstrap empties    ImportEmptyYoloSplits.bat  → fastest HN seed (~1k frames)
-1. Runtime band-aid     EnableFpGuard.bat          → raise conf now
-2. Collect HN           EnableHardNegCapture.bat   → walk map, force empty labels
+0. Bootstrap empties    tools/training/ImportEmptyYoloSplits.bat  → fastest HN seed (~1k frames)
+1. Runtime band-aid     tools/training/EnableFpGuard.bat          → raise conf now
+2. Collect HN           tools/training/EnableHardNegCapture.bat   → walk map, force empty labels
 3. Also passive         empty_scene in normal capture (no dets → empty)
-4. Promote              BuildHardNegativesFromRaw.bat
+4. Promote              tools/training/BuildHardNegativesFromRaw.bat
 5. Optional mine        mine_hard_negatives.py --mode folder|predict
-6. Merge + train        BuildProductWithHardNegatives.bat + TrainProductModel.bat
+6. Merge + train        tools/training/BuildProductWithHardNegatives.bat + tools/training/TrainProductModel.bat
 7. Promote weights      EnsureWeights / registry
 ```
 
@@ -23,12 +23,12 @@ Public bootstrap already has ~20% **empty YOLO labels** (map/UI without players)
 Do **not** delete them. Import into `sources/hard_negatives` (preserves train/val/test):
 
 ```bat
-ImportEmptyYoloSplits.bat D:\datasets\product_v1_bootstrap
+tools/training/ImportEmptyYoloSplits.bat D:\datasets\product_v1_bootstrap
 REM or a USB parent that contains train\ val\ test\
-ImportEmptyYoloSplits.bat E:\
+tools/training/ImportEmptyYoloSplits.bat E:\
 
-BuildProductWithHardNegatives.bat
-TrainProductModel.bat --data vendor\csgobot\yolov8\datasets\product_data_hn.yaml --name product_fpfix_v1
+tools/training/BuildProductWithHardNegatives.bat
+tools/training/TrainProductModel.bat --data vendor\csgobot\yolov8\datasets\product_data_hn.yaml --name product_fpfix_v1
 ```
 
 Mac / offline:
@@ -55,7 +55,7 @@ Then zip `sources/hard_negatives` to the Train PC if datasets live only there.
 ## 1) Immediate FP guard (no retrain)
 
 ```bat
-EnableFpGuard.bat
+tools/training/EnableFpGuard.bat
 call data\fp_guard.env.bat
 FarmPanel.bat
 ```
@@ -65,7 +65,7 @@ Sets ~`CSGOBOT_CONFIDENCE=0.58`. Temporary — lowers texture FP; may hide weak 
 ## 2) Hard-neg collector (best automated data)
 
 ```bat
-EnableHardNegCapture.bat
+tools/training/EnableHardNegCapture.bat
 call data\capture_hardneg.env.bat
 FarmPanel.bat
 ```
@@ -79,7 +79,7 @@ Captures: `vendor/csgobot/data/captures/`
 ## 3) Promote
 
 ```bat
-BuildHardNegativesFromRaw.bat
+tools/training/BuildHardNegativesFromRaw.bat
 ```
 
 → `vendor/csgobot/yolov8/datasets/sources/hard_negatives/{train,val,test}/`
@@ -104,8 +104,8 @@ venv\Scripts\python.exe yolov8\datasets\mine_hard_negatives.py --mode predict --
 Preferred (TRAIN PC):
 
 ```bat
-BuildProductWithHardNegatives.bat
-TrainProductModel.bat --data vendor\csgobot\yolov8\datasets\product_data_hn.yaml --name product_fpfix_v1
+tools/training/BuildProductWithHardNegatives.bat
+tools/training/TrainProductModel.bat --data vendor\csgobot\yolov8\datasets\product_data_hn.yaml --name product_fpfix_v1
 ```
 
 Manual equivalent:
@@ -119,12 +119,12 @@ venv\Scripts\python.exe yolov8\datasets\build_product_dataset.py ^
   --classes c,ch,t,th --copy-images
 ```
 
-Soak on crate walls / Dust2 car, then promote `.pt` via registry + `EnsureWeights.bat`.
+Soak on crate walls / Dust2 car, then promote `.pt` via registry + `tools/training/EnsureWeights.bat`.
 
 ## Normal CT collector (also helps)
 
-`EnableAutoCapture.bat` now enables **`empty_scene`**: when YOLO sees nothing, saves empty-label backgrounds (passive negatives).  
-`BuildOurCs2FromRaw.bat` accepts empties up to **15%**.
+`tools/training/EnableAutoCapture.bat` now enables **`empty_scene`**: when YOLO sees nothing, saves empty-label backgrounds (passive negatives).  
+`tools/training/BuildOurCs2FromRaw.bat` accepts empties up to **15%**.
 
 Dedicated HN sessions still better for **high-conf** texture FPs (`ct 0.88` on crates).
 

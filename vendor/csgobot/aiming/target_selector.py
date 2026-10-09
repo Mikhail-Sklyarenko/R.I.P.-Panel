@@ -141,6 +141,16 @@ class TargetSelector:
             is_head=self._is_head(class_name),
         )
 
+    def select_body_for_head(self, head, detections, *, max_distance):
+        """Associate the head with its enclosing enemy body, not another player."""
+        candidates=[]
+        for body in self.filter_enemies(detections):
+            if body.is_head or body.distance>max_distance:continue
+            if (body.x1<=head.aim_x<=body.x2 and
+                    body.y1-body.height*.15<=head.aim_y<=body.y1+body.height*.45):
+                candidates.append(body)
+        return min(candidates,key=lambda b:abs(b.aim_x-head.aim_x)) if candidates else None
+
     def filter_enemies(self, detections: Dict[str, List[Dict]]) -> List[Target]:
         """
         Filter detections to only include enemies.

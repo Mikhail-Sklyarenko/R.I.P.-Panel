@@ -1,0 +1,11 @@
+{
+  "map_id": "de_nuke_lower",
+  "initial_hud_scale": 0.355,
+  "runtime_ready": true,
+  "layer_id": "lower",
+  "live_validated": false,
+  "clearance_px": 3,
+  "grid_step": 2,
+  "version": "wingman-nuke-5",
+  "scope": "Wingman ramp and B; excludes normal-mode outdoor/A areas"
+}

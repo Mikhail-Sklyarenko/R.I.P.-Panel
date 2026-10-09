@@ -96,7 +96,7 @@ def test_create_config_lead_and_adaptive_defaults(monkeypatch) -> None:
     from run import create_config  # noqa: E402
 
     cfg = create_config()
-    assert cfg.aim.lead_aim_enabled is True
+    assert cfg.aim.lead_aim_enabled is False
     assert cfg.aim.adaptive_smoothing is True
     assert cfg.aim.body_fallback_sec == 0.2
 
@@ -134,7 +134,7 @@ def test_create_config_a12_dual_phase_defaults(monkeypatch) -> None:
     from run import create_config  # noqa: E402
 
     cfg = create_config()
-    assert cfg.aim.mouse_step_max_delta == 20
+    assert cfg.aim.mouse_step_max_delta == 32
     assert cfg.aim.aim_near_step_max_delta == 8
     assert cfg.aim.aim_near_px == 48.0
     assert cfg.aim.aim_snap_px == 100.0

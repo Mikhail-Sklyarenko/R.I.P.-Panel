@@ -24,13 +24,14 @@ AI_PC_1280 = Path(__file__).resolve().parent / "fixtures" / "ai_pc" / "1280x720"
 def test_1280_main_menu_play_fixture_detects_and_clicks_play_not_shop() -> None:
     coords = load_nav_coords("1280x720")
     img = Image.open(AI_PC_1280 / "main_menu_play.png").convert("RGB")
-    img720 = img.resize((1280, 720), Image.Resampling.LANCZOS)
+    img720 = img.crop((0,24,img.width,img.height)).resize((1280, 720), Image.Resampling.LANCZOS)
     assert detect_state(img720, ScreenState.MAIN_MENU, coords, min_match=2) is True
     play = coords.click("main_menu_play")
     shop_x = 736
     assert play.x < shop_x
-    assert img720.getpixel((play.x, play.y))[0] > 200
-    assert img720.getpixel((shop_x, 43))[2] < 120
+    from modules.ui_nav.menu_labels import play_button
+    assert play_button(img720) is not None
+    assert play_button(img720)[0] < shop_x
 
 
 def test_1280_play_dm_fixture_click_targets() -> None:
@@ -81,11 +82,11 @@ def test_dm_runner_fallback_after_menu_timeout(data_dir, monkeypatch) -> None:
 
     with patch.object(nav, "wait_main_menu", side_effect=UiNavTimeoutError("timeout")):
         with patch.object(nav, "_click_target") as mock_click:
-            assert nav._pre_click_main_menu_wait() is True
-            mock_click.assert_called_once_with("main_menu_play")
+            assert nav._pre_click_main_menu_wait() is False
+            mock_click.assert_not_called()
     pt = coords.click("main_menu_play")
     assert pt.x == 217
-    assert any("controlled click ИГРАТЬ @(217,14)" in line for line in progress)
+    assert not any("controlled click" in line for line in progress)
 
 
 def test_strict_in_dm_rejects_black_image() -> None:
@@ -121,6 +122,7 @@ def test_main_menu_probes_not_on_loadout_x168() -> None:
 
 
 def test_autoscale_client_375x308(monkeypatch) -> None:
+    monkeypatch.setattr("modules.ui_nav.cs2_modal_dismiss.dismiss_cs2_modals", lambda *a, **k: None)
     monkeypatch.setattr("sys.platform", "win32")
     with patch("modules.ui_nav.window.client_size", return_value=(375, 308)):
         coords = load_nav_coords_for_hwnd(12345, "360x270")
@@ -130,6 +132,7 @@ def test_autoscale_client_375x308(monkeypatch) -> None:
 
 
 def test_load_nav_coords_for_hwnd_warns_on_mismatch(monkeypatch) -> None:
+    monkeypatch.setattr("modules.ui_nav.cs2_modal_dismiss.dismiss_cs2_modals", lambda *a, **k: None)
     monkeypatch.setattr("sys.platform", "win32")
     warnings: list[str] = []
     with patch("modules.ui_nav.window.client_size", return_value=(375, 308)):
@@ -176,6 +179,7 @@ def test_launcher_moves_windows_before_menu_wait(
     mock_load_coords.return_value = load_nav_coords("360x270")
     mock_wait_menu.return_value = MainMenuWaitResult(strict_ok=True, attempts=1)
     mock_move.return_value = MoveResult(moved=[], width=360, height=270)
+    monkeypatch.setattr("modules.ui_nav.cs2_modal_dismiss.dismiss_cs2_modals", lambda *a, **k: None)
     monkeypatch.setattr("sys.platform", "win32")
 
     cfg = AppConfig(
@@ -223,6 +227,7 @@ def test_launcher_waits_main_menu_before_cs2_ok(
     )
     mock_load_coords.return_value = load_nav_coords("360x270")
     mock_wait_menu.return_value = MainMenuWaitResult(strict_ok=True, attempts=1)
+    monkeypatch.setattr("modules.ui_nav.cs2_modal_dismiss.dismiss_cs2_modals", lambda *a, **k: None)
     monkeypatch.setattr("sys.platform", "win32")
 
     emitted: list[tuple[EventType, str]] = []
@@ -278,12 +283,13 @@ def test_menu_confirmed_waits_strict_before_clicks(data_dir, monkeypatch) -> Non
         with patch.object(nav2, "click_sequence_deathmatch"):
             nav2._pre_click_main_menu_wait()
             mock_wait.assert_called_once()
-            assert mock_wait.call_args.kwargs.get("min_match") == 1
+            assert mock_wait.call_args.kwargs.get("min_match") == 2
             assert mock_wait.call_args.kwargs.get("timeout") == 15.0
 
 
 def test_dm_retry_aborts_on_invalid_hwnd(data_dir, monkeypatch) -> None:
     monkeypatch.setenv("DM_NAV_SIM", "0")
+    monkeypatch.setattr("modules.ui_nav.cs2_modal_dismiss.dismiss_cs2_modals", lambda *a, **k: None)
     monkeypatch.setattr("sys.platform", "win32")
     from modules.dm_runner.errors import DmNavStopped
     from modules.dm_runner.navigate import DmNavigator
@@ -328,7 +334,7 @@ def test_dm_run_stops_gracefully(data_dir, monkeypatch) -> None:
         assert run(ctx) is False
 
 
-def test_dm_retry_skips_menu_wait_after_clicks(data_dir, monkeypatch) -> None:
+def test_dm_retry_restarts_search_after_timeout(data_dir, monkeypatch) -> None:
     monkeypatch.setenv("DM_NAV_SIM", "1")
     from modules.ui_nav.errors import UiNavTimeoutError
     from modules.dm_runner.navigate import DmNavigator
@@ -354,7 +360,7 @@ def test_dm_retry_skips_menu_wait_after_clicks(data_dir, monkeypatch) -> None:
                 with patch.object(nav, "_prepare_cs2_window"):
                     with pytest.raises(UiNavTimeoutError):
                         nav.navigate_to_dm_with_retries()
-    assert mock_menu.call_count == 0
+    assert mock_menu.call_count == 1
     assert mock_in_dm.call_count == 2
 
 
@@ -386,7 +392,7 @@ def test_searching_dm_not_emitted_when_search_unconfirmed(data_dir, monkeypatch)
             "modules.dm_runner.navigate.detect_state",
             return_value=False,
         ):
-            with pytest.raises(UiNavTimeoutError, match="start_search not confirmed"):
+            with pytest.raises(UiNavTimeoutError, match="Search/load not confirmed"):
                 nav._confirm_search_started()
 
     assert EventType.SEARCHING_DM not in emitted
@@ -414,8 +420,7 @@ def test_searching_dm_emitted_after_searching_probe(data_dir, monkeypatch) -> No
 
     with patch("modules.dm_runner.navigate.wait_for_state") as mock_wait:
         nav._confirm_search_started()
-        mock_wait.assert_called_once()
-        assert mock_wait.call_args.args[1] == ScreenState.SEARCHING
+        mock_wait.assert_not_called()
 
     assert EventType.SEARCHING_DM in emitted
 
@@ -426,6 +431,7 @@ def test_searching_dm_fast_path_when_in_dm_before_searching_probe(
     monkeypatch.setenv("DM_NAV_SIM", "1")
     from modules.dm_runner.navigate import DmNavigator
 
+    monkeypatch.setattr("modules.dm_runner.team_join.past_team_select_screen", lambda *a: True)
     emitted: list[EventType] = []
 
     def emit(event: EventType, detail: str = "", **kwargs) -> None:

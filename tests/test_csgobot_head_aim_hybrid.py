@@ -106,3 +106,20 @@ def test_create_config_h1_defaults(monkeypatch) -> None:
     assert cfg.aim.prioritize_heads is True
     assert cfg.aim.head_aim_min_conf == 0.8
     assert cfg.aim.long_range_body_bias is True
+
+
+def test_body_fallback_stays_with_selected_head():
+    selector = _selector()
+    detections = {
+        "th": [{"xyxy": [710, 300, 730, 330], "conf": .95, "cls": 3}],
+        "t": [
+            {"xyxy": [610, 320, 670, 440], "conf": .95, "cls": 2},
+            {"xyxy": [690, 300, 750, 480], "conf": .90, "cls": 2},
+        ],
+    }
+    head = next(t for t in selector.filter_enemies(detections) if t.is_head)
+    body = selector.select_body_for_head(head, detections, max_distance=400)
+    assert body is not None
+    assert body.x1 == 690
+    detections["t"] = detections["t"][:1]
+    assert selector.select_body_for_head(head, detections, max_distance=400) is None

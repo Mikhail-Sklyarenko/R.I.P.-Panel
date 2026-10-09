@@ -11,7 +11,8 @@ from __future__ import annotations
 import logging
 import threading
 import time
-from math import hypot
+from math import hypot, radians, tan
+from collections import deque
 from typing import TYPE_CHECKING, Callable
 
 from aiming.dead_zone import AimHysteresis, AimHysteresisConfig
@@ -24,7 +25,7 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger("CS2Bot.aim")
 
-ApplyMouseFn = Callable[[int, int], None]
+ApplyMouseFn = Callable[[int, int], bool | None]
 
 # Cap coast velocity so a bad detection jump cannot fling the mouse.
 _MAX_COAST_SPEED_PX_S = 2500.0
@@ -45,7 +46,9 @@ class AimMouseController:
         *,
         config: AimConfig,
         fov_mouse: FOVMouseMovement,
+        command_history=None,
     ) -> None:
+        self._command_history = command_history
         self._config = config
         self._fov_mouse = fov_mouse
         self._hysteresis = AimHysteresis(
@@ -59,6 +62,8 @@ class AimMouseController:
         self._thread: threading.Thread | None = None
         self._thread_stop = threading.Event()
 
+        self._sent = deque(maxlen=256)
+        self._revision = 0
         self._active = False
         self._target_x = 0.0
         self._target_y = 0.0
@@ -153,6 +158,15 @@ class AimMouseController:
         now: float,
     ) -> None:
         with self._lock:
+            if self._has_sample and now < self._target_t:
+                return
+            self._revision += 1
+            # Transport the previous observation into this capture's camera frame.
+            previous_x, previous_y = self._remaining_screen_point(
+                self._target_x, self._target_y, self._target_t, until=now)
+            if self._settled:
+                self._lock_x, self._lock_y = self._remaining_screen_point(
+                    self._lock_x, self._lock_y, self._target_t, until=now)
             raw_x = float(aim_x)
             raw_y = float(aim_y)
 
@@ -175,8 +189,8 @@ class AimMouseController:
             if self._has_sample:
                 dt = now - self._target_t
                 if 0.001 < dt < 0.5:
-                    vx = (raw_x - self._target_x) / dt
-                    vy = (raw_y - self._target_y) / dt
+                    vx = (raw_x - previous_x) / dt
+                    vy = (raw_y - previous_y) / dt
                     speed = hypot(vx, vy)
                     if speed > _MAX_COAST_SPEED_PX_S:
                         scale = _MAX_COAST_SPEED_PX_S / speed
@@ -209,6 +223,7 @@ class AimMouseController:
     def reset_track(self) -> None:
         """Target switch / body fallback — drop settle + coast, keep thread."""
         with self._lock:
+            self._revision += 1
             self._has_sample = False
             self._vx = 0.0
             self._vy = 0.0
@@ -217,6 +232,7 @@ class AimMouseController:
             self._hysteresis.reset()
 
     def _clear_locked(self) -> None:
+        self._revision += 1
         self._active = False
         self._has_sample = False
         self._vx = 0.0
@@ -250,6 +266,23 @@ class AimMouseController:
         self._vy = 0.0
         self._hysteresis.reset()
 
+    def project_point(self, x, y, observed_at, until=None):
+        """Reproject a measured point using accepted mouse output only."""
+        with self._lock:
+            return self._remaining_screen_point(x, y, observed_at, until=until)
+
+    def _remaining_screen_point(self,x,y,observed_at,until=None):
+        """Subtract only mouse commands already sent after this capture."""
+        ax,ay=self._fov_mouse.screen_to_angle(x,y)
+        history = (self._command_history(observed_at,until) if self._command_history is not None
+                   else self._sent)
+        dx=sum(dx for stamp,dx,dy in history if stamp>=observed_at and (until is None or stamp<until))
+        dy=sum(dy for stamp,dx,dy in history if stamp>=observed_at and (until is None or stamp<until))
+        unit=360./self._fov_mouse.fov.x360
+        ax=max(-80.,min(80.,ax-dx*unit));ay=max(-80.,min(80.,ay-dy*unit))
+        return (self._fov_mouse._center_x+self._fov_mouse._focal_x*tan(radians(ax)),
+                self._fov_mouse._center_y+self._fov_mouse._focal_y*tan(radians(ay)))
+
     def _mouse_loop(self) -> None:
         hz = max(30.0, float(self._config.mouse_hz))
         period = 1.0 / hz
@@ -276,6 +309,12 @@ class AimMouseController:
                     continue
                 now = time.monotonic()
                 age = now - self._target_t
+                if not 0<=age<=.25:
+                    self._clear_locked()
+                    continue
+                while self._sent and self._sent[0][0]<now-.5:
+                    self._sent.popleft()
+                revision = self._revision
                 speed = hypot(self._vx, self._vy)
                 base_x = self._target_x
                 base_y = self._target_y
@@ -293,6 +332,8 @@ class AimMouseController:
                 else:
                     tx = base_x
                     ty = base_y
+                tx,ty=self._remaining_screen_point(tx,ty,self._target_t)
+                base_x,base_y=self._remaining_screen_point(base_x,base_y,self._target_t)
                 smoothing = self._smoothing
                 apply_fn = self._apply_mouse
 
@@ -302,10 +343,10 @@ class AimMouseController:
             ).pixel_distance
 
             with self._lock:
-                if not self._active:
+                if not self._active or revision != self._revision:
                     continue
                 if settle_on and settle_px > 0 and settle_dist <= settle_px:
-                    self._enter_settle_locked(base_x, base_y)
+                    self._enter_settle_locked(self._target_x, self._target_y)
                     self._last_pixel_distance = settle_dist
                     self._last_dx = 0
                     self._last_dy = 0
@@ -323,10 +364,10 @@ class AimMouseController:
             aim_result = self._fov_mouse.get_move(tx, ty, smoothing=eff_smooth)
             dist = aim_result.pixel_distance
 
-            if near_px > 0 and dist <= near_px:
-                step_max = min(far_step, near_step)
-            else:
-                step_max = far_step
+            # Blend the speed limit instead of changing it abruptly at near_px.
+            blend = max(0.0, min(1.0, (dist - near_px) / (snap_px - near_px)))
+            step_max = round(min(far_step, near_step) +
+                             (far_step - min(far_step, near_step)) * blend)
 
             dx, dy = filter_mouse_delta(
                 aim_result.mouse_x,
@@ -345,7 +386,7 @@ class AimMouseController:
                 dy = int(round(dy * near_y_scale))
 
             with self._lock:
-                if not self._active:
+                if not self._active or revision != self._revision:
                     continue
 
                 if self._settled and dist > max(
@@ -363,9 +404,13 @@ class AimMouseController:
             if apply_fn is None:
                 continue
             try:
-                apply_fn(dx, dy)
                 with self._lock:
-                    self._applied_since_arm = True
+                    if not self._active or revision != self._revision:
+                        continue
+                    accepted = apply_fn(dx, dy)
+                    if accepted is not False:
+                        self._sent.append((time.monotonic(), dx, dy))
+                        self._applied_since_arm = True
             except Exception as exc:
                 logger.debug("aim: mouse apply failed: %s", exc)
                 self._thread_stop.set()

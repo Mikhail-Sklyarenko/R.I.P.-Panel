@@ -1,0 +1,227 @@
+{
+  "map_id": "de_nuke_ramp",
+  "references": [
+    {
+      "image": "ramp_track_9.png",
+      "to_map": [
+        [
+          2.817012506968547,
+          0.0,
+          288.11249709467296
+        ],
+        [
+          0.0,
+          2.817012506968547,
+          7.868347683501167
+        ]
+      ],
+      "source_time": 159.72,
+      "calibration": "Short optical track anchored at independently registered 159s; approximate calibration"
+    },
+    {
+      "image": "ramp_track_12.png",
+      "to_map": [
+        [
+          2.8169014084507045,
+          0.0,
+          288.5940567765799
+        ],
+        [
+          0.0,
+          2.8169014084507045,
+          -1.256980299250647
+        ]
+      ],
+      "source_time": 159.96,
+      "calibration": "Short optical track anchored at independently registered 159s; approximate calibration"
+    },
+    {
+      "image": "ramp_track_15.png",
+      "to_map": [
+        [
+          2.8169014084507045,
+          0.0,
+          277.1357400248855
+        ],
+        [
+          0.0,
+          2.8169014084507045,
+          2.1426724703045714
+        ]
+      ],
+      "source_time": 160.2,
+      "calibration": "Short optical track anchored at independently registered 159s; approximate calibration"
+    },
+    {
+      "image": "ramp_track_18.png",
+      "to_map": [
+        [
+          2.8169014084507045,
+          0.0,
+          273.79241895291335
+        ],
+        [
+          0.0,
+          2.8169014084507045,
+          8.128553712824985
+        ]
+      ],
+      "source_time": 160.44,
+      "calibration": "Short optical track anchored at independently registered 159s; approximate calibration"
+    },
+    {
+      "image": "ramp_track_21.png",
+      "to_map": [
+        [
+          2.8169014084507045,
+          0.0,
+          273.27995913125375
+        ],
+        [
+          0.0,
+          2.8169014084507045,
+          15.905268370095369
+        ]
+      ],
+      "source_time": 160.68,
+      "calibration": "Short optical track anchored at independently registered 159s; approximate calibration"
+    },
+    {
+      "image": "ramp_track_24.png",
+      "to_map": [
+        [
+          2.8169014084507045,
+          0.0,
+          273.22723521581327
+        ],
+        [
+          0.0,
+          2.8169014084507045,
+          20.838296256621376
+        ]
+      ],
+      "source_time": 160.92,
+      "calibration": "Short optical track anchored at independently registered 159s; approximate calibration"
+    },
+    {
+      "image": "ramp_track_27.png",
+      "to_map": [
+        [
+          2.8169014084507045,
+          0.0,
+          270.7392680264584
+        ],
+        [
+          0.0,
+          2.8169014084507045,
+          27.867938857243324
+        ]
+      ],
+      "source_time": 161.16,
+      "calibration": "Short optical track anchored at independently registered 159s; approximate calibration"
+    },
+    {
+      "image": "ramp_track_30.png",
+      "to_map": [
+        [
+          2.8169014084507045,
+          0.0,
+          269.1834724295773
+        ],
+        [
+          0.0,
+          2.8169014084507045,
+          33.724307491481255
+        ]
+      ],
+      "source_time": 161.4,
+      "calibration": "Short optical track anchored at independently registered 159s; approximate calibration"
+    },
+    {
+      "image": "ramp_track_33.png",
+      "to_map": [
+        [
+          2.8169014084507045,
+          0.0,
+          269.32511414994235
+        ],
+        [
+          0.0,
+          2.8169014084507045,
+          41.370716408738076
+        ]
+      ],
+      "source_time": 161.64,
+      "calibration": "Short optical track anchored at independently registered 159s; approximate calibration"
+    },
+    {
+      "image": "ramp_track_36.png",
+      "to_map": [
+        [
+          2.8169014084507045,
+          0.0,
+          271.39278922819204
+        ],
+        [
+          0.0,
+          2.8169014084507045,
+          49.271120926704235
+        ]
+      ],
+      "source_time": 161.88,
+      "calibration": "Short optical track anchored at independently registered 159s; approximate calibration"
+    },
+    {
+      "image": "ramp_contour_162.png",
+      "to_map": [
+        [
+          2.8169014084507045,
+          0.0,
+          277.46478873239437
+        ],
+        [
+          0.0,
+          2.8169014084507045,
+          61.971830985915496
+        ]
+      ],
+      "source_time": 162,
+      "calibration": "Offline contour hypotheses agree within 3 map pixels; not independent validation"
+    },
+    {
+      "image": "ramp_25.png",
+      "to_map": [
+        [
+          2.8169014084507045,
+          0.0,
+          272.8361148766707
+        ],
+        [
+          0.0,
+          2.8169014084507045,
+          23.402587866585478
+        ]
+      ],
+      "source_time": 161.0,
+      "calibration": "Tracked from registered 159s frame"
+    },
+    {
+      "image": "ramp_37.png",
+      "to_map": [
+        [
+          2.8169014084507045,
+          0.0,
+          272.1175472006502
+        ],
+        [
+          0.0,
+          2.8169014084507045,
+          52.40745396154083
+        ]
+      ],
+      "source_time": 161.96,
+      "calibration": "Tracked from registered 159s frame"
+    }
+  ],
+  "live_validated": false
+}

@@ -14,16 +14,10 @@ def is_suspect_black_capture(img: Image.Image, *, luminance_threshold: int = 8) 
     """True when client grab looks empty (all-near-black), not a probe calibration miss."""
     if img.width <= 0 or img.height <= 0:
         return True
-    samples = [
-        (0, 0),
-        (img.width // 2, img.height // 2),
-        (max(0, img.width - 1), max(0, img.height - 1)),
-    ]
-    for x, y in samples:
-        r, g, b = img.getpixel((x, y))[:3]
-        if r + g + b > luminance_threshold:
-            return False
-    return True
+    # A disabled menu backdrop can be black at all three old sample points
+    # while the toolbar is fully rendered. Inspect the whole image instead.
+    return img.convert("L").getextrema()[1] < luminance_threshold
+
 
 
 def capture_client(

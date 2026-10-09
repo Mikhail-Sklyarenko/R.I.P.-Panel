@@ -1,0 +1,7 @@
+{
+  "vendor/csgobot/main.py": "f8db82dc0233f194c919b5024e2ceb89024ad498d52c2cf42c42f02e062a3cdf",
+  "vendor/csgobot/nav/map_confirmation.py": "b2e9be102ef2f9d58a66805adc8d7ef7d7bbc7b875c7674208fda8065d673e5a",
+  "vendor/csgobot/nav/release.py": "4d9327ba86ad6b63ad253922d3b6b0fba8e48565b91f765247e27206e4bd831e",
+  "vendor/csgobot/detectors/yolov8.py": "c6b9ed0056142f2e0cbdb5386819323ad262c3dc32c89b620c27a4adf16bf1b5",
+  "vendor/csgobot/detectors/precision.py": "fa6dbebf449f6051dbaf6d6e99be1135442f06f31dc53057ce74943a80efae59"
+}

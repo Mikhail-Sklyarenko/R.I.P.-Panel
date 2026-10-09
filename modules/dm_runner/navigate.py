@@ -57,6 +57,7 @@ class DmNavigator:
         self.should_stop = should_stop
         self.on_team_joined = on_team_joined
         self._menu_nav_done = False
+        self._search_requested = False
         self._team_done_mono: float | None = None
         self._startup_buy_done = False
         self._combat_preload_started = False
@@ -81,6 +82,8 @@ class DmNavigator:
             self.artifacts,
             hwnd=hwnd,
         )
+        if self.hwnd is None and not isinstance(self.driver,SimDriver):
+            self.hwnd=self.driver.hwnd
 
     def _nav_progress(self, msg: str) -> None:
         if self.on_nav_progress:
@@ -153,6 +156,7 @@ class DmNavigator:
             self.artifacts,
             timeout_sec=timeout,
             min_match=min_match,
+            should_stop=self.should_stop,
         )
 
     _SOFT_MENU_WAIT_SEC = 15.0
@@ -170,12 +174,12 @@ class DmNavigator:
         else:
             if self.menu_probe_warn:
                 self._nav_progress(
-                    "dm nav: main menu was not confirmed at launch; soft probe wait"
+                    "dm nav: main menu was not confirmed at launch; confirming all menu probes"
                 )
                 wait_timeout = min(menu_timeout, self._SOFT_MENU_WAIT_SEC)
             else:
                 wait_timeout = menu_timeout
-            min_match = 1
+            min_match = strict_count
         from modules.ui_nav.cs2_modal_dismiss import dismiss_cs2_modals
 
         if self.hwnd and not isinstance(self.driver, SimDriver):
@@ -184,20 +188,11 @@ class DmNavigator:
             self.wait_main_menu(timeout=wait_timeout, min_match=min_match)
             return False
         except UiNavTimeoutError:
-            img = self.driver.capture()
-            if detect_state(
-                img, ScreenState.MAIN_MENU, self.coords, min_match=1
-            ) and not detect_state(
-                img, ScreenState.MAIN_MENU, self.coords, min_match=strict_count
-            ):
-                self._nav_progress("dm nav: soft main_menu on frame; proceeding")
+            self._abort_if_stopped()
+            img=self.driver.capture()
+            if detect_state(img,ScreenState.MAIN_MENU,self.coords):
                 return False
-            pt = self.coords.click("main_menu_play")
-            self._nav_progress(
-                f"dm nav: main_menu probe timeout; controlled click ИГРАТЬ @({pt.x},{pt.y})"
-            )
-            self._click_target("main_menu_play")
-            return True
+            raise UiNavTimeoutError('Main menu unconfirmed; no blind Play click') from None
 
     def _click_sequence_after_play(self) -> None:
         for name in ("mode_deathmatch", "start_search"):
@@ -223,48 +218,21 @@ class DmNavigator:
         self._set_sim_phase(ScreenState.SEARCHING)
         search_timeout = float(self.config.game_search_timeout_sec)
 
-        try:
-            wait_for_state(
-                self.driver,
-                ScreenState.SEARCHING,
-                self.coords,
-                self.artifacts,
-                timeout_sec=search_timeout,
-            )
-            self._e(EventType.SEARCHING_DM, "dm_runner: search started")
-            return
-        except UiNavTimeoutError:
-            img = self.driver.capture()
-            if detect_state(
-                img,
-                ScreenState.IN_DM,
-                self.coords,
-                min_match=self.config.in_dm_min_match,
-            ):
-                self._nav_progress(
-                    "dm nav: searching screen skipped; in_dm probes already match"
-                )
-                self._e(
-                    EventType.SEARCHING_DM,
-                    "dm_runner: search started (fast load, searching screen skipped)",
-                )
+        deadline=time.monotonic()+search_timeout
+        stable=0
+        from modules.dm_runner.team_join import past_team_select_screen
+        while time.monotonic()<deadline:
+            self._abort_if_stopped()
+            img=self.driver.capture()
+            found=(detect_state(img,ScreenState.SEARCHING,self.coords)
+                   or detect_probe_key(img,self.coords,'team_select')
+                   or past_team_select_screen(img,self.coords))
+            stable=stable+1 if found else 0
+            if stable>=3:
+                self._e(EventType.SEARCHING_DM,'dm_runner: search or loaded match confirmed')
                 return
-            if detect_state(img, ScreenState.MAIN_MENU, self.coords):
-                self._nav_progress(
-                    "dm nav: still on main_menu after start_search; click likely missed"
-                )
-            else:
-                self._nav_progress(
-                    "dm nav: searching not confirmed after clicks; match search likely not started"
-                )
-            self.artifacts.log_step(
-                "search_not_confirmed",
-                timeout_sec=search_timeout,
-            )
-            raise UiNavTimeoutError(
-                f"timeout waiting for searching ({search_timeout}s); "
-                "start_search not confirmed"
-            ) from None
+            time.sleep(.25)
+        raise UiNavTimeoutError('Search/load not confirmed')
 
     def _in_dm_detail(self, *, soft_peek: bool) -> str:
         if soft_peek:
@@ -304,25 +272,16 @@ class DmNavigator:
         """Blocking team-pick phase before map load / spawn."""
         if isinstance(self.driver, SimDriver):
             return
-        if self._team_done_mono is not None:
-            return
-        from modules.dm_runner.team_join import past_team_select_screen, wait_team_select_done
-
-        img = self.driver.capture()
-        if past_team_select_screen(img, self.coords):
-            self._nav_progress("dm nav: team select skipped (already in game)")
-            self._team_done_mono = time.monotonic()
-            return
+        from modules.dm_runner.team_join import wait_team_select_done
 
         wait_team_select_done(
             self.driver,
             self.coords,
-            timeout_sec=float(self.config.dm_team_select_timeout_sec),
+            timeout_sec=float(max(120,self.config.dm_team_select_timeout_sec,self.config.map_load_delay_sec)),
             click_retry_sec=1.0,
             on_progress=self._nav_progress,
             log_step=self.artifacts.log_step,
             should_stop=self.should_stop,
-            on_team_random_clicked=lambda: self._console_buy_once(label="team_random"),
         )
         self._team_done_mono = time.monotonic()
 
@@ -357,9 +316,11 @@ class DmNavigator:
         self._combat_preload_started = True
 
     def _finish_spawn_phase(self, *, soft_peek: bool) -> None:
-        """Autobuy already at team click — start combat AI immediately."""
+        """Reconfirm spawn immediately before console input and combat start."""
+        self._ensure_team_joined()
+        self._abort_if_stopped()
         if not self._startup_buy_done:
-            self._console_buy_once(label="fallback")
+            self._console_buy_once(label="confirmed_spawn")
         self._start_combat_preload()
         self._e(EventType.IN_DM, self._in_dm_detail(soft_peek=soft_peek))
 
@@ -388,18 +349,32 @@ class DmNavigator:
         self._set_sim_phase(ScreenState.IN_DM)
         self._ensure_team_joined()
         self._bootstrap_cs2_farm_cfg()
-        self._nav_progress("dm nav: team buy done — starting combat")
+        self._nav_progress("dm nav: spawn ready — preparing combat")
         self._finish_spawn_phase(soft_peek=True)
 
     def _click_target(self, name: str) -> None:
+        self._abort_if_stopped()
         before = self.driver.capture()
         on_main_before = detect_state(before, ScreenState.MAIN_MENU, self.coords)
         last_err: Exception | None = None
         for attempt in range(1, 3):
             pt = self.coords.click(name)
+            if not isinstance(self.driver,SimDriver) and self.coords.base_width==1280:
+                from modules.ui_nav.menu_labels import play_button,play_page,deathmatch_selected
+                from modules.ui_nav.coords import Point
+                current=self.driver.capture()
+                if name=='main_menu_play':
+                    found=play_button(current)
+                    if found is None:raise UiNavError('Play label not found; click cancelled')
+                    pt=Point(*found)
+                elif name=='mode_deathmatch' and not play_page(current):
+                    raise UiNavError('Play page not confirmed; Deathmatch click cancelled')
+                elif name=='start_search' and not deathmatch_selected(current):
+                    raise UiNavError('Deathmatch selection not confirmed; search click cancelled')
             self._nav_progress(f"dm click {name} @({pt.x},{pt.y})")
             try:
                 self.driver.click(pt)
+                if name=="start_search":self._search_requested=True
             except UiNavError as exc:
                 last_err = exc
                 time.sleep(0.3)
@@ -414,6 +389,19 @@ class DmNavigator:
                 y=pt.y,
                 attempt=attempt,
             )
+            if not isinstance(self.driver,SimDriver) and self.coords.base_width==1280:
+                from modules.ui_nav.menu_labels import deathmatch_selected,start_button_available
+                if name=='mode_deathmatch' and not deathmatch_selected(after):
+                    if attempt<2:continue
+                    raise UiNavError('Deathmatch tab did not become selected')
+                if name=='start_search' and deathmatch_selected(after) and start_button_available(after):
+                    if attempt<2:continue
+                    raise UiNavError('Start button remained available; search click did not take effect')
+            if name == 'main_menu_play' and not isinstance(self.driver,SimDriver) and self.coords.base_width==1280:
+                from modules.ui_nav.menu_labels import play_page
+                if play_page(after):return
+                if attempt<2:continue
+                raise UiNavError('Play click did not open the matchmaking page')
             if name == "main_menu_play" and on_main_before and not self.driver.sim:
                 if not detect_state(after, ScreenState.MAIN_MENU, self.coords):
                     return
@@ -472,10 +460,27 @@ class DmNavigator:
                     self._retry_focus_once()
                 if attempt < self.config.search_retries:
                     time.sleep(2.0)
-                    if not self._menu_nav_done:
-                        self._set_sim_phase(ScreenState.MAIN_MENU)
+                    self._reset_search()
         if last_err:
             raise last_err
+
+    def _reset_search(self) -> None:
+        """Abandon a timed-out load and confirm the menu before starting a new search."""
+        self._abort_if_stopped()
+        self._team_done_mono=None
+        self._startup_buy_done=False
+        self._combat_preload_started=False
+        self._menu_nav_done=False
+        if (not isinstance(self.driver,SimDriver) and getattr(self,"_search_requested",False)
+                and not detect_state(self.driver.capture(),ScreenState.MAIN_MENU,self.coords)):
+            from modules.ui_nav.cs2_console import run_cs2_console_commands
+            from modules.ui_nav.cs2_modal_dismiss import dismiss_cs2_modals
+            dismiss_cs2_modals(self.hwnd,on_progress=self._nav_progress)
+            run_cs2_console_commands(self.hwnd,'disconnect')
+        self._set_sim_phase(ScreenState.MAIN_MENU)
+        self.wait_main_menu()
+        self._search_requested=False
+        self._nav_progress('dm nav: menu confirmed; restarting search')
 
     def disconnect(self) -> None:
         """Выход из DM (bind j disconnect в resources/cs2/fsm.cfg)."""

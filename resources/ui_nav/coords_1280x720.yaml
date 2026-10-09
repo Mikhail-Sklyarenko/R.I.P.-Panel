@@ -10,9 +10,16 @@ meta:
 clicks:
   main_menu_play: {x: 663, y: 20}
   mode_deathmatch: {x: 667, y: 95}
+  mode_wingman: {x: 760, y: 90}
+  map_inferno: {x: 520, y: 310}
   start_search: {x: 1125, y: 691}
+  cancel_search: {x: 640, y: 430}
+  accept_match: {x: 560, y: 390}
   leave_match: {x: 1255, y: 19}
+  leave_lobby: {x: 80, y: 688}
   team_random: {x: 1152, y: 688}
+  invite_open: {x: 1210, y: 90}
+  accept_invite: {x: 700, y: 400}
 
 detectors:
   main_menu:
@@ -34,3 +41,15 @@ detectors:
   level_up:
     - {x: 640, y: 192, rgb: [255, 210, 60], tolerance: 70}
     - {x: 640, y: 253, rgb: [40, 120, 200], tolerance: 80}
+  wingman_play:
+    - {x: 760, y: 90, rgb: [250, 250, 250], tolerance: 70}
+  wingman_searching:
+    - {x: 640, y: 360, rgb: [200, 200, 200], tolerance: 70}
+    - {x: 640, y: 266, rgb: [160, 160, 160], tolerance: 65}
+  wingman_confirm:
+    - {x: 640, y: 340, rgb: [255, 255, 255], tolerance: 40}
+  wingman_result:
+    - {x: 640, y: 240, rgb: [240, 240, 240], tolerance: 70}
+  wingman_modal:
+    - {x: 640, y: 400, rgb: [52, 56, 68], tolerance: 18}
+    - {x: 700, y: 360, rgb: [52, 56, 68], tolerance: 18}

@@ -1,0 +1,43 @@
+{
+  "map_id": "de_cache",
+  "version": 1,
+  "layers": {
+    "upper": "walkable.png",
+    "roof": "roof_exit_walkable.png"
+  },
+  "clearance_px": 4,
+  "grid_step": 2,
+  "label_roi": [
+    0,
+    254,
+    240,
+    283
+  ],
+  "labels": [
+    {
+      "image": "level_labels/roof.png",
+      "source_second": 210
+    },
+    {
+      "image": "level_labels/roof_shadow.png",
+      "source_second": 10
+    },
+    {
+      "image": "level_labels/roof_dark.png",
+      "source_second": 20
+    }
+  ],
+  "roof_bounds": [
+    386,
+    574,
+    455,
+    622
+  ],
+  "exit_point": [
+    417,
+    566
+  ],
+  "language": "ru",
+  "live_validated": false,
+  "evidence": "Roof occupied at 4-24 and 178-242 seconds; north drop annotated from scene and radar. Drop traversal requires live validation."
+}

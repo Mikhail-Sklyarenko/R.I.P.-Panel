@@ -85,7 +85,7 @@ def load_map_templates(directory: Path | str) -> tuple[MapTemplate, ...]:
             source = "match_ready"
         else:
             continue
-        if script not in ("dust2", "mirage"):
+        if script not in ("dust2", "mirage", "inferno", "vertigo", "cache"):
             continue
         img = np.asarray(Image.open(path).convert("RGB"))
         templates.append(

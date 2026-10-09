@@ -33,6 +33,16 @@ def build_parser() -> argparse.ArgumentParser:
         nargs=argparse.REMAINDER,
         help="Vault CLI: add|list|import-fsm (после --vault-cli)",
     )
+    parser.add_argument(
+        "--fleet-coordinator",
+        action="store_true",
+        help="Запустить координатор флота Напарников (LAN :8790)",
+    )
+    parser.add_argument(
+        "--fleet-agent",
+        action="store_true",
+        help="Запустить агент флота Напарников (без UI)",
+    )
     return parser
 
 
@@ -50,6 +60,28 @@ def main(argv: list[str] | None = None) -> int:
         if cli_args and cli_args[0] == "--":
             cli_args = cli_args[1:]
         return _run_vault_cli(cli_args)
+
+    if args.fleet_coordinator or args.fleet_agent:
+        from config.loader import ensure_config
+        from modules.fleet_agent.host import FleetHost
+
+        ensure_config()
+        host = FleetHost(log=print)
+        try:
+            if args.fleet_coordinator:
+                print(host.start_coordinator())
+            if args.fleet_agent:
+                print(host.start_agent())
+            import time
+            while True:
+                time.sleep(1.0)
+        except KeyboardInterrupt:
+            host.stop()
+            return 0
+
+    from core.farm_runtime import configure_farm_runtime
+
+    configure_farm_runtime()
 
     from config.loader import ensure_config, load_config, save_config
 

@@ -1,0 +1,53 @@
+{
+  "map_id": "de_mirage",
+  "version": 2,
+  "coordinate_system": "normalized_radar",
+  "zones": [
+    {
+      "id": "jungle_window_crouch",
+      "action": "crouch",
+      "polygon": [
+        [
+          0.34408602150537637,
+          0.5063538611925709
+        ],
+        [
+          0.40078201368523947,
+          0.5063538611925709
+        ],
+        [
+          0.40078201368523947,
+          0.5474095796676441
+        ],
+        [
+          0.34408602150537637,
+          0.5474095796676441
+        ]
+      ],
+      "jump_entry": {
+        "polygon": [
+          [
+            0.3304007820136852,
+            0.5161290322580645
+          ],
+          [
+            0.34408602150537637,
+            0.5161290322580645
+          ],
+          [
+            0.34408602150537637,
+            0.5425219941348973
+          ],
+          [
+            0.3304007820136852,
+            0.5425219941348973
+          ]
+        ],
+        "direction_deg": 0
+      },
+      "evidence": "2026-09-19 13-23-04.mp4, 134-146s inside and 156-162s / 358-364s outside. Eastward CT approach requires jump then crouch; westward exit crouch only.",
+      "bidirectional": true
+    }
+  ],
+  "live_validated": false
+}

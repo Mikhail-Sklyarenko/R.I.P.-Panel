@@ -1,0 +1,83 @@
+{
+  "engine": "visual-nav-multimap-17",
+  "code_sha256": "fad4b2fa84cdec3895521862db912a492cb3d2dc6a4e5205d014478b29fc8e0a",
+  "profile_sha256": "f6b80d6f83e735a5226be2c1cd538dfad497d51a8fd4cbfa3ccd6f8af3fd9900",
+  "profile_path": "/Users/mihailsklarenko/FSM_PANEL v.3.0.1/farm-panel-prototype/resources/nav/profiles/de_vertigo",
+  "source_video": "2026-09-15 16-38-30.mp4",
+  "source_log_engine": "visual-nav-multimap-9",
+  "automated_tests_unique_passed": 226,
+  "test_batches": [
+    {
+      "scope": "Full selected navigation/panel regression suite before final boundary distance guard",
+      "passed": 225
+    },
+    {
+      "scope": "Final Vertigo regression suite including guard",
+      "passed": 21
+    }
+  ],
+  "development_video_replay": {
+    "samples": 170,
+    "interval_seconds": 2,
+    "before_accepted": 141,
+    "after_accepted": 147,
+    "changed_previous_measurements": 0,
+    "new_acceptance_seconds": [
+      26,
+      30,
+      32,
+      34,
+      36,
+      38
+    ],
+    "remaining_t_spawn_rejection_seconds": [
+      28
+    ],
+    "note": "Same-source contour/floor replay, not independent accuracy or measured walking success. A rejected frame remains rejected; no position is predicted to keep input held."
+  },
+  "negative_map_check": {
+    "samples": 79,
+    "false_acceptances": 0,
+    "maps": [
+      "de_cache",
+      "de_dust2",
+      "de_inferno",
+      "de_mirage"
+    ]
+  },
+  "profile_changes": {
+    "lower_passage_corner_capsule": {
+      "centers_px": [
+        [
+          350,
+          560
+        ],
+        [
+          358,
+          551
+        ]
+      ],
+      "radius_px": 9,
+      "note": "Local occupancy correction from measured positions on the development recording."
+    },
+    "upper_only_barrier_at_a_ramp": true,
+    "recorded_lower_ramp_projection_kept_open": true,
+    "character_clearance_px": 4,
+    "rebuild_matches_assets": true
+  },
+  "controller_checks": {
+    "narrow_passage_cases": 3,
+    "measurement_noise_px": 0.65,
+    "nearby_portal_goal_survives_floor_change_both_directions": true,
+    "boundary_prefers_deeper_target": true,
+    "stale_boundary_target_distance_limited": true,
+    "note": "Synthetic motion on the annotated masks, not CS2 collision physics."
+  },
+  "live_validated": false,
+  "full_map_ready": false,
+  "limits": [
+    "The single rejected T-spawn sample at 28s remains a perception limitation.",
+    "Annotated corner occupancy and upper barrier need live traversal confirmation.",
+    "No exhaustive random-spawn or dynamic-obstacle validation on Windows/CS2."
+  ]
+}

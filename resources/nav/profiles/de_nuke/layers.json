@@ -1,0 +1,28 @@
+{
+  "map_id": "de_nuke",
+  "layers": {
+    "upper": "de_nuke",
+    "lower": "de_nuke_lower",
+    "ramp": "de_nuke_ramp"
+  },
+  "portals": [
+    {
+      "id": "central_ramp",
+      "upper_to_lower": [
+        [
+          610,
+          315
+        ],
+        [
+          596,
+          315
+        ],
+        [
+          596,
+          401
+        ]
+      ],
+      "intermediate_layer": "ramp"
+    }
+  ]
+}

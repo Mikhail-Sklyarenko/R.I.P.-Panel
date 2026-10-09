@@ -165,3 +165,19 @@ def test_env_resolvers_6d(monkeypatch) -> None:
     assert resolve_burst_size(5) == 4
     assert resolve_burst_gap_sec(0.15) == 0.2
     assert resolve_hold_max_sec(0.4) == 0.5
+
+
+def test_short_hold_deadline_overrides_off_target_grace():
+    c=FireController(FireConfig(hold_max_sec=.22,hold_repress_gap_sec=.18,
+                               hold_release_grace_sec=1.,humanize_jitter_sec=0))
+    assert c.tick(pixel_distance=0,confidence=.99,is_head=False,now=1.).press
+    assert not c.tick(pixel_distance=100,confidence=.99,is_head=False,now=1.21).release
+    assert c.tick(pixel_distance=100,confidence=.99,is_head=False,now=1.22).release
+    assert not c.tick(pixel_distance=0,confidence=.99,is_head=False,now=1.39).press
+    assert c.tick(pixel_distance=0,confidence=.99,is_head=False,now=1.401).press
+
+
+def test_product_defaults_use_short_holds_and_recovery_gap():
+    config=FireController.from_aim_config(AimConfig()).config
+    assert config.hold_max_sec==.22
+    assert config.hold_repress_gap_sec==.18

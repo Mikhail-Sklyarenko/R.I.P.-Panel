@@ -1,0 +1,122 @@
+{
+  "map_id": "de_mirage",
+  "version": 1,
+  "coordinate_system": "radar_pixels",
+  "layers": {
+    "upper": "upper_entry_walkable.png",
+    "lower": "underpass_walkable.png"
+  },
+  "clearance_px": 6,
+  "grid_step": 2,
+  "label_roi": [
+    0,
+    254,
+    240,
+    283
+  ],
+  "labels": [
+    {
+      "image": "level_labels/underpass.png",
+      "layer": "lower",
+      "source_second": 196
+    },
+    {
+      "image": "level_labels/ledge.png",
+      "layer": "upper",
+      "source_second": 164
+    },
+    {
+      "image": "level_labels/ladder.png",
+      "layer": "upper",
+      "source_second": 154
+    },
+    {
+      "image": "level_labels/house.png",
+      "layer": "upper",
+      "source_second": 192
+    },
+    {
+      "image": "level_labels/alley.png",
+      "layer": "upper",
+      "source_second": 194
+    },
+    {
+      "image": "level_labels/mid.png",
+      "layer": "upper",
+      "source_second": 202
+    }
+  ],
+  "language": "ru",
+  "underpass_route": [
+    [
+      570,
+      254
+    ],
+    [
+      454,
+      258
+    ],
+    [
+      440,
+      281
+    ],
+    [
+      443,
+      395
+    ],
+    [
+      447,
+      444
+    ],
+    [
+      461,
+      463
+    ],
+    [
+      503,
+      469
+    ]
+  ],
+  "lower_exits": [
+    {
+      "id": "alley",
+      "point": [
+        558,
+        255
+      ]
+    },
+    {
+      "id": "mid",
+      "point": [
+        493,
+        467
+      ]
+    }
+  ],
+  "upper_entries": [
+    {
+      "id": "alley",
+      "point": [
+        504,
+        258
+      ]
+    },
+    {
+      "id": "mid",
+      "point": [
+        447,
+        436
+      ]
+    }
+  ],
+  "source_video": "2026-09-13 16-49-19.mp4",
+  "source_seconds": [
+    194,
+    202
+  ],
+  "live_validated": false,
+  "limitations": [
+    "Lower floor identified by Russian HUD location labels inside the overlapping corridor; unknown labels cannot authorize an ambiguous spawn.",
+    "The lower mask is a corridor around the measured traversal, not a full 3D navmesh."
+  ]
+}

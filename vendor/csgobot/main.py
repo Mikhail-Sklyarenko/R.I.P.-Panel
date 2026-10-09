@@ -7,6 +7,7 @@ Architecture: [Grab Process] --queue--> [Detection Process] --queue--> [Preview 
 import json
 import logging
 import multiprocessing
+import os
 import random
 import signal
 import sys
@@ -41,7 +42,8 @@ from aiming.aim_mouse_controller import AimMouseController
 from aiming.aim_pipeline import AimPipelineState, process_aim_frame
 from aiming.fire_actions import apply_fire_action
 from aiming.fire_controller import FireAction, FireController
-from aiming.combat_aim import maybe_switch_to_body
+from aiming.combat_contact import CombatContact
+from aiming.combat_aim import maybe_switch_to_body, observed_fire_distance
 from aim_tuning import aim_debug_enabled, team_debug_enabled
 from team.hud_team_detect import (
     TeamDetectState,
@@ -55,7 +57,6 @@ from map.hud_map_detect import (
     MatchReadyLatch,
     MapDetectState,
     detect_map_hud,
-    match_ready_visible,
     unlock_map_detect,
     update_map_hysteresis,
 )
@@ -217,8 +218,13 @@ class CS2Bot:
 
         # Main loop
         child_died = False
+        from fleet_gate import gate as fleet_gate
         try:
             while not self.stop_event.is_set():
+                if fleet_gate().stop_requested():
+                    logger.info("fleet: cooperative stop requested")
+                    self.stop_event.set()
+                    break
                 # Check if any process died
                 for p in self.processes:
                     if not p.is_alive():
@@ -308,6 +314,10 @@ def detection_process(
 
     import torch
 
+    # Small radar operations share this process with detector and map workers.
+    cv2.setNumThreads(1)
+    logger.info("nav: OpenCV threads=%d", cv2.getNumThreads())
+
     if config.detector.torch_num_threads > 0:
         torch.set_num_threads(config.detector.torch_num_threads)
 
@@ -376,13 +386,40 @@ def detection_process(
         stop_event.set()
         return
 
+    from nav.farm_runtime import CameraOwnership, expanded_mode, create_navigation
+    from utils.win32 import get_foreground_window_title
+    from fleet_gate import gate as fleet_gate
+    integrated_roam = expanded_mode()
+    control_frame_at = [0.]
+    wingman = None
+    if os.environ.get("CSGOBOT_GAME_MODE") == "wingman":
+        try:
+            from nav.wingman_runtime import WingmanRuntime
+            wingman = WingmanRuntime(config,mouse,lambda: activated.is_set() and not stop_event.is_set()
+                and fleet_gate().admitted()
+                and 0 <= time.monotonic()-control_frame_at[0] <= .25
+                and config.window_title.lower() in get_foreground_window_title().lower())
+        except Exception:
+            logger.exception("Wingman initialization failed")
+            stop_event.set()
+            return
+    camera_owner = CameraOwnership(mouse.move_relative,
+        lambda: activated.is_set() and not stop_event.is_set()
+        and fleet_gate().admitted()
+        and (wingman is None or wingman.camera_allowed())
+        and 0 <= time.monotonic()-control_frame_at[0] <= .25
+        and config.window_title.lower() in get_foreground_window_title().lower(),
+        objective_allowed=wingman.objective_camera_allowed if wingman is not None else None)
+    if wingman is not None:wingman.objective_camera=camera_owner
+
     aim_mouse: Optional[AimMouseController] = None
     if float(config.aim.mouse_hz) > 0:
         aim_mouse = AimMouseController(
             config=config.aim,
             fov_mouse=fov_mouse,
+            command_history=camera_owner.commands_since if wingman is not None else None,
         )
-        aim_mouse.start(mouse.move_relative)
+        aim_mouse.start(lambda dx,dy: camera_owner.emit("combat",dx,dy))
 
     fps = FPSCounter()
     last_move_time = 0.0
@@ -393,12 +430,17 @@ def detection_process(
     stuck_detector: Optional[StuckDetector] = None
     patrol_mode = PatrolMode.PATROL
     last_enemy_seen = 0.0
+    combat_contact = CombatContact(grace_sec=.18 if wingman is not None else .10)
+    if wingman is not None:
+        from aiming.wingman_target import WingmanTargetLock
+        wingman_target = WingmanTargetLock()
     stuck_since: Optional[float] = None
     last_unstuck_time = 0.0
     aim_debug = aim_debug_enabled()
     last_aim_debug_log = 0.0
     aim_pipeline = AimPipelineState.from_aim_config(config.aim)
     head_miss_since: Optional[float] = None
+    body_preferred_until = 0.
     last_target_key: Optional[tuple] = None
     last_target_aim: Optional[tuple] = None
     last_detect_debug_log = 0.0
@@ -437,6 +479,9 @@ def detection_process(
     map_transition_active = False
     match_ready_latch = MatchReadyLatch(confirm_frames=20)
     nav_reader = None
+    nav_map_selector = None
+    nav_map_seen_at = 0.
+    nav_map_confirmed = config.nav.pack_id not in ("", "auto")
     nav_pose_filter = None
     nav_perception = None
     nav_pack = None
@@ -572,17 +617,22 @@ def detection_process(
 
     if config.nav.enabled:
         try:
+            if patrol_key_down is None:
+                import pydirectinput
+                patrol_key_down, patrol_key_up = pydirectinput.keyDown, pydirectinput.keyUp
             from nav.calibration import load_calibration
-            from nav.visual_controller import VisualNavController as NavController
             from nav.metrics import NavMetrics
             from nav.minimap_reader import MinimapReader
             from nav.pack import load_nav_pack
             from nav.paths import resolve_calibration_path, resolve_nav_pack_path
-            from nav.visual_perception import VisualPerception as NavPerception
+            from nav.async_perception import AsyncVisualPerception as NavPerception
             from nav.place_localizer import PlaceLocalizer
             from nav.pose_filter import PoseFilter
             nav_cal_path = resolve_calibration_path(config.nav.calibration_path)
             nav_cal = load_calibration(nav_cal_path)
+            if integrated_roam and config.nav.pack_id in ("", "auto"):
+                from nav.map_selector import AsyncVisualMapSelector
+                nav_map_selector = AsyncVisualMapSelector(nav_cal)
             nav_pack_path = resolve_nav_pack_path(active_nav_pack_id)
             nav_pack = load_nav_pack(nav_pack_path)
             nav_reader = MinimapReader(nav_cal)
@@ -590,20 +640,16 @@ def detection_process(
             nav_place = PlaceLocalizer(nav_pack.map_id)
             nav_perception = NavPerception(nav_reader, nav_place)
             from nav.release import identity
-            logger.info("nav: runtime_identity %s", json.dumps(identity(nav_pack.map_id), sort_keys=True))
+            logger.info("nav: integrated mode=%s", "wingman_fixed_goal" if wingman is not None else "expanded_roam" if integrated_roam else "route")
+            logger.info("nav: runtime_identity %s", json.dumps(wingman.navigation_identity() if wingman is not None else identity(nav_pack.map_id), sort_keys=True))
             if not config.nav.read_only:
                 if patrol_key_down is None or patrol_key_up is None:
                     raise RuntimeError(
                         "nav movement requires patrol keys (pydirectinput)"
                     )
-                nav_controller = NavController(
-                    nav_pack,
-                    fov_mouse,
-                    key_down=patrol_key_down,
-                    key_up=patrol_key_up,
-                    move_relative=mouse.move_relative,
-                    logger=logger,
-                    watchdog=True,
+                nav_controller = create_navigation(
+                    nav_pack, fov_mouse, patrol_key_down, patrol_key_up, camera_owner,
+                    expanded=integrated_roam, logger=logger,
                 )
                 nav_metrics = NavMetrics(
                     log_interval_sec=config.nav.metrics_log_interval_sec,
@@ -611,7 +657,7 @@ def detection_process(
                 nav_metrics.set_pack_id(nav_pack.pack_id)
                 goal_ids = ", ".join(g.id for g in nav_pack.goals)
                 logger.info(
-                    "nav: movement enabled pack=%s strategy=%s goals=[%s] "
+                    "nav: controller ready pack=%s strategy=%s goals=[%s] "
                     "locomotion=measured-visual",
                     nav_pack.pack_id,
                     nav_pack.strategy,
@@ -630,23 +676,110 @@ def detection_process(
             logger.error("nav: init failed (%s); disabled", exc)
             config.nav.enabled = False
 
+    if integrated_roam and (nav_controller is None or nav_controller.walkable is None):
+        logger.error("Integrated navigation unavailable; stopping combat worker")
+        stop_event.set()
+
+    from concurrent.futures import ThreadPoolExecutor
+    nav_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="nav-current-frame")
+    previous_nav_combat_hold = False
+    last_nav_timing_log = 0.
     try:
         while not stop_event.is_set():
             try:
                 captured_at, img = frame_queue.get(timeout=0.01)
             except Exception:
+                if not camera_owner.allowed():
+                    camera_owner.select(None)
+                    if aim_mouse is not None:
+                        aim_mouse.clear()
+                    if fire_controller.is_holding:
+                        apply_fire_action(mouse,fire_controller.force_release(time.monotonic()))
                 # A stalled capture must release movement even without another
                 # frame reaching the controller's normal freshness check.
                 if nav_controller is not None:
                     observed = getattr(nav_controller.last_pose, "observed_at", None)
-                    if observed is None or time.monotonic() - observed > .25:
+                    if not getattr(nav_controller,"input_active", observed is not None and time.monotonic()-observed<=.25):
                         nav_controller.release_keys()
                 continue
 
             now = time.monotonic()
-            if nav_requested and now - captured_at > .25:
+            control_frame_at[0] = captured_at
+            if now - captured_at > .25:
+                camera_owner.select(None)
+                if aim_mouse is not None:
+                    aim_mouse.clear()
+                if fire_controller.is_holding:
+                    apply_fire_action(mouse,fire_controller.force_release(now))
                 if nav_controller is not None:
                     nav_controller.release_keys()
+                continue
+
+            if wingman is not None:
+                current_state=wingman.receiver.state.snapshot()
+                if (current_state is not None and current_state.observation.connected
+                        and current_state.observation.own_player
+                        and current_state.observation.map_id!=wingman.map_id):
+                    camera_owner.select(None)
+                    if aim_mouse is not None:aim_mouse.clear()
+                    apply_fire_action(mouse,fire_controller.force_release(now))
+                    if nav_controller is not None:nav_controller.release_keys()
+                    try:
+                        selected_map=current_state.observation.map_id
+                        selected_pack={"de_inferno":"inferno_visual","de_nuke":"nuke_wingman"}[selected_map]
+                        check=run_nav_preflight(pack_id=selected_pack,calibration_path=config.nav.calibration_path)
+                        if not check.get("ok"):raise ValueError(str(check.get("errors")))
+                        new_pack=load_nav_pack(resolve_nav_pack_path(selected_pack))
+                        # Every previous nav future is consumed within its own frame.
+                        # Closing perception additionally invalidates atlas workers.
+                        if nav_perception is not None:nav_perception.close()
+                        wingman.select_map(selected_map)
+                        if nav_controller is not None:nav_controller.reload_pack(new_pack)
+                        nav_reader=MinimapReader(nav_cal)
+                        nav_reader.competitive_markers=True
+                        nav_perception=NavPerception(nav_reader,PlaceLocalizer(selected_map))
+                        nav_pose_filter.reset();wingman_target.reset()
+                        aim_pipeline.reset_trackers()
+                        combat_contact.update(detected=False,active=False,now=now)
+                        previous_nav_combat_hold=False
+                        if nav_metrics is not None:
+                            nav_metrics.set_pack_id(selected_pack)
+                            nav_metrics.start(now)
+                        nav_pack=new_pack;active_nav_pack_id=selected_pack
+                        logger.info("nav: runtime_identity %s",json.dumps(wingman.navigation_identity(),sort_keys=True))
+                    except Exception:
+                        logger.exception("wingman: map switch failed; stopping worker")
+                        break
+                if nav_reader is not None:nav_reader.competitive_markers = True
+                wingman.observe(img,nav_controller,now=now)
+                if nav_reader is not None:
+                    nav_reader.objective_overlay_allowed=bool(wingman.snapshot and
+                        wingman.snapshot.observation.bomb=="planted" and wingman.decision.navigation)
+                wingman.set_objective(nav_controller,now=now)
+                if not wingman.decision.combat or wingman.interaction is not None or wingman.restoring_camera:
+                    wingman_target.reset()
+                    camera_owner.select(None)
+                    if aim_mouse is not None:aim_mouse.clear()
+                    apply_fire_action(mouse,fire_controller.force_release(now))
+                    if nav_controller is not None:nav_controller.release_keys()
+                    if wingman.decision.state == "finished":
+                        logger.info("wingman: match_finished")
+                        stop_event.set()
+                        break
+                    camera_owner.select("objective" if wingman.objective_camera_allowed() else None)
+                    wingman.idle_tick(nav_controller,now=now)
+                    continue
+
+            if not camera_owner.allowed():
+                camera_owner.select(None)
+                if aim_mouse is not None:
+                    aim_mouse.clear()
+                if nav_controller is not None:
+                    nav_controller.release_keys()
+                if look_controller is not None:
+                    look_controller.abort(now=now)
+                if fire_controller.is_holding:
+                    apply_fire_action(mouse,fire_controller.force_release(now))
                 continue
 
             map_transition_active = False
@@ -655,32 +788,36 @@ def detection_process(
                 and map_regions is not None
                 and map_detect_state is not None
                 and map_templates
-                and config.patrol.enabled
-                and patrol_runner is not None
-                and patrol_key_down is not None
-                and patrol_key_up is not None
             ):
-                # Product: debounce match-ready — single-frame probe FP paused Nav mid-DM.
-                map_transition_active = match_ready_latch.update(
-                    match_ready_visible(img, map_regions)
-                )
-                if map_transition_active and map_detect_state.locked:
-                    prev_script = map_detect_state.confirmed_script
-                    if unlock_map_detect(map_detect_state):
-                        logger.info(
-                            "map: unlock (match_ready) was=%s — awaiting reconfirm",
-                            prev_script,
-                        )
-
                 detected, detect_source = detect_map_hud(
                     img,
                     map_regions,
                     map_templates,
                     use_ocr_fallback=config.map_detect.use_ocr_fallback,
                 )
+                from nav.map_confirmation import named_match_ready, active_map_confirmed
+                # Only a detected map name may activate the match-ready hold.
+                # The old bare pixel probe falsely fired on live Mirage scenery.
+                map_transition_active = match_ready_latch.update(
+                    named_match_ready(detected, detect_source)
+                )
+                if map_transition_active and nav_controller is not None:
+                    nav_controller.release_keys()
+                # Do not discard the known map on a readiness probe. The named
+                # map detector/geometry selector below confirms actual changes.
+                # Training may show neither scoreboard nor match-ready map name.
+                # Query geometry only after the current map has lost localization.
+                if nav_map_selector is not None:
+                    if detected is None and (not nav_map_confirmed or now-nav_map_seen_at > 3.):
+                        candidate = nav_map_selector.update(img, now=captured_at)
+                        if candidate is not None:
+                            detected = candidate.removeprefix("de_")
+                            detect_source = "visual_geometry"
+                    else:
+                        nav_map_selector.reset()
                 # Match-ready with a *different* map name also unlocks before hysteresis.
                 if (
-                    detect_source == "match_ready"
+                    detect_source in ("match_ready", "visual_geometry")
                     and detected is not None
                     and detected != map_detect_state.confirmed_script
                     and map_detect_state.locked
@@ -695,30 +832,31 @@ def detection_process(
                 map_changed, map_pending = update_map_hysteresis(
                     map_detect_state,
                     detected,
-                    confirm_frames=config.map_detect.confirm_frames,
+                    confirm_frames=1 if detect_source == "visual_geometry" else config.map_detect.confirm_frames,
                     lock_after_confirm=config.map_detect.lock_after_confirm,
                     allow_reconfirm=True,
                 )
                 if map_changed is not None:
                     try:
-                        patrol_runner.pause()
-                        patrol_path = resolve_patrol_path(
-                            map_changed,
-                            config.patrol.script_path,
-                        )
-                        patrol_script = load_patrol(patrol_path)
-                        patrol_runner = PatrolRunner(
-                            patrol_script,
-                            key_down=patrol_key_down,
-                            key_up=patrol_key_up,
-                        )
-                        patrol_mode = PatrolMode.PATROL
-                        stuck_since = None
-                        if stuck_detector is not None:
-                            stuck_detector.reset()
+                        if config.patrol.enabled and patrol_runner is not None and not config.nav.enabled:
+                            patrol_runner.pause()
+                            patrol_path = resolve_patrol_path(
+                                map_changed,
+                                config.patrol.script_path,
+                            )
+                            patrol_script = load_patrol(patrol_path)
+                            patrol_runner = PatrolRunner(
+                                patrol_script,
+                                key_down=patrol_key_down,
+                                key_up=patrol_key_up,
+                            )
+                            patrol_mode = PatrolMode.PATROL
+                            stuck_since = None
+                            if stuck_detector is not None:
+                                stuck_detector.reset()
                         shared_state["patrol_script"] = map_changed
                         logger.info(
-                            "map: auto patrol %s via %s (%d/%d frames)",
+                            "map: confirmed %s via %s (%d/%d frames)",
                             map_changed,
                             detect_source or "unknown",
                             config.map_detect.confirm_frames,
@@ -757,6 +895,7 @@ def detection_process(
                                     nav_pose_filter.reset()
                                 nav_pack = new_pack
                                 active_nav_pack_id = new_pack_id
+                                logger.info("nav: runtime_identity %s", json.dumps(identity(new_pack.map_id), sort_keys=True))
                                 if nav_metrics is not None:
                                     nav_metrics = NavMetrics(
                                         log_interval_sec=config.nav.metrics_log_interval_sec,
@@ -769,15 +908,30 @@ def detection_process(
                                     new_pack.version,
                                     ", ".join(g.id for g in new_pack.goals),
                                 )
+                        if nav_pack is not None and nav_pack.map_id == "de_" + map_changed:
+                            nav_map_confirmed = True
+                            nav_map_seen_at = now
                     except Exception as exc:
-                        logger.error("map: patrol reload failed (%s)", exc)
+                        nav_map_confirmed = False
+                        logger.error("map: profile reload failed (%s)", exc)
                         if nav_controller is not None:
                             nav_controller.release_keys()
                         if nav_pose_filter is not None:
                             nav_pose_filter.reset()
                         # Never feed the previous map's registered coordinates
                         # to a controller after a failed map switch.
+                        if nav_perception is not None:
+                            nav_perception.close()
                         nav_perception = None
+                # Reconfirming the SAME map deliberately returns map_changed=None.
+                # Recover the movement gate from the confirmed detector state,
+                # provided the matching profile and perception really are loaded.
+                if (nav_pack is not None and nav_perception is not None
+                        and nav_controller is not None and nav_controller.walkable is not None
+                        and active_map_confirmed(nav_pack.map_id, map_detect_state)):
+                    if not nav_map_confirmed:
+                        logger.info("nav: map confirmation restored map=%s", nav_pack.map_id)
+                    nav_map_confirmed = True
                 # Product: always log map_detect status (farm observability).
                 if now - last_map_debug_log >= 5.0:
                     logger.info(
@@ -789,6 +943,8 @@ def detection_process(
                         map_detect_state.confirmed_script,
                         map_detect_state.locked,
                     )
+                    if nav_map_selector is not None:
+                        logger.info("map: geometry=%s", nav_map_selector.status)
                     last_map_debug_log = now
 
             if (
@@ -855,17 +1011,38 @@ def detection_process(
 
             # Update team from shared state
             current_team_str = shared_state.get("team", "ct")
+            if wingman is not None and wingman.snapshot is not None:
+                current_team_str = wingman.snapshot.observation.team.lower()
+                shared_state["team"] = current_team_str
+                nav_map_confirmed = True
+                map_transition_active = False
             target_selector.config.current_team = Team(current_team_str)
             # Keep AimConfig.target_mode as source of truth for enemy_classes
             target_selector.config.target_mode = config.aim.target_mode
 
-            # Run detection (full frame + optional ROI fallback)
-            detections, roi_used_last = run_combat_detection(
-                detector,
-                img,
-                config.detector,
-                config.aim,
-            )
+            # Navigation and detection read the SAME capture in parallel. Consume
+            # this future before the next frame/map reload; never queue old frames.
+            nav_stage_started = time.monotonic()
+            nav_job = None
+            if (config.nav.enabled and nav_perception is not None
+                    and nav_reader is not None and nav_pose_filter is not None
+                    and activated.is_set()):
+                nav_job = nav_executor.submit(nav_perception.update, img.copy(),
+                    now=captured_at, allow_global=not previous_nav_combat_hold)
+
+            # Wingman retries after teammate filtering; a vetoed full-frame
+            # box must not suppress the ROI recovery pass.
+            if wingman is not None:
+                from detectors.wingman_detect import detect_wingman
+                detections,roi_used_last,team_reason,raw_counts=detect_wingman(
+                    detector,img,config.detector,wingman.snapshot.observation.team)
+                if now-getattr(wingman,"last_team_log",0.)>2:
+                    logger.info("wingman_detect: reason=%s raw=%s eligible=%s roi=%s",
+                        team_reason,raw_counts,{k:len(v) for k,v in detections.items()},roi_used_last)
+                    wingman.last_team_log=now
+            else:
+                detections, roi_used_last = run_combat_detection(
+                    detector,img,config.detector,config.aim)
             last_detect_debug_log = log_detect_status(
                 detections=detections,
                 enemy_classes=config.aim.enemy_classes,
@@ -893,35 +1070,40 @@ def detection_process(
 
             enemy_target = None
             if activated.is_set() and detections:
-                enemy_target = target_selector.select_best_target(
-                    detections,
-                    max_distance=config.aim.max_assist_distance,
-                )
+                if wingman is not None:
+                    enemy_target = wingman_target.select(target_selector,detections,now=captured_at,
+                        project=aim_mouse.project_point if aim_mouse is not None else None)
+                else:
+                    enemy_target = target_selector.select_best_target(
+                        detections, max_distance=config.aim.max_assist_distance)
+            contact_now = time.monotonic()
+            contact_held = combat_contact.update(
+                detected=enemy_target is not None, active=activated.is_set(), now=contact_now)
             fire_action = FireAction()
             if enemy_target is None:
-                head_miss_since = None
-                last_target_key = None
-                last_target_aim = None
-                aim_pipeline.reset_trackers()
+                if not contact_held:
+                    if wingman is not None:wingman_target.reset()
+                    body_preferred_until = 0.
+                    head_miss_since = None
+                    last_target_key = None
+                    last_target_aim = None
+                    aim_pipeline.reset_trackers()
                 if aim_mouse is not None:
                     aim_mouse.clear()
                 if fire_controller.is_holding:
                     fire_action = fire_controller.force_release(now)
 
-            in_combat = enemy_target is not None
-            if in_combat:
+            in_combat = contact_held
+            if enemy_target is not None:
                 last_enemy_seen = now
 
-            # Product DM: pause Nav only for close engage or active fire.
-            # FermK soak: 220px froze seek too often — tighten to close fights.
-            NAV_COMBAT_ENGAGE_PX = 130.0
-            nav_combat_hold = bool(
-                enemy_target is not None
-                and (
-                    fire_controller.is_holding
-                    or float(enemy_target.distance) <= NAV_COMBAT_ENGAGE_PX
-                )
-            )
+            # A selected target owns aim regardless of its screen distance.
+            # Switching ownership serializes with both background mouse writers.
+            nav_combat_hold = contact_held
+            previous_nav_combat_hold = nav_combat_hold
+            camera_owner.select("combat" if nav_combat_hold else "nav")
+            if nav_combat_hold and nav_controller is not None:
+                nav_controller.release_keys()
 
             if not activated.is_set() and aim_mouse is not None:
                 aim_mouse.clear()
@@ -945,6 +1127,170 @@ def detection_process(
                 unstuck_seq is not None and unstuck_seq.is_running
             )
 
+            # Aim and fire consume this capture BEFORE waiting for navigation.
+            now = time.monotonic()
+            if activated.is_set() and enemy_target is not None:
+                target = enemy_target
+                if target.is_head and now<body_preferred_until:
+                    body = target_selector.select_body_for_head(target,detections,
+                        max_distance=config.aim.max_assist_distance)
+                    if body is not None:target=body
+                target, head_miss_since, switched_body = maybe_switch_to_body(
+                    target,
+                    prioritize_heads=config.aim.prioritize_heads,
+                    aim_dead_zone_high=config.aim.aim_dead_zone_high,
+                    body_fallback_sec=config.aim.body_fallback_sec,
+                    head_miss_since=head_miss_since,
+                    now=now,
+                    select_body=lambda: target_selector.select_body_for_head(
+                        target, detections,
+                        max_distance=config.aim.max_assist_distance,
+                    ),
+                )
+                if switched_body:
+                    body_preferred_until = now+1.0
+                    aim_pipeline.reset_trackers()
+                    if aim_mouse is not None:
+                        aim_mouse.reset_track()
+                    last_target_aim = None
+
+                # A1.2.1: hard-retarget only on class change or large aim jump.
+                # The old aim_x//8 bucket reset cleared settle every few pixels
+                # and caused on-target vertical thrash.
+                hard_px = max(8.0, float(config.aim.aim_hard_retarget_px))
+                target_key = (target.class_name,)
+                jump = 0.0
+                if last_target_aim is not None:
+                    jump = hypot(
+                        target.aim_x - last_target_aim[0],
+                        target.aim_y - last_target_aim[1],
+                    )
+                hard_retarget = (
+                    last_target_key is None
+                    or target_key != last_target_key
+                    or jump >= hard_px
+                )
+                if hard_retarget:
+                    aim_pipeline.reset_trackers()
+                    if aim_mouse is not None:
+                        aim_mouse.reset_track()
+                    last_target_key = target_key
+                last_target_aim = (float(target.aim_x), float(target.aim_y))
+
+                frame = process_aim_frame(
+                    raw_x=target.aim_x,
+                    raw_y=target.aim_y,
+                    target_distance=target.distance,
+                    now=captured_at,
+                    aim_config=config.aim,
+                    fov_mouse=fov_mouse,
+                    pipeline=aim_pipeline,
+                    fps_value=fps(),
+                    reproject=aim_mouse.project_point if aim_mouse is not None else None,
+                )
+
+                if aim_mouse is not None:
+                    aim_mouse.set_target(
+                        frame.aim_x,
+                        frame.aim_y,
+                        smoothing=frame.smoothing,
+                        now=captured_at,
+                    )
+                    dbg_dx, dbg_dy = aim_mouse.last_delta
+                    if config.aim.one_shot and aim_mouse.consume_applied():
+                        activated.clear()
+                else:
+                    dbg_dx, dbg_dy = frame.mouse_dx, frame.mouse_dy
+                    if frame.should_move and (frame.mouse_dx or frame.mouse_dy):
+                        camera_owner.emit("combat",frame.mouse_dx,frame.mouse_dy)
+
+                        if config.aim.one_shot:
+                            activated.clear()
+
+                # Fire against the actual detection, not the EMA/lead ghost.
+                fire_measure = observed_fire_distance
+                if wingman is not None:
+                    from aiming.combat_aim import precise_fire_distance
+                    fire_measure = precise_fire_distance
+                fire_distance = fire_measure(
+                    target, center_x=fov_mouse._center_x, center_y=fov_mouse._center_y,
+                    captured_at=captured_at, now=time.monotonic(),
+                    project=aim_mouse.project_point if aim_mouse is not None else None)
+                fire_action = fire_controller.tick(
+                    pixel_distance=fire_distance,
+                    confidence=target.confidence,
+                    is_head=target.is_head,
+                    now=time.monotonic(),
+                )
+
+                if aim_debug and now - last_aim_debug_log >= 2.0:
+                    logger.info(
+                        "aim: fps=%.0f dist=%.1f smooth=%.2f "
+                        "mouse=(%d,%d) target=(%.0f,%.0f) "
+                        "lead_stable=%s speed=%.0f move=%s "
+                        "fire=%s hold=%s roi=%s body_fb=%s hz=%.0f settle=%s",
+                        fps(),
+                        frame.pixel_distance,
+                        frame.smoothing,
+                        dbg_dx,
+                        dbg_dy,
+                        frame.aim_x,
+                        frame.aim_y,
+                        frame.lead.stable,
+                        frame.lead.speed_px_s,
+                        frame.should_move if aim_mouse is None else bool(dbg_dx or dbg_dy),
+                        fire_action.mode,
+                        fire_action.holding,
+                        roi_used_last,
+                        switched_body,
+                        float(config.aim.mouse_hz),
+                        aim_mouse.is_settled if aim_mouse is not None else False,
+                    )
+                    last_aim_debug_log = now
+
+                if config.preview.enabled:
+                    detector.draw_aim_point(
+                        img,
+                        frame.aim_x,
+                        frame.aim_y,
+                        color=(0, 255, 0),
+                    )
+
+            if (
+                fire_action.click
+                or fire_action.press
+                or fire_action.release
+            ):
+                if camera_owner.allowed():
+                    apply_fire_action(mouse, fire_action)
+                    if (fire_action.press or fire_action.click) and not combat_contact.shot_reported:
+                        logger.info(
+                            "aim_contact: first_fire_ms=%.0f frame_age_ms=%.0f raw_error_px=%.1f corrected_error_px=%.1f",
+                            1000 * (time.monotonic() - (combat_contact.acquired_at or contact_now)),
+                            1000 * (time.monotonic() - captured_at), target.distance, fire_distance)
+                        combat_contact.shot_reported = True
+                else:
+                    apply_fire_action(mouse,fire_controller.force_release(time.monotonic()))
+                if not fire_announced and (
+                    fire_action.fired or fire_action.press
+                ):
+                    logger.info(
+                        "auto_shoot: %s fire active",
+                        config.aim.shoot_mode,
+                    )
+                    fire_announced = True
+
+            # Combat ownership/release above takes effect before waiting for nav.
+            # Drain even if deactivated mid-frame so reset cannot race perception.
+            nav_wait_started = time.monotonic()
+            nav_result = nav_job.result() if nav_job is not None else None
+            nav_finished = time.monotonic()
+            if nav_job is not None and nav_finished-last_nav_timing_log >= 5.:
+                logger.info("nav_timing: capture_age_ms=%.0f parallel_stage_ms=%.0f wait_nav_ms=%.0f",
+                    (nav_finished-captured_at)*1000.,
+                    (nav_finished-nav_stage_started)*1000.,
+                    (nav_finished-nav_wait_started)*1000.)
+                last_nav_timing_log = nav_finished
             nav_pose = None
             if (
                 config.nav.enabled
@@ -953,16 +1299,20 @@ def detection_process(
                 and activated.is_set()
             ):
                 if nav_perception is not None:
-                    perc = nav_perception.update(
-                        img, now=captured_at
+                    perc = nav_result if nav_result is not None else nav_perception.update(
+                        img, now=captured_at, allow_global=not nav_combat_hold
                     )
                     raw_pose = perc.pose
+                    if raw_pose.valid and nav_map_confirmed:
+                        nav_map_seen_at = now
                 else:
                     raw_pose = nav_reader.read(img)
+                now = time.monotonic()
                 nav_pose = nav_pose_filter.update(raw_pose, now=now)
 
             use_nav_movement = (
                 config.nav.enabled
+                and nav_map_confirmed
                 and not config.nav.read_only
                 and nav_controller is not None
                 and activated.is_set()
@@ -1014,7 +1364,8 @@ def detection_process(
                 )
                 # Pause nav only on confirmed match-ready (latched), not RGB flicker.
                 nav_paused = (
-                    nav_combat_hold
+                    (wingman is not None and wingman.mission is None)
+                    or nav_combat_hold
                     or patrol_buy_freeze
                     or look_hold_movement
                     or map_transition_active
@@ -1026,6 +1377,8 @@ def detection_process(
                     radar_progressing = False
                     nav_tick_result = nav_controller.tick(
                         nav_pose,
+                        motion_hint=getattr(nav_perception,"motion_hint",None),
+                        door_observation=getattr(nav_perception,"door_observation",None),
                         now=time.monotonic(),
                         paused=True,
                         team=current_team_str,
@@ -1041,6 +1394,8 @@ def detection_process(
                     radar_progressing = False
                     nav_tick_result = nav_controller.tick(
                         nav_pose,
+                        motion_hint=getattr(nav_perception,"motion_hint",None),
+                        door_observation=getattr(nav_perception,"door_observation",None),
                         now=time.monotonic(),
                         paused=False,
                         team=current_team_str,
@@ -1378,133 +1733,6 @@ def detection_process(
                     ):
                         nav_controller.release_keys()
 
-            if activated.is_set() and enemy_target is not None:
-                target = enemy_target
-                target, head_miss_since, switched_body = maybe_switch_to_body(
-                    target,
-                    prioritize_heads=config.aim.prioritize_heads,
-                    aim_dead_zone_high=config.aim.aim_dead_zone_high,
-                    body_fallback_sec=config.aim.body_fallback_sec,
-                    head_miss_since=head_miss_since,
-                    now=now,
-                    select_body=lambda: target_selector.select_nearest_body(
-                        detections,
-                        max_distance=config.aim.max_assist_distance,
-                    ),
-                )
-                if switched_body:
-                    aim_pipeline.reset_trackers()
-                    if aim_mouse is not None:
-                        aim_mouse.reset_track()
-                    last_target_aim = None
-
-                # A1.2.1: hard-retarget only on class change or large aim jump.
-                # The old aim_x//8 bucket reset cleared settle every few pixels
-                # and caused on-target vertical thrash.
-                hard_px = max(8.0, float(config.aim.aim_hard_retarget_px))
-                target_key = (target.class_name,)
-                jump = 0.0
-                if last_target_aim is not None:
-                    jump = hypot(
-                        target.aim_x - last_target_aim[0],
-                        target.aim_y - last_target_aim[1],
-                    )
-                hard_retarget = (
-                    last_target_key is None
-                    or target_key != last_target_key
-                    or jump >= hard_px
-                )
-                if hard_retarget:
-                    aim_pipeline.reset_trackers()
-                    if aim_mouse is not None:
-                        aim_mouse.reset_track()
-                    last_target_key = target_key
-                last_target_aim = (float(target.aim_x), float(target.aim_y))
-
-                frame = process_aim_frame(
-                    raw_x=target.aim_x,
-                    raw_y=target.aim_y,
-                    target_distance=target.distance,
-                    now=now,
-                    aim_config=config.aim,
-                    fov_mouse=fov_mouse,
-                    pipeline=aim_pipeline,
-                    fps_value=fps(),
-                )
-
-                if aim_mouse is not None:
-                    aim_mouse.set_target(
-                        frame.aim_x,
-                        frame.aim_y,
-                        smoothing=frame.smoothing,
-                        now=now,
-                    )
-                    dbg_dx, dbg_dy = aim_mouse.last_delta
-                    if config.aim.one_shot and aim_mouse.consume_applied():
-                        activated.clear()
-                else:
-                    dbg_dx, dbg_dy = frame.mouse_dx, frame.mouse_dy
-                    if frame.should_move and (frame.mouse_dx or frame.mouse_dy):
-                        mouse.move_relative(frame.mouse_dx, frame.mouse_dy)
-
-                        if config.aim.one_shot:
-                            activated.clear()
-
-                fire_action = fire_controller.tick(
-                    pixel_distance=frame.pixel_distance,
-                    confidence=target.confidence,
-                    is_head=target.is_head,
-                    now=now,
-                )
-
-                if aim_debug and now - last_aim_debug_log >= 2.0:
-                    logger.info(
-                        "aim: fps=%.0f dist=%.1f smooth=%.2f "
-                        "mouse=(%d,%d) target=(%.0f,%.0f) "
-                        "lead_stable=%s speed=%.0f move=%s "
-                        "fire=%s hold=%s roi=%s body_fb=%s hz=%.0f settle=%s",
-                        fps(),
-                        frame.pixel_distance,
-                        frame.smoothing,
-                        dbg_dx,
-                        dbg_dy,
-                        frame.aim_x,
-                        frame.aim_y,
-                        frame.lead.stable,
-                        frame.lead.speed_px_s,
-                        frame.should_move if aim_mouse is None else bool(dbg_dx or dbg_dy),
-                        fire_action.mode,
-                        fire_action.holding,
-                        roi_used_last,
-                        switched_body,
-                        float(config.aim.mouse_hz),
-                        aim_mouse.is_settled if aim_mouse is not None else False,
-                    )
-                    last_aim_debug_log = now
-
-                if config.preview.enabled:
-                    detector.draw_aim_point(
-                        img,
-                        frame.aim_x,
-                        frame.aim_y,
-                        color=(0, 255, 0),
-                    )
-
-            if (
-                fire_action.click
-                or fire_action.press
-                or fire_action.release
-            ):
-                apply_fire_action(mouse, fire_action)
-                if not fire_announced and (
-                    fire_action.fired or fire_action.press
-                ):
-                    logger.info(
-                        "auto_shoot: %s fire active",
-                        config.aim.shoot_mode,
-                    )
-                    fire_announced = True
-
             # Update FPS
             current_fps = fps()
             shared_state["fps"] = current_fps
@@ -1522,6 +1750,14 @@ def detection_process(
 
                 preview_queue.put_nowait(img)
     finally:
+        if wingman is not None:wingman.close()
+        if nav_controller is not None:
+            nav_controller.release_keys()
+        nav_executor.shutdown(wait=True, cancel_futures=True)
+        if nav_map_selector is not None:
+            nav_map_selector.close()
+        if nav_perception is not None and hasattr(nav_perception, "close"):
+            nav_perception.close()
         if auto_capture is not None:
             try:
                 auto_capture.stop()

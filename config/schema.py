@@ -8,12 +8,24 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 
+class GameMode(str, Enum):
+    DEATHMATCH = "deathmatch"
+    WINGMAN = "wingman"
+
+
 class BotMode(str, Enum):
     """Режим боя: auto → ai если csgobot готов, иначе simple."""
 
     AUTO = "auto"
     AI = "ai"
     SIMPLE = "simple"
+
+
+class FleetRole(str, Enum):
+    """Coordinator hosts the LAN server; every gaming PC still runs an agent."""
+
+    COORDINATOR = "coordinator"
+    AGENT = "agent"
 
 
 class AppConfig(BaseModel):
@@ -170,6 +182,7 @@ class AppConfig(BaseModel):
         default=True,
         description="VAC-safe CS2: applaunch 730, minimal flags, farm_panel.cfg only (no video.txt overwrite)",
     )
+    game_mode: GameMode = Field(default=GameMode.DEATHMATCH)
     bot_mode: BotMode = Field(
         default=BotMode.AUTO, description="auto | ai | simple"
     )
@@ -189,7 +202,7 @@ class AppConfig(BaseModel):
     )
     csgobot_nav_pack: str = Field(
         default="auto",
-        description="Nav pack id or auto (map_detect picks dust2_dm / mirage_dm)",
+        description="Nav pack id or auto (automatic Dust2 / Mirage / Inferno / Vertigo / Cache selection)",
     )
     nav_fleet_collector_port: int = Field(
         default=8765,
@@ -238,6 +251,36 @@ class AppConfig(BaseModel):
     fsm_import_on_refresh: bool = Field(
         default=False,
         description="Авто-импорт при Refresh accounts (post-MVP)",
+    )
+    wingman_fleet_role: FleetRole = Field(
+        default=FleetRole.AGENT,
+        description="coordinator = LAN server + local agent; agent = worker PC",
+    )
+    wingman_fleet_url: str = Field(
+        default="http://127.0.0.1:8790",
+        description="Coordinator base URL (agents POST /v1/heartbeat here)",
+    )
+    wingman_fleet_port: int = Field(
+        default=8790,
+        ge=1024,
+        le=65535,
+        description="Coordinator listen port (only used when role=coordinator)",
+    )
+    wingman_fleet_token: str = Field(
+        default="",
+        description="Shared fleet token (empty = load/create data/wingman_fleet.json)",
+    )
+    wingman_fleet_agent_id: str = Field(
+        default="",
+        description="This PC's agent id (must match a roster slot)",
+    )
+    wingman_fleet_expected_steamid64: str = Field(
+        default="",
+        description="SteamID64 that must be signed in on this PC",
+    )
+    wingman_fleet_autostart: bool = Field(
+        default=False,
+        description="Start coordinator/agent when the panel opens",
     )
 
     model_config = {"extra": "ignore"}

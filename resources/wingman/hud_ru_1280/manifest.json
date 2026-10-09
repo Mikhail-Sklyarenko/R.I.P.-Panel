@@ -1,0 +1,98 @@
+{
+  "resolution": [
+    1280,
+    720
+  ],
+  "language": "ru",
+  "source_video": "2026-09-20 20-01-41.mp4",
+  "templates": [
+    {
+      "name": "round_win",
+      "box": [
+        545,
+        135,
+        736,
+        159
+      ],
+      "state": "round_over",
+      "source_seconds": 340
+    },
+    {
+      "name": "round_loss",
+      "box": [
+        540,
+        135,
+        743,
+        159
+      ],
+      "state": "round_over",
+      "source_seconds": 240
+    },
+    {
+      "name": "halftime",
+      "box": [
+        550,
+        96,
+        730,
+        119
+      ],
+      "state": "halftime",
+      "source_seconds": 400
+    },
+    {
+      "name": "match_result",
+      "box": [
+        73,
+        11,
+        148,
+        21
+      ],
+      "state": "finished",
+      "source_seconds": 478
+    },
+    {
+      "name": "buy_header",
+      "box": [
+        360,
+        125,
+        549,
+        140
+      ],
+      "state": "buy_menu",
+      "source_seconds": 40
+    },
+    {
+      "name": "buy_rifles",
+      "box": [
+        530,
+        153,
+        598,
+        167
+      ],
+      "state": "buy_menu",
+      "source_seconds": 40
+    },
+    {
+      "name": "defuse",
+      "box": [
+        566,
+        430,
+        789,
+        441
+      ],
+      "state": "defusing",
+      "source_seconds": 440
+    },
+    {
+      "name": "match_victory",
+      "box": [
+        551,
+        110,
+        730,
+        143
+      ],
+      "state": "finished",
+      "source_seconds": 478
+    }
+  ]
+}

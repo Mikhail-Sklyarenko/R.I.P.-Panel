@@ -1,0 +1,22 @@
+{
+  "map_id": "de_dust2",
+  "version": "expanded-ground-2",
+  "scope": "Dust2 ground routes with connected Long door passages",
+  "map_sha256": "3be20317d1383da6f390a5bb245cabb65857ef08b1e2c5b82b5938a8cb3167bb",
+  "clearance_px": 6,
+  "grid_step": 2,
+  "search_weight": 1.5,
+  "experimental": true,
+  "live_validated": false,
+  "full_map_ready": false,
+  "mask_source": "colored radar floor, structures excluded; multi-level overlap blocked",
+  "limitations": [
+    "No height or directed transition model",
+    "No independent full-map localization validation",
+    "Disconnected areas remain disconnected"
+  ],
+  "raw_floor_pixels": 421142,
+  "usable_pixels": 322290,
+  "components_over_100_pixels": 6,
+  "atlas_references": 19
+}

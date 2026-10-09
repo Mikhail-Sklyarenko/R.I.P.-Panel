@@ -1,0 +1,300 @@
+{
+  "map_id": "de_mirage",
+  "version": "mirage-visual-1",
+  "map_sha256": "5de1cc16362e538dc5f4561a24661cb1fb1c15c77ec289e32b44c0fc07bfb85b",
+  "clearance_px": 6,
+  "scope": "mirage_floor_candidates",
+  "experimental": true,
+  "live_validated": false,
+  "full_map_ready": false,
+  "limitations": [
+    "Radar-derived floor geometry is not a 3D navmesh",
+    "Overlapping floors and one-way drops require explicit transition validation"
+  ],
+  "floor_regions": [
+    {
+      "name": "t_long_floor",
+      "points": [
+        [
+          899,
+          411
+        ],
+        [
+          937,
+          411
+        ],
+        [
+          937,
+          737
+        ],
+        [
+          889,
+          737
+        ],
+        [
+          889,
+          816
+        ],
+        [
+          867,
+          816
+        ],
+        [
+          867,
+          709
+        ],
+        [
+          899,
+          709
+        ]
+      ]
+    },
+    {
+      "name": "b_back_hall",
+      "points": [
+        [
+          551,
+          156
+        ],
+        [
+          783,
+          156
+        ],
+        [
+          783,
+          207
+        ],
+        [
+          716,
+          207
+        ],
+        [
+          716,
+          224
+        ],
+        [
+          675,
+          224
+        ],
+        [
+          675,
+          277
+        ],
+        [
+          620,
+          277
+        ],
+        [
+          620,
+          217
+        ],
+        [
+          551,
+          198
+        ]
+      ]
+    },
+    {
+      "name": "a_default_floor",
+      "points": [
+        [
+          515,
+          742
+        ],
+        [
+          588,
+          727
+        ],
+        [
+          616,
+          776
+        ],
+        [
+          604,
+          818
+        ],
+        [
+          515,
+          828
+        ]
+      ]
+    },
+    {
+      "name": "palace_t_stairs",
+      "points": [
+        [
+          812,
+          629
+        ],
+        [
+          851,
+          629
+        ],
+        [
+          851,
+          738
+        ],
+        [
+          830,
+          750
+        ],
+        [
+          812,
+          730
+        ]
+      ]
+    },
+    {
+      "name": "t_spawn_floor",
+      "points": [
+        [
+          864,
+          303
+        ],
+        [
+          938,
+          303
+        ],
+        [
+          938,
+          445
+        ],
+        [
+          865,
+          445
+        ]
+      ]
+    },
+    {
+      "name": "a_site_floor",
+      "points": [
+        [
+          570,
+          623
+        ],
+        [
+          610,
+          623
+        ],
+        [
+          610,
+          635
+        ],
+        [
+          644,
+          635
+        ],
+        [
+          644,
+          660
+        ],
+        [
+          714,
+          660
+        ],
+        [
+          714,
+          709
+        ],
+        [
+          677,
+          709
+        ],
+        [
+          637,
+          709
+        ],
+        [
+          637,
+          778
+        ],
+        [
+          600,
+          817
+        ],
+        [
+          551,
+          825
+        ],
+        [
+          520,
+          804
+        ],
+        [
+          539,
+          757
+        ],
+        [
+          562,
+          717
+        ],
+        [
+          562,
+          680
+        ],
+        [
+          574,
+          675
+        ]
+      ]
+    },
+    {
+      "name": "ct_a_steps",
+      "points": [
+        [
+          452,
+          648
+        ],
+        [
+          514,
+          662
+        ],
+        [
+          529,
+          702
+        ],
+        [
+          522,
+          756
+        ],
+        [
+          508,
+          793
+        ],
+        [
+          463,
+          819
+        ],
+        [
+          452,
+          798
+        ]
+      ]
+    }
+  ],
+  "blocked_transitions": [
+    {
+      "name": "ladder_room_vertical_ladder",
+      "points": [
+        [
+          429,
+          348
+        ],
+        [
+          458,
+          348
+        ],
+        [
+          458,
+          419
+        ],
+        [
+          429,
+          419
+        ]
+      ]
+    }
+  ],
+  "mask_source": "radar floor palette plus inspected A/CT/T floor regions; spawn outlines are annotations",
+  "initial_hud_scale": 0.355
+}

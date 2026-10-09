@@ -10,7 +10,7 @@ from modules.ui_nav.coords import (
     load_nav_coords_for_hwnd,
     resolve_cs_coords_path,
 )
-from modules.ui_nav.detectors import ScreenState, detect_state
+from modules.ui_nav.detectors import ScreenState, detect_state, probe_match_results
 from modules.ui_nav.errors import UiNavError
 from modules.drop_picker.slots import load_drop_layout
 from modules.drop_picker.errors import DropPickerError
@@ -39,7 +39,7 @@ def test_load_nav_coords_1280_scale_one_to_one() -> None:
     assert coords.scale_x == pytest.approx(1.0)
     assert coords.scale_y == pytest.approx(1.0)
     pt = coords.click("main_menu_play")
-    assert pt.x == 736
+    assert pt.x == 663
     assert pt.y == 20
 
 
@@ -81,7 +81,8 @@ def test_main_menu_detects_1280x720_synthetic_probes() -> None:
             (probe.x - 2, probe.y - 2, probe.x + 2, probe.y + 2),
             fill=probe.rgb,
         )
-    assert detect_state(img, ScreenState.MAIN_MENU, coords, min_match=2) is True
+    # 1280 MAIN_MENU additionally requires PLAY/LOADOUT lettering; probes still match.
+    assert all(r.matched for r in probe_match_results(img, ScreenState.MAIN_MENU, coords))
 
 
 def test_main_menu_detects_armoryfarm_fixture() -> None:

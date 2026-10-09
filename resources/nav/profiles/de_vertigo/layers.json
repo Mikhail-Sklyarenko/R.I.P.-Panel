@@ -1,0 +1,186 @@
+{
+  "map_id": "de_vertigo",
+  "layers": {
+    "upper": "de_vertigo",
+    "lower": "de_vertigo_lower"
+  },
+  "portals": [
+    {
+      "id": "b_stairs",
+      "upper_to_lower": [
+        [
+          200,
+          375
+        ],
+        [
+          176,
+          457
+        ],
+        [
+          216,
+          495
+        ],
+        [
+          246,
+          453
+        ],
+        [
+          260,
+          429
+        ]
+      ],
+      "source_seconds": [
+        18,
+        20,
+        21,
+        22,
+        23,
+        24
+      ],
+      "kind": "walk_stairs"
+    },
+    {
+      "id": "a_ramp",
+      "upper_to_lower": [
+        [
+          741,
+          722
+        ],
+        [
+          693,
+          754
+        ],
+        [
+          631,
+          760
+        ],
+        [
+          609,
+          759
+        ]
+      ],
+      "source_seconds": [
+        56,
+        57,
+        58,
+        59,
+        60
+      ],
+      "kind": "walk_ramp"
+    }
+  ],
+  "excluded_transitions": [
+    "ladder_shaft"
+  ],
+  "live_validated": false,
+  "geometry_edits": [
+    {
+      "id": "passage_measured_corner",
+      "layers": [
+        "lower"
+      ],
+      "action": "add_capsule",
+      "points": [
+        [
+          350,
+          560
+        ],
+        [
+          358,
+          551
+        ]
+      ],
+      "radius": 9,
+      "source_seconds": [
+        212,
+        216,
+        224,
+        254,
+        270
+      ],
+      "note": "Measured occupied corner differs from overview wall tip. Local footprint correction only."
+    },
+    {
+      "id": "a_ramp_top_barrier",
+      "layers": [
+        "upper"
+      ],
+      "action": "block_polygon",
+      "points": [
+        [
+          531,
+          636
+        ],
+        [
+          689,
+          636
+        ],
+        [
+          689,
+          643
+        ],
+        [
+          531,
+          643
+        ]
+      ],
+      "source_seconds": [
+        310,
+        312
+      ],
+      "note": "Upper barrier at crane. Lower recorded passage 328-334s at x624-630 crosses this projection and remains open."
+    },
+    {
+      "id": "a_ramp_left_rail",
+      "layers": [
+        "upper"
+      ],
+      "action": "block_polygon",
+      "points": [
+        [
+          557,
+          643
+        ],
+        [
+          562,
+          643
+        ],
+        [
+          562,
+          746
+        ],
+        [
+          557,
+          746
+        ]
+      ],
+      "note": "Solid rail visible in both source floor radars."
+    },
+    {
+      "id": "a_ramp_crate",
+      "layers": [
+        "upper"
+      ],
+      "action": "block_polygon",
+      "points": [
+        [
+          538,
+          609
+        ],
+        [
+          563,
+          609
+        ],
+        [
+          563,
+          633
+        ],
+        [
+          538,
+          633
+        ]
+      ],
+      "note": "Solid crate in source overview previously overwritten by broad fill."
+    }
+  ]
+}

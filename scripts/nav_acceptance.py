@@ -22,6 +22,32 @@ from nav.visual_perception import VisualPerception
 from nav.walkable import WalkableMap
 
 
+def readiness(rows, routes_ok, ground, goals):
+    """Gate this route on its own reference observations, not other map zones."""
+    required = {"mid_frame.jpg": "mid", "mid_upper_frame.jpg": "mid_upper"}
+    by_name = {row["frame"]: row for row in rows}
+    targets = {goal.id: (goal.x, goal.y) for goal in goals}
+    errors, warnings = [], []
+    if not routes_ok:
+        errors.append("MVP route is not connected in both directions")
+    for name, goal_id in required.items():
+        row = by_name.get(name)
+        if row is None or not row.get("accepted"):
+            errors.append(f"Required route frame {name}: {row.get('reason', 'rejected') if row else 'missing'}")
+            continue
+        point, goal = (row["x"], row["y"]), targets.get(goal_id)
+        if ground is None or goal is None or not ground.contains(point):
+            errors.append(f"Required route frame {name}: outside MVP ground or missing goal")
+        elif max(abs(point[0] - goal[0]), abs(point[1] - goal[1])) > .015:
+            errors.append(f"Required route frame {name}: position differs from calibrated goal")
+    for row in rows:
+        if not row.get("accepted") and row["frame"] not in required:
+            warnings.append(f"Outside MVP route: {row['frame']}: {row.get('reason', 'rejected')}")
+    return {"offline_ready": not errors, "errors": errors, "warnings": warnings,
+            "required_route_frames": list(required),
+            "corpus_all_accepted": len(rows) == 22 and all(row["accepted"] for row in rows)}
+
+
 def check():
     pack = load_nav_pack(resolve_nav_pack_path("dust2_visual_mvp"))
     ground = WalkableMap.load(pack.map_id)
@@ -43,7 +69,9 @@ def check():
                      "mean_update_ms": round((time.perf_counter() - started) * 500, 2)})
     accepted = sum(row["accepted"] for row in rows)
     return {**identity(pack.map_id), "pack": pack.pack_id,
-            "offline_ready": bool(routes_ok and len(rows) == 22 and accepted == 22),
+            "acceptance_version": "mid-scope-2",
+            **readiness(rows, routes_ok, ground, pack.goals),
+            "opencv_version": cv2.__version__, "python_version": sys.version.split()[0],
             "route_connected_both_directions": bool(routes_ok),
             "frames_accepted": accepted, "frames_total": len(rows),
             "live_validated": False,

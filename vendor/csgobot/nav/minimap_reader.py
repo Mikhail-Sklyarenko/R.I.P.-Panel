@@ -90,6 +90,10 @@ class MinimapReader:
         self._last_circle: Optional[RadarCircle] = None
         self.last_icon_xy: Optional[tuple[float, float]] = None
         self.last_icon_component: Optional[np.ndarray] = None
+        self.last_heading = None
+        self._center_samples = []
+        self._verified_circles = []
+        self._validated_circle = None
 
     @property
     def calibration(self) -> NavCalibration:
@@ -103,7 +107,7 @@ class MinimapReader:
     def last_circle(self) -> Optional[RadarCircle]:
         return self._last_circle
 
-    def _player_mask(self, crop: np.ndarray) -> np.ndarray:
+    def _player_color_masks(self, crop: np.ndarray):
         """T = yellow/gold chevron; CT = cyan (legacy calib)."""
         r = crop[:, :, 0].astype(np.int16)
         g = crop[:, :, 1].astype(np.int16)
@@ -121,7 +125,19 @@ class MinimapReader:
             (r > 185) & (g > 165) & (b < 110)
             & ((r - b) > 70) & ((g - b) > 55)
         )
-        return cyan | yellow
+        if getattr(self, "competitive_markers", False):
+            # Competitive player colours differ from the DM cyan/yellow marker.
+            # Translucent purple body is darker than its small bright center.
+            # Keep saturated edges so the centroid/tip do not jump with scenery.
+            purple = (r > 90) & (b > 90) & (g < 150) & (r-g > 35) & (b-g > 35)
+            green = (g > 140) & (g-r > 35) & (g-b > 25)
+            blue = (b > 155) & (b-r > 45) & (b-g > 15)
+            orange = (r > 190) & (g > 80) & (g < 180) & (b < 100) & (r-g > 35)
+            return yellow, cyan, purple, green, blue, orange
+        return yellow, cyan
+
+    def _player_mask(self, crop: np.ndarray) -> np.ndarray:
+        return np.logical_or.reduce(self._player_color_masks(crop))
 
     def _pick_center_blob(
         self,
@@ -215,10 +231,23 @@ class MinimapReader:
         self._last_circle = None
         self.last_icon_xy = None
         self.last_icon_component = None
+        self.last_heading = None
         if frame is None or frame.size == 0:
             return PoseResult.invalid()
 
         circle = detect_radar_circle(frame)
+        if getattr(self,'competitive_markers',False) and len(self._center_samples)>=3:
+            stable=np.asarray(self._center_samples[-5:],float)
+            measured=np.median(stable,axis=0)
+            if (np.max(np.std(stable,axis=0))<2.5 and
+                    (circle is None or math.dist((circle.cx,circle.cy,circle.radius),measured)>7)):
+                from nav.radar_geom import visible_ring_support
+                prior=RadarCircle(*map(float,measured))
+                if visible_ring_support(frame,prior):circle=prior
+        if getattr(self,'competitive_markers',False) and self._validated_circle is not None:
+            from nav.radar_geom import visible_ring_support
+            if visible_ring_support(frame,self._validated_circle):
+                circle=self._validated_circle
         self._last_circle = circle
         if circle is not None:
             crop, local_cx, local_cy, radius = self._crop_from_circle(frame, circle)
@@ -230,18 +259,57 @@ class MinimapReader:
         if crop.size == 0:
             return PoseResult.invalid()
 
-        mask = self._player_mask(crop)
-        # Keep only inside radar disk
-        h, w = mask.shape
-        yy, xx = np.ogrid[:h, :w]
-        mask &= (xx - local_cx) ** 2 + (yy - local_cy) ** 2 <= radius ** 2
+        if getattr(self, "competitive_markers", False):
+            # Runtime requires centered radar. Do not substitute a nearby team
+            # dot when our own direction tip is occluded (walkthrough 218s).
+            max_dist = min(max_dist, max(8.0, radius * .08))
 
-        components = _label_components(mask)
-        picked = self._pick_center_blob(
-            components, local_cx=local_cx, local_cy=local_cy, max_dist=max_dist
-        )
-        if picked is None:
+        if circle is not None and getattr(self,'competitive_markers',False):
+            sample=(circle.cx,circle.cy,circle.radius)
+            if self._center_samples and math.dist(sample,self._center_samples[-1])>5:
+                self._center_samples=[]
+            self._center_samples=(self._center_samples+[sample])[-15:]
+            if getattr(self,'objective_overlay_allowed',False):
+                from nav.wingman_icon import observe_objective_tip
+                # This center is image geometry, not a remembered world position.
+                screen=np.median(np.array(self._center_samples),axis=0)
+                x,y,_,_=circle.rect;cx,cy=screen[0]-x,screen[1]-y
+                color=self._player_mask(crop)
+                heading,display=observe_objective_tip(crop,cx,cy,color)
+                if heading is not None:
+                    self.last_icon_xy=(float(cx),float(cy))
+                    yy,xx=np.ogrid[:color.shape[0],:color.shape[1]]
+                    self.last_icon_component=color & ((xx-cx)**2+(yy-cy)**2<=36)
+                    self.last_heading=heading
+                    self._last_ring_gray=self._build_ring_gray(crop,self.last_icon_component,
+                        local_cx=local_cx,local_cy=local_cy,radius=radius)
+                    return PoseResult(.5,.5,heading[0],.75,True,
+                        int(np.count_nonzero(self.last_icon_component)),'centered')
+                if display is not None:return PoseResult.invalid()
+
+        # Segment marker colours independently. On a translucent radar the
+        # cyan sky can touch the yellow player body; their union would merge
+        # the genuine icon into a huge rejected component.
+        h, w = crop.shape[:2]
+        yy, xx = np.ogrid[:h, :w]
+        disk = (xx-local_cx)**2 + (yy-local_cy)**2 <= radius**2
+        options = []
+        for color_mask in self._player_color_masks(crop):
+            candidate_mask = color_mask & disk
+            candidate = self._pick_center_blob(_label_components(candidate_mask),
+                local_cx=local_cx, local_cy=local_cy, max_dist=max_dist)
+            if candidate is not None:
+                if getattr(self, "competitive_markers", False):
+                    # Team dots have no attached white direction tip. Require it.
+                    _, labels, _, centers = cv2.connectedComponentsWithStats(candidate_mask.astype(np.uint8), 8)
+                    label = 1 + int(np.argmin(np.sum((centers[1:]-np.array(candidate[1:3]))**2, axis=1)))
+                    from nav.icon_heading import observe_heading
+                    if observe_heading(crop, labels == label) is None:
+                        continue
+                options.append((candidate, candidate_mask))
+        if not options:
             return PoseResult.invalid()
+        picked, mask = min(options, key=lambda item: item[0][3]-item[0][0]*.02)
 
         area, bx, by, center_dist = picked
         self.last_icon_xy = (bx, by)
@@ -250,23 +318,21 @@ class MinimapReader:
             num, labels, _stats, _c = cv2.connectedComponentsWithStats(
                 mask.astype(np.uint8), connectivity=8
             )
-            # pick label nearest seed
-            best_label = 0
-            best_d = 1e9
-            for i in range(1, num):
-                ys, xs = np.where(labels == i)
-                if len(xs) == 0:
-                    continue
-                d = (float(np.mean(xs)) - bx) ** 2 + (float(np.mean(ys)) - by) ** 2
-                if d < best_d:
-                    best_d = d
-                    best_label = i
+            # Centroids already exist; do not rescan every pixel once per
+            # component (translucent scenery can create hundreds of them).
+            distances = np.sum((_c[1:]-np.array([bx,by]))**2,axis=1)
+            best_label = 1+int(np.argmin(distances))
             component = labels == best_label
         else:
             component = mask
 
         yaw_deg = _yaw_from_arrow_tip(crop, component)
         self.last_icon_component = component
+        if getattr(self, "competitive_markers", False):
+            from nav.icon_heading import observe_heading
+            self.last_heading = observe_heading(crop, component)
+            if self.last_heading is None:return PoseResult.invalid()
+            yaw_deg = self.last_heading[0]
         self._last_ring_gray = self._build_ring_gray(
             crop, component, local_cx=local_cx, local_cy=local_cy, radius=radius
         )
@@ -276,6 +342,16 @@ class MinimapReader:
         area_score = min(1.0, area / 120.0)
         confidence = max(0.0, min(1.0, 0.35 * area_score + 0.65 * center_bonus))
 
+        if (getattr(self,'competitive_markers',False) and circle is not None
+                and confidence>=self._cal.pose.min_confidence):
+            # Learn HUD geometry only from a frame with our own direction tip.
+            # Subsequent frames must still show this disk boundary and marker.
+            sample=(circle.cx,circle.cy,circle.radius)
+            self._verified_circles=(self._verified_circles+[sample])[-5:]
+            if len(self._verified_circles)>=3:
+                values=np.asarray(self._verified_circles,float)
+                if np.max(np.std(values,axis=0))<2.5:
+                    self._validated_circle=RadarCircle(*map(float,np.median(values,axis=0)))
         return PoseResult(
             x_norm=0.5,
             y_norm=0.5,

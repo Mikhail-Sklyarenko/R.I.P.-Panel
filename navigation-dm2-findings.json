@@ -1,0 +1,48 @@
+{
+  "engine": "visual-nav-dm-2",
+  "video_total_seconds": 251.5667,
+  "video_analyzed_seconds": 240,
+  "video_samples": 2400,
+  "accepted_measurements_before": 957,
+  "accuracy_measured": false,
+  "console_state_change_entries": 681,
+  "console_reason_transitions": {
+    "external_pause": 172,
+    "confirm_spawn_position": 55,
+    "follow_verified_route": 102,
+    "align_measured_heading": 122,
+    "goal_reached": 10,
+    "segment_obstructed": 30,
+    "retrace_verified_ground": 2,
+    "recovered_replan": 2,
+    "pose_outside_verified_ground": 44,
+    "no_verified_recovery": 1,
+    "recovery_exhausted": 1,
+    "no_fresh_measured_pose": 140
+  },
+  "outside_inflated_ground_samples": 281,
+  "outside_raw_floor_samples": 0,
+  "candidate_atlas": {
+    "training_seconds": [
+      0,
+      120
+    ],
+    "evaluation_seconds": [
+      120,
+      240
+    ],
+    "baseline_accepted": 378,
+    "candidate_accepted": 381,
+    "samples": 1200,
+    "newly_accepted": 7,
+    "previously_accepted_lost": 4,
+    "enabled_by_default": false
+  },
+  "new_windows_live_run": false,
+  "farm_integration": false,
+  "limitations": [
+    "Replay measures acceptance, not pose accuracy",
+    "Recorded video cannot validate responses to newly generated control commands",
+    "Full-map heights and transitions remain unmodelled"
+  ]
+}

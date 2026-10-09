@@ -17,6 +17,7 @@ import numpy as np
 from nav.coords import normalize_angle_deg
 from nav.paths import resolve_map_radar_path, resolve_visual_profile_file
 from nav.pose import PoseResult
+from nav.reference_tracker import ReferenceTracker
 
 
 @dataclass(frozen=True)
@@ -26,6 +27,7 @@ class Registration:
     inliers: int
     residual_px: float
     source: str
+    layer_id: str | None = None
 
 
 def gray_features(rgb: np.ndarray) -> np.ndarray:
@@ -48,13 +50,20 @@ class VisualLocalizer:
         self.sift = cv2.SIFT_create(nfeatures=2500, contrastThreshold=0.015)
         self.matcher = cv2.BFMatcher(cv2.NORM_L2)
         self.references = []
+        self._reference_images = {}
+        self._live_anchors = []
+        self._last_anchor_at = float('-inf')
         self.reason = "not_observed"
         self.last_registration = None
         self._previous = None
         self._pending = None
         self._confirmed = False
         self._pyramid = None
-        self.add_reference(map_rgb, np.array([[1., 0., 0.], [0., 1., 0.]]), "radar")
+        self._dense = None
+        self._layered = None
+        self._tracker = ReferenceTracker()
+        if map_id!="de_nuke_ramp":
+            self.add_reference(map_rgb, np.array([[1., 0., 0.], [0., 1., 0.]]), "radar")
         if manifest.is_file():
             data = json.loads(manifest.read_text(encoding="utf-8"))
             if data.get("map_id") != map_id:
@@ -80,13 +89,40 @@ class VisualLocalizer:
             xy = np.float32([k.pt for k in kp])
             mapped = xy @ to_map[:, :2].T + to_map[:, 2]
             self.references.append((name, mapped, desc))
+            self._reference_images[name] = (rgb.copy(), to_map.copy())
 
     def reset(self):
         self._previous = self._pending = None
         self._confirmed = False
         self.last_registration = None
+        self._tracker.anchor = None
 
-    def _edge_agreement(self, rgb, mask, matrix):
+    def _remember_observation(self, rgb, mask, registration, now):
+        if self.map_id in ("de_vertigo", "de_nuke"):
+            return  # Never insert lower-floor live anchors into the upper atlas.
+        # Only original calibrated references can anchor a new live view.
+        # Never chain observed->observed transforms or integrate camera input.
+        if (registration.confidence < .70 or registration.source.startswith("observed:")
+                or now-self._last_anchor_at < 1.):
+            return
+        matrix = registration.matrix
+        center = matrix @ np.array([rgb.shape[1]/2, rgb.shape[0]/2, 1.])
+        angle = math.degrees(math.atan2(matrix[1, 0], matrix[0, 0]))
+        if any(np.linalg.norm(center-p) < 15 and abs(normalize_angle_deg(angle-a)) < 25
+               for _, p, a in self._live_anchors):
+            return
+        self._last_anchor_at = now
+        name = f"observed:{now:.6f}"
+        clean = rgb.copy()
+        clean[mask == 0] = 0
+        self.add_reference(clean, matrix, name)
+        self._live_anchors.append((name, center, angle))
+        if len(self._live_anchors) > 8:
+            old, _, _ = self._live_anchors.pop(0)
+            self.references = [ref for ref in self.references if ref[0] != old]
+            self._reference_images.pop(old, None)
+
+    def _edge_agreement(self, rgb, mask, matrix, reference_rgb=None):
         """Validate a proposed transform using wall pixels not descriptor votes.
 
         A low descriptor inlier ratio is common across render styles. It is
@@ -94,7 +130,7 @@ class VisualLocalizer:
         directions and be spread over the radar.
         """
         projected = cv2.warpAffine(
-            self.map_rgb, matrix, (rgb.shape[1], rgb.shape[0]),
+            self.map_rgb if reference_rgb is None else reference_rgb, matrix, (rgb.shape[1], rgb.shape[0]),
             flags=cv2.INTER_LINEAR | cv2.WARP_INVERSE_MAP,
         )
         expected = cv2.Canny(projected, 25, 80)
@@ -115,7 +151,12 @@ class VisualLocalizer:
                    (slice(h//2, h), slice(0, w//2)),
                    (slice(h//2, h), slice(w//2, w))]
         covered = sum(np.count_nonzero(support[region]) >= 25 for region in regions)
-        if recall < .78 or precision < .50 or covered < 3:
+        # At the edge of a map the empty half of the radar contains no walls.
+        # Two quadrants are sufficient only with broad 2-D contour support.
+        sy, sx = np.nonzero(support)
+        broad = (len(sx) >= 120 and np.ptp(sx) >= w*.35 and np.ptp(sy) >= h*.35
+                 and cv2.contourArea(cv2.convexHull(np.float32(np.column_stack((sx,sy))))) >= h*w*.12)
+        if recall < .78 or precision < .50 or (covered < 3 and not (covered >= 2 and broad)):
             return None
         return min(1., .55 * recall + .45 * precision)
 
@@ -170,6 +211,20 @@ class VisualLocalizer:
         return candidates
 
     def register(self, rgb, mask) -> Registration | None:
+        if self.map_id in ('de_vertigo', 'de_nuke'):
+            if self._layered is None:
+                from nav.layered_localizer import LayeredLocalizer
+                if self.map_id=="de_nuke":
+                    from nav.nuke_localizer import NukeLocalizer
+                    self._layered=NukeLocalizer(self)
+                else:self._layered = LayeredLocalizer(self)
+            result = self._layered.register(rgb,mask)
+            self.last_registration = result
+            self.reason = 'registered' if result else 'ambiguous_or_missing_floor'
+            return result
+        return self._register_single(rgb,mask)
+
+    def _register_single(self, rgb, mask) -> Registration | None:
         self.last_registration = None
         if rgb.size == 0 or not np.any(mask):
             self.reason = "empty_radar"
@@ -201,6 +256,14 @@ class VisualLocalizer:
             if matrix is None or inlier_mask is None or not np.isfinite(matrix).all():
                 continue
             good = inlier_mask.ravel().astype(bool)
+            if self.map_id=="de_nuke_ramp":
+                # These references are calibrated north-up at a fixed HUD zoom.
+                # A free similarity fit on repetitive ramp rails can drift in
+                # scale while retaining a deceptively small feature residual.
+                basis=np.eye(2)/.355
+                offset=np.median(dst[good]-src[good]@basis.T,axis=0)
+                matrix=np.column_stack((basis,offset))
+                good=np.linalg.norm(src@basis.T+offset-dst,axis=1)<=3.
             n = int(good.sum())
             scale = float(np.linalg.norm(matrix[:, 0]))
             if n < 10 or n / len(matches) < .6 or not .2 <= scale <= 15:
@@ -214,9 +277,28 @@ class VisualLocalizer:
             if error > 2.0:
                 continue
             confidence = min(1., n / 24.) * (n / len(matches)) * max(.5, 1. - error / 6.)
+            agreement = None
+            if confidence < .6 and name != "radar":
+                # Sparse SIFT votes alone remain insufficient. Verify the fit
+                # against independent wall contours in the same HUD style.
+                reference_rgb, to_map = self._reference_images[name]
+                inverse = cv2.invertAffineTransform(to_map)
+                to_reference = np.column_stack((inverse[:, :2] @ matrix[:, :2],
+                                                 inverse[:, :2] @ matrix[:, 2] + inverse[:, 2]))
+                agreement = self._edge_agreement(rgb, mask, to_reference, reference_rgb)
+                if agreement is not None:
+                    confidence = max(confidence, agreement)
             candidates.append(Registration(matrix, confidence, n, error, name))
-        if not candidates or max(c.confidence for c in candidates) < .45:
+        if self.map_id!="de_nuke_ramp" and (not candidates or max(c.confidence for c in candidates) < .45):
             candidates.extend(self._map_candidates(rgb, mask))
+        if self.map_id!="de_nuke_ramp" and (not candidates or max(c.confidence for c in candidates) < .70):
+            if self._dense is None:
+                from nav.dense_localizer import DenseMapMatcher
+                self._dense = DenseMapMatcher(self.map_rgb, translucent=self.map_id in ("de_inferno","de_vertigo","de_vertigo_lower","de_nuke","de_nuke_lower","de_cache","de_mirage","de_dust2"), rich_hud=self.map_id == "de_dust2", inferno_hud=self.map_id == "de_inferno")
+            dense = self._dense.match(rgb,mask)
+            if dense is not None:
+                matrix,confidence,support = dense
+                candidates.append(Registration(matrix,confidence,support,0.,"global_contours"))
         if not candidates:
             self.reason = "no_geometric_match"
             return None
@@ -233,6 +315,19 @@ class VisualLocalizer:
 
     def locate(self, rgb, mask, icon_xy, icon: PoseResult, *, now: float) -> PoseResult:
         registration = self.register(rgb, mask)
+        if self.map_id not in ("de_vertigo", "de_nuke") and icon.valid and self.reason != "ambiguous_map_match" and (registration is None or registration.confidence < .6):
+            tracked = self._tracker.track(rgb, mask, now)
+            if tracked is not None:
+                matrix, confidence, count, residual = tracked
+                center = np.array([*icon_xy, 1.])
+                if (registration is not None and registration.confidence >= .45
+                        and np.linalg.norm((registration.matrix-matrix) @ center) > 20):
+                    self.reason = "ambiguous_map_match"
+                    self._confirmed = False
+                    self._pending = None
+                    return PoseResult.invalid()
+                registration = Registration(matrix, confidence, count, residual, "fixed_frame_track")
+                self.last_registration = registration
         if registration is None or not icon.valid:
             self._pending = None
             self._confirmed = False
@@ -253,7 +348,7 @@ class VisualLocalizer:
         pose = PoseResult(
             x / (self.width - 1), y / (self.height - 1), yaw,
             min(icon.confidence, registration.confidence), True,
-            icon.blob_area_px, "visual", None, now,
+            icon.blob_area_px, "visual", None, now, registration.layer_id,
         )
         # Require two consistent independent observations after a miss or respawn.
         previous = self._previous
@@ -261,15 +356,19 @@ class VisualLocalizer:
             dt = now - previous.observed_at
             jump = math.hypot((pose.x_norm - previous.x_norm) * self.width,
                               (pose.y_norm - previous.y_norm) * self.height)
-            if dt <= 0 or dt > .5 or jump > 8. + 250. * dt:
+            if dt <= 0 or dt > .5 or jump > 8. + 250. * dt or pose.layer_id != previous.layer_id:
                 self._confirmed = False
         if not self._confirmed:
             pending = self._pending
             self._pending = pose
-            if pending is None or not 0 < now - pending.observed_at <= .5 or math.hypot(pose.x_norm - pending.x_norm, pose.y_norm - pending.y_norm) > .035:
+            if pending is None or pending.layer_id != pose.layer_id or not 0 < now - pending.observed_at <= .5 or math.hypot(pose.x_norm - pending.x_norm, pose.y_norm - pending.y_norm) > .035:
                 self.reason = "confirming_position"
                 return PoseResult.invalid()
             self._confirmed = True
         self._previous = pose
         self.reason = "measured"
+        if registration.source != "fixed_frame_track":
+            self._remember_observation(rgb, mask, registration, now)
+            if registration.confidence >= .70 and not registration.source.startswith("observed:"):
+                self._tracker.seed(rgb, mask, registration.matrix, now)
         return pose

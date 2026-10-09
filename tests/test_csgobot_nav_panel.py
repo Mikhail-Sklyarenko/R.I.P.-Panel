@@ -57,3 +57,16 @@ def test_nav_env_summary_fail(_mock: object) -> None:
     line = csgobot_ai._nav_env_summary({"config": cfg})
     assert line is not None
     assert "preflight failed" in line
+
+
+def test_integrated_farm_does_not_fall_back_to_simple(monkeypatch):
+    from config.schema import AppConfig, BotMode
+    from modules.combat import factory, csgobot_ai, simple
+    monkeypatch.setenv('CSGOBOT_NAV_MODE','expanded_roam')
+    monkeypatch.setattr(csgobot_ai,'start_ai',lambda ctx:False)
+    calls=[]
+    monkeypatch.setattr(simple,'run_simple',lambda *a,**kw:calls.append(True))
+    config=AppConfig(bot_mode=BotMode.SIMPLE)
+    assert factory.resolve_mode(config)==BotMode.AI
+    ctx={'config':config};factory._run_bot_loop(ctx)
+    assert ctx['stop_requested'] and not calls

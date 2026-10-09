@@ -12,16 +12,18 @@ from nav.perception import PerceptionResult
 from nav.pose import PoseResult
 from nav.visual_localizer import VisualLocalizer
 from nav.icon_heading import observe_heading
+from nav.hud_mask import exclude_range_ring
 
 
 class VisualPerception:
-    def __init__(self, reader, localizer, yaw=None, **_compat):
+    def __init__(self, reader, localizer, yaw=None, *, visual_profile=None, **_compat):
+        self._visual_profile = visual_profile
         self.reader, self.localizer = reader, localizer
         self._last_log = 0.
         self.reload_map(localizer.map_id)
 
     def reload_map(self, map_id):
-        self.visual = VisualLocalizer(map_id)
+        self.visual = VisualLocalizer(map_id, profile_dir=self._visual_profile)
         self.reason = "not_observed"
         self._cached = None
         self._next_at = 0.
@@ -47,9 +49,12 @@ class VisualPerception:
             colored = cv2.cvtColor(crop, cv2.COLOR_RGB2HSV)[:, :, 1] > 160
             colored = cv2.dilate(np.uint8(colored), np.ones((7, 7), np.uint8)) > 0
             mask[colored] = 0
+            if self.visual.map_id in ("de_inferno", "de_vertigo"):
+                exclude_range_ring(mask, cx, cy, radius)
             heading = observe_heading(crop, self.reader.last_icon_component)
             if heading is None:
-                self.visual.reset()
+                # An unreadable arrow is not evidence that the map anchor moved.
+                # Keep geometric references; still emit no pose or movement.
                 self.reason = "ambiguous_icon_heading"
             else:
                 icon = replace(icon, yaw_deg=heading[0], confidence=min(icon.confidence, heading[1]))

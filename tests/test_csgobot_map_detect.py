@@ -57,8 +57,8 @@ def test_parse_map_script_mirage() -> None:
 
 
 def test_parse_map_script_unknown_is_none() -> None:
-    assert parse_map_script("Бой насмерть | Inferno") is None
-    assert parse_map_script("Бой насмерть | Vertigo") is None
+    assert parse_map_script("Бой насмерть | Inferno") == "inferno"
+    assert parse_map_script("Бой насмерть | Vertigo") == "vertigo"
     assert parse_map_script("") is None
 
 

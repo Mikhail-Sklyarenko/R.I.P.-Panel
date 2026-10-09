@@ -40,6 +40,9 @@ class PanelController:
         self._drop_log_widget: Any | None = None
         self._nav_metrics_widget: Any | None = None
         self._nav_metrics_poll_at: float = 0.0
+        self._fleet_widget: Any | None = None
+        self._fleet_poll_at: float = 0.0
+        self._fleet_host: Any | None = None
         self.on_accounts_changed: Callable[[], None] | None = None
         self.on_counters_changed: Callable[[], None] | None = None
         self.on_config_paths_changed: Callable[[], None] | None = None
@@ -76,6 +79,11 @@ class PanelController:
         self.append_log(f"orchestrator: {mode}")
         for warn in collect_startup_warnings(self.config):
             self.append_log(f"WARN: {warn}")
+        if self.config.wingman_fleet_autostart:
+            try:
+                self.fleet_autostart()
+            except Exception as exc:
+                self.append_log(f"fleet autostart: {exc}")
         self._schedule_poll()
 
     def _schedule_poll(self) -> None:
@@ -85,6 +93,7 @@ class PanelController:
     def _poll_logs_tick(self) -> None:
         self._drain_log_queue()
         self._maybe_refresh_nav_metrics()
+        self._maybe_refresh_fleet()
         if self.root is not None:
             self.root.after(100, self._poll_logs_tick)
 
@@ -418,6 +427,137 @@ class PanelController:
 
     # --- Farm control (B10) ---
 
+    def bind_fleet_widget(self, widget: Any) -> None:
+        self._fleet_widget = widget
+        self.refresh_fleet_dashboard()
+
+    def _fleet(self):
+        if self._fleet_host is None:
+            from modules.fleet_agent.host import FleetHost
+            self._fleet_host = FleetHost(log=self.append_log)
+        return self._fleet_host
+
+    def _maybe_refresh_fleet(self) -> None:
+        import time
+        now = time.monotonic()
+        if now - self._fleet_poll_at < 0.5:
+            return
+        self._fleet_poll_at = now
+        self.refresh_fleet_dashboard()
+
+    def refresh_fleet_dashboard(self) -> None:
+        widget = self._fleet_widget
+        if widget is None:
+            return
+        text = self.format_fleet_status()
+        try:
+            widget.configure(state="normal")
+            widget.delete("1.0", "end")
+            widget.insert("1.0", text)
+            widget.configure(state="disabled")
+        except Exception:
+            pass
+
+    def format_fleet_status(self) -> str:
+        from core.wingman_fleet.roster import SLOT_LAYOUT
+        roster = self._fleet().roster()
+        lines = ["Напарники Inferno — флот 4 ПК / 2 пары"]
+        host = self._fleet_host
+        st = host.status() if host is not None else {}
+        lines.append(f"координатор: {'да' if st.get('coordinator') else 'нет'}  {st.get('url', '')}")
+        if st.get("run_id"):
+            lines.append(f"run {st['run_id']}  {st.get('run_state', '')}  {st.get('run_reason', '')}")
+            lines.append(f"циклы {st.get('cycles', 0)}  волна {st.get('wave', 0)}")
+        for slot, pair_id, role in SLOT_LAYOUT:
+            e = roster.slots.get(slot) or {}
+            agent = e.get("agent_id", "—")
+            info = (st.get("agents") or {}).get(agent, {})
+            lines.append(
+                f"слот {slot} {role.value} {pair_id}: {e.get('display_name', '—')} "
+                f"{e.get('steam_id64', '')} @{agent} "
+                f"{info.get('link', 'offline')} seen={info.get('screen', '')} "
+                f"gsi={info.get('gsi_age')} cmd={info.get('active_command') or '—'} "
+                f"in={info.get('input_owner') or 'none'} {info.get('preflight', '')}"
+            )
+        for pair in st.get("pairs") or ():
+            lines.append(f"  {pair['pair_id']}: {pair['state']} — {pair['reason']}")
+        agent = st.get("agent")
+        if agent:
+            lines.append(f"локальный агент {agent.get('agent_id')} lease={agent.get('lease') or 'нет'}")
+        return "\n".join(lines)
+
+    def fleet_autostart(self) -> None:
+        cfg = load_config()
+        if cfg.wingman_fleet_role.value == "coordinator":
+            self.start_fleet_coordinator()
+        self.start_fleet_agent()
+
+    def start_fleet_coordinator(self) -> None:
+        info = self._fleet().start_coordinator()
+        self.append_log(f"fleet coordinator {info.get('url')}")
+
+    def start_fleet_agent(self) -> None:
+        info = self._fleet().start_agent()
+        self.append_log(f"fleet agent {info.get('agent_id')}")
+
+    def start_fleet_run(self) -> None:
+        if self._orchestrator.active_login is not None or not self._orchestrator._queue.empty():
+            self.append_log("Сначала остановите очередь фарма DM")
+            return
+        if self._wingman_test_running():
+            self.append_log("Сначала остановите тест Напарников")
+            return
+        run_id = self._fleet().start_run()
+        self.append_log(f"fleet run started {run_id}")
+
+    def stop_fleet_run(self) -> None:
+        self._fleet().stop_run()
+        self.append_log("fleet: stop requested")
+
+    def stop_fleet(self) -> None:
+        if self._fleet_host is not None:
+            self._fleet_host.stop()
+            self.append_log("fleet host stopped")
+
+    def save_fleet_slot(self, slot: int, agent_id: str, steam_id64: str, display_name: str,
+                        friend_code: str = "") -> None:
+        roster = self._fleet().roster()
+        roster.set_slot(slot, agent_id=agent_id, steam_id64=steam_id64,
+                        display_name=display_name, friend_code=friend_code)
+        self._fleet().save_roster(roster)
+        self.append_log(f"fleet slot {slot} = {display_name} @{agent_id}")
+
+    def fleet_pair_action(self, pair_id: str, action: str) -> None:
+        self._fleet().pair_action(pair_id, action)
+        self.append_log(f"fleet {pair_id}: {action}")
+
+    def fleet_agent_command(self, agent_id: str, command: str) -> None:
+        self._fleet().agent_command(agent_id, command)
+        self.append_log(f"fleet {agent_id}: {command}")
+
+    def start_wingman_test(self) -> None:
+        current = getattr(self,"_wingman_test",None)
+        if current is not None and current.running:
+            self.append_log("Напарники: тест уже запущен")
+            return
+        if self._orchestrator.active_login is not None or not self._orchestrator._queue.empty():
+            self.append_log("Сначала остановите очередь фарма")
+            return
+        try:
+            from modules.wingman.test_session import TestSession
+            self._wingman_test = TestSession(load_config(),self.append_log)
+            self._wingman_test.start()
+        except Exception as exc:
+            self.append_log(f"Напарники: {exc}")
+
+    def stop_wingman_test(self) -> None:
+        current = getattr(self,"_wingman_test",None)
+        if current is not None:current.stop()
+
+    def _wingman_test_running(self) -> bool:
+        current = getattr(self,"_wingman_test",None)
+        return current is not None and current.running
+
     def start_farm(self) -> None:
         """Конвейер: все unfarmed (или выбранные, если есть галочки)."""
         sel = self.get_selected_logins()
@@ -442,6 +582,9 @@ class PanelController:
         self._enqueue_farm(queue)
 
     def launch_selected(self) -> None:
+        if self._wingman_test_running():
+            self.append_log("Сначала остановите тест Напарников")
+            return
         sel = self.get_selected_logins()
         if not sel:
             self.append_log("launch_selected: no accounts checked")
@@ -457,6 +600,9 @@ class PanelController:
         self._notify_counters()
 
     def _enqueue_farm(self, logins: list[str], *, force_farm: bool = True) -> None:
+        if self._wingman_test_running():
+            self.append_log("Сначала остановите тест Напарников")
+            return
         cfg = load_config()
         if cfg.auto_collect_drop and not (cfg.trade_offer_link or "").strip():
             self.append_log(
@@ -472,6 +618,7 @@ class PanelController:
         self._notify_counters()
 
     def stop_farm(self) -> None:
+        self.stop_wingman_test()
         self._orchestrator.stop()
         self.append_log("stop_farm: orchestrator stop requested")
 

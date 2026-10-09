@@ -1,0 +1,11 @@
+{
+  "version": "wingman-grenade-buy-1",
+  "base": "wingman-inferno-fix-10",
+  "files": {
+    "modules/wingman/economy.py": "79fea7a12bdf5b1d3b326630a4b78612868e1d957987a0e35f981ff959c3d9e6",
+    "modules/wingman/telemetry.py": "df1bf61a22944ad79fea2edfaf0b51ddbe2a570f9dcba4b55812633ded84efcb",
+    "vendor/csgobot/nav/wingman_runtime.py": "ce059ee80c24b0c506d0f463cc1dc4a554970a3f105960a5187bf8fe380f28b9",
+    "tests/test_wingman_grenade_buy.py": "c6872fdad676ef40e216f9117ef8fcb2d21dc31ff00e2308a6efb91a293f93a7",
+    "docs/WINGMAN_GRENADE_BUY.md": "b0a6336d8749fcaf689d0e36aaf3acc9b758bb8b51b344e26c0bce2e5bb6fa91"
+  }
+}

@@ -1,0 +1,67 @@
+{
+  "engine": "visual-nav-multimap-15",
+  "code_sha256": "2b9e4c123891f434a8ca7e31f4b1e7d20ca8cde1ff656e80eaf7d39f27501f68",
+  "profile_sha256": "3143eb934aa17508154f60ab9e5453b1df471dda368a03bf8bd062f395f22b20",
+  "profile_path": "/Users/mihailsklarenko/FSM_PANEL v.3.0.1/farm-panel-prototype/resources/nav/profiles/de_mirage",
+  "source_videos": [
+    "2026-09-19 13-23-04.mp4",
+    "2026-09-13 16-49-19.mp4"
+  ],
+  "automated_tests_passed": 177,
+  "underpass_replay": {
+    "source_seconds": [
+      194,
+      203
+    ],
+    "samples": 90,
+    "accepted": 85,
+    "layers": {
+      "upper": 27,
+      "lower": 58
+    },
+    "accepted_positions_on_appropriate_ground": 85,
+    "core_seconds": [
+      195.3,
+      200.7
+    ],
+    "core_samples": 55,
+    "core_correct_lower": 55,
+    "note": "Same-source development replay; original atlas and label calibration contain frames from this recording. No live inputs are exercised."
+  },
+  "label_negative_check": {
+    "video": "2026-09-19 13-23-04.mp4",
+    "samples": 206,
+    "false_lower": 0,
+    "note": "Lower-label threshold unchanged after this scan; additional upper-label corroboration was refined."
+  },
+  "synthetic_controller": {
+    "lower_start_positions": [
+      [
+        537,
+        258
+      ],
+      [
+        443,
+        330
+      ],
+      [
+        447,
+        430
+      ]
+    ],
+    "all_reach_stair_exit": true,
+    "collisions": 0,
+    "window_both_directions": true,
+    "window_inward_jumps": 1,
+    "window_outward_jumps": 0,
+    "note": "Synthetic planar movement and a synthetic sill/low aperture, not full CS2 physics."
+  },
+  "hud_language": "ru",
+  "capture_size": [
+    1280,
+    720
+  ],
+  "live_validated": false,
+  "full_map_ready": false,
+  "scope": "Existing Mirage surface plus measured underpass corridor, two walking stair approaches, and directed CT/window jump-crouch."
+}

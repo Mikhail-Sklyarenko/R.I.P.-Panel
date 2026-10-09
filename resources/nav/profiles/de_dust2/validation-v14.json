@@ -1,0 +1,38 @@
+{
+  "engine": "visual-nav-multimap-14",
+  "code_sha256": "b6f96f3f66262f588fbd01629f43b4cfb06f1f1dc56e45e922744711544be638",
+  "profile_sha256": "c2bce2a4bbc8377166d74123427862da9173ad010c7ffdde10000f02ad25010e",
+  "profile_path": "/Users/mihailsklarenko/FSM_PANEL v.3.0.1/farm-panel-prototype/resources/nav/profiles/de_dust2",
+  "source_video": "2026-09-19 14-17-01.mp4",
+  "source_video_seconds": 219.0833,
+  "automated_tests_passed": 155,
+  "same_capture_parallelism": "Production submit, detection and result statements executed with rendezvous events; original capture timestamp asserted.",
+  "optimizer_benchmark": {
+    "synthetic": true,
+    "old_median_ms": 38.2,
+    "reduced_median_ms": 18.4,
+    "note": "One optimizer stage only; not end-to-end Windows latency."
+  },
+  "perception_replay": {
+    "start_seconds": 30,
+    "duration_seconds": 60,
+    "samples": 600,
+    "baseline_accepted": 331,
+    "reduced_optimizer_accepted": 334,
+    "baseline_source_sha256": "3bc9760eac730cf6798db80e6e56ccd3d459f259f5892d4660db57a5e814a9f6",
+    "optimizer_source_sha256": "542e9a3f8c25f88b0abf99e133300dfb994e7dac2d23e6929f24d9c789208189",
+    "note": "These replays precede the main.py overlap integration and engine bump. No actual detector/input is exercised. Coverage is not accuracy; asynchronous scheduling introduces variability."
+  },
+  "rejected_experiments": [
+    "Nearby-scale search did not improve coverage.",
+    "Five independently calibrated candidate HUD images did not materially improve coverage; not shipped."
+  ],
+  "profile_modified": false,
+  "live_validated": false,
+  "zero_stops_proven": false,
+  "limits": [
+    "No Windows game test of the concurrent detector/perception pipeline was possible here.",
+    "Long geometric localization gaps still stop movement.",
+    "250 ms capture freshness and v13 corridor expiry remain unchanged."
+  ]
+}

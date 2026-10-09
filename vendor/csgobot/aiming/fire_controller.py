@@ -23,8 +23,8 @@ class FireConfig:
     burst_size: int = 5
     burst_shot_interval_sec: float = 0.07
     burst_gap_sec: float = 0.15
-    hold_max_sec: float = 0.8
-    hold_repress_gap_sec: float = 0.05
+    hold_max_sec: float = 0.22
+    hold_repress_gap_sec: float = 0.18
     hold_release_grace_sec: float = 0.08
     humanize_jitter_sec: float = 0.02
 
@@ -84,9 +84,9 @@ class FireController:
                     getattr(aim, "burst_shot_interval_sec", 0.07)
                 ),
                 burst_gap_sec=float(getattr(aim, "burst_gap_sec", 0.15)),
-                hold_max_sec=float(getattr(aim, "hold_max_sec", 0.8)),
+                hold_max_sec=float(getattr(aim, "hold_max_sec", 0.22)),
                 hold_repress_gap_sec=float(
-                    getattr(aim, "hold_repress_gap_sec", 0.05)
+                    getattr(aim, "hold_repress_gap_sec", 0.18)
                 ),
                 hold_release_grace_sec=float(
                     getattr(aim, "hold_release_grace_sec", 0.1)
@@ -135,6 +135,12 @@ class FireController:
         if not self.config.enabled:
             return self.force_release(now)
 
+        if self._holding and now >= self._hold_until:
+            self._holding = False
+            self._off_target_since = None
+            self._schedule_gap(now,self.config.hold_repress_gap_sec)
+            return FireAction(release=True,fired=True,holding=False,mode="hold")
+
         on_target = target_in_shoot_zone(
             pixel_distance=pixel_distance,
             shoot_dead_zone=self.config.shoot_dead_zone,
@@ -148,7 +154,7 @@ class FireController:
             if self._holding:
                 if self._off_target_since is None:
                     self._off_target_since = now
-                elif now - self._off_target_since >= self.config.hold_release_grace_sec:
+                if now - self._off_target_since >= self.config.hold_release_grace_sec:
                     return self.force_release(now)
             else:
                 self._off_target_since = None
@@ -157,15 +163,6 @@ class FireController:
         self._off_target_since = None
 
         if self._holding:
-            if now >= self._hold_until:
-                self._holding = False
-                self._schedule_gap(now, self.config.hold_repress_gap_sec)
-                return FireAction(
-                    release=True,
-                    fired=True,
-                    holding=False,
-                    mode="hold",
-                )
             return FireAction(holding=True, mode="hold")
 
         mode = self.config.mode

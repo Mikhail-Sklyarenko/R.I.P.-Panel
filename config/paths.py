@@ -92,6 +92,23 @@ def get_fleet_inbox_dir() -> Path:
     return get_data_dir() / "fleet_inbox"
 
 
+def get_wingman_fleet_dir() -> Path:
+    return get_data_dir() / "fleet"
+
+
+def get_wingman_fleet_roster_path() -> Path:
+    return get_data_dir() / "wingman_fleet.json"
+
+
+def get_wingman_fleet_db_path() -> Path:
+    return get_wingman_fleet_dir() / "coordinator.db"
+
+
+def get_wingman_agent_journal_path(agent_id: str) -> Path:
+    safe = "".join(c if c.isalnum() or c in "-_" else "_" for c in agent_id) or "agent"
+    return get_wingman_fleet_dir() / f"journal-{safe}.db"
+
+
 def get_nav_packs_override_dir() -> Path:
     return get_data_dir() / "nav_packs"
 

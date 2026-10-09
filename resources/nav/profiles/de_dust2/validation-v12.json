@@ -1,0 +1,312 @@
+{
+  "engine": "visual-nav-multimap-12",
+  "code_sha256": "a19cf32bc96fe556b64ece662696ef911ef143426ad7c7a4c45789a2b12a3236",
+  "profile_sha256": "c2bce2a4bbc8377166d74123427862da9173ad010c7ffdde10000f02ad25010e",
+  "profile_path": "/Users/mihailsklarenko/FSM_PANEL v.3.0.1/farm-panel-prototype/resources/nav/profiles/de_dust2",
+  "video": "2026-09-15 17-54-09.mp4",
+  "source_log_engine": "visual-nav-multimap-10",
+  "baseline_engine": "visual-nav-multimap-11",
+  "baseline_code_sha256": "b2fb6baace39b1b50fad83f5aac9bf7e0cfe82982bf5db30b5cdd7553d9dffe8",
+  "paired_interval_seconds": [
+    30,
+    110
+  ],
+  "baseline": {
+    "samples": 800,
+    "accepted": 440,
+    "accepted_percent": 55.0,
+    "fresh_at_processing_end": 406,
+    "processing_ms_median": 67.02,
+    "processing_ms_p95": 192.72,
+    "reasons": {
+      "confirming_position": 53,
+      "measured_global_contours": 85,
+      "measured_fixed_anchor": 268,
+      "measured_atlas_frame": 47,
+      "waiting_visual_anchor": 297,
+      "measured_pose_within_deadline": 40,
+      "no_player_icon": 10
+    },
+    "longest_invalid_spans": [
+      {
+        "start": 80.8,
+        "end": 88.8,
+        "seconds": 8.0
+      },
+      {
+        "start": 106.3,
+        "end": 109.7,
+        "seconds": 3.4
+      },
+      {
+        "start": 98.6,
+        "end": 101.2,
+        "seconds": 2.6
+      },
+      {
+        "start": 104.2,
+        "end": 105.4,
+        "seconds": 1.2
+      },
+      {
+        "start": 32.8,
+        "end": 33.9,
+        "seconds": 1.1
+      },
+      {
+        "start": 57.6,
+        "end": 58.7,
+        "seconds": 1.1
+      },
+      {
+        "start": 67.2,
+        "end": 68.3,
+        "seconds": 1.1
+      },
+      {
+        "start": 47.0,
+        "end": 48.0,
+        "seconds": 1.0
+      },
+      {
+        "start": 78.8,
+        "end": 79.8,
+        "seconds": 1.0
+      },
+      {
+        "start": 90.5,
+        "end": 91.5,
+        "seconds": 1.0
+      },
+      {
+        "start": 30.8,
+        "end": 31.7,
+        "seconds": 0.9
+      },
+      {
+        "start": 38.3,
+        "end": 39.2,
+        "seconds": 0.9
+      }
+    ]
+  },
+  "updated": {
+    "samples": 800,
+    "accepted": 559,
+    "accepted_percent": 69.88,
+    "fresh_at_processing_end": 518,
+    "processing_ms_median": 109.22,
+    "processing_ms_p95": 303.85,
+    "reasons": {
+      "measured_global_contours": 310,
+      "measured_pose_within_deadline": 43,
+      "waiting_visual_anchor": 200,
+      "confirming_position": 31,
+      "measured_hud_atlas_contours": 170,
+      "measured_fixed_anchor": 36,
+      "no_player_icon": 10
+    },
+    "longest_invalid_spans": [
+      {
+        "start": 85.2,
+        "end": 88.8,
+        "seconds": 3.6
+      },
+      {
+        "start": 80.6,
+        "end": 83.8,
+        "seconds": 3.2
+      },
+      {
+        "start": 53.0,
+        "end": 54.4,
+        "seconds": 1.4
+      },
+      {
+        "start": 30.6,
+        "end": 31.7,
+        "seconds": 1.1
+      },
+      {
+        "start": 38.0,
+        "end": 39.1,
+        "seconds": 1.1
+      },
+      {
+        "start": 43.5,
+        "end": 44.6,
+        "seconds": 1.1
+      },
+      {
+        "start": 32.8,
+        "end": 33.8,
+        "seconds": 1.0
+      },
+      {
+        "start": 47.0,
+        "end": 48.0,
+        "seconds": 1.0
+      },
+      {
+        "start": 78.8,
+        "end": 79.8,
+        "seconds": 1.0
+      },
+      {
+        "start": 40.2,
+        "end": 41.1,
+        "seconds": 0.9
+      },
+      {
+        "start": 57.8,
+        "end": 58.7,
+        "seconds": 0.9
+      },
+      {
+        "start": 36.5,
+        "end": 37.2,
+        "seconds": 0.7
+      }
+    ]
+  },
+  "full_recording": {
+    "samples": 4487,
+    "accepted": 3134,
+    "accepted_percent": 69.85,
+    "fresh_at_processing_end": 2958,
+    "processing_ms_median": 97.36,
+    "processing_ms_p95": 286.83,
+    "reasons": {
+      "no_player_icon": 128,
+      "waiting_visual_anchor": 1029,
+      "confirming_position": 139,
+      "measured_global_contours": 2118,
+      "measured_fixed_anchor": 314,
+      "measured_pose_within_deadline": 223,
+      "ambiguous_icon_heading": 57,
+      "measured_hud_atlas_contours": 477,
+      "measured_atlas_frame": 2
+    },
+    "longest_invalid_spans": [
+      {
+        "start": 211.2,
+        "end": 216.1,
+        "seconds": 4.9
+      },
+      {
+        "start": 189.2,
+        "end": 193.3,
+        "seconds": 4.1
+      },
+      {
+        "start": 293.3,
+        "end": 297.2,
+        "seconds": 3.9
+      },
+      {
+        "start": 85.2,
+        "end": 88.8,
+        "seconds": 3.6
+      },
+      {
+        "start": 80.6,
+        "end": 83.8,
+        "seconds": 3.2
+      },
+      {
+        "start": 17.1,
+        "end": 20.2,
+        "seconds": 3.1
+      },
+      {
+        "start": 267.3,
+        "end": 270.4,
+        "seconds": 3.1
+      },
+      {
+        "start": 285.8,
+        "end": 288.8,
+        "seconds": 3.0
+      },
+      {
+        "start": 171.4,
+        "end": 174.3,
+        "seconds": 2.9
+      },
+      {
+        "start": 314.8,
+        "end": 317.6,
+        "seconds": 2.8
+      },
+      {
+        "start": 389.1,
+        "end": 391.9,
+        "seconds": 2.8
+      },
+      {
+        "start": 233.8,
+        "end": 236.1,
+        "seconds": 2.3
+      }
+    ]
+  },
+  "checks": {
+    "unique_tests_passed": 139,
+    "long_doors_connected_both_directions": true,
+    "old_grid_reproduces_disconnected_room": true,
+    "walkable_mask_and_clearance_unchanged": true,
+    "closed_loop_door_simulations": 4,
+    "simulated_collisions": 0,
+    "wrong_maps_rejected_on_door_fixture": 4
+  },
+  "live_validated": false,
+  "full_map_ready": false,
+  "limits": [
+    "Video was used for development; a new session is needed for independent validation.",
+    "Replay acceptance is coverage, not coordinate accuracy or successful live traversal.",
+    "Processing latency is host-specific; baseline and development short replay conditions are not a controlled hardware benchmark.",
+    "Four planar simulations do not validate all CS2 physics, height transitions, crowds or raised obstacles.",
+    "No speculative crouch/jump/use actions were added to Dust2."
+  ],
+  "raw_replay_sha256": "0a336e547a11de474fcda34058c7a818fde9bb5165b4a4754d14c3cedaaf82e8",
+  "long_doors_interval": {
+    "seconds": [
+      90,
+      170
+    ],
+    "accepted": 789,
+    "samples": 800,
+    "accepted_percent": 98.625,
+    "longest_invalid_seconds": 0.3
+  },
+  "reviewed_residuals": [
+    {
+      "seconds": [
+        80.6,
+        83.8
+      ],
+      "context": "Active movement near B; localization gap remains."
+    },
+    {
+      "seconds": [
+        211.2,
+        216.1
+      ],
+      "context": "Interval includes active play, death and respawn; not entirely a death-only pause."
+    },
+    {
+      "seconds": [
+        189.2,
+        193.3
+      ],
+      "context": "Death and respawn visible at 190 and 192 seconds."
+    },
+    {
+      "seconds": [
+        233.8,
+        236.1
+      ],
+      "context": "Residual localization gap near tunnels; live traversal not validated."
+    }
+  ]
+}

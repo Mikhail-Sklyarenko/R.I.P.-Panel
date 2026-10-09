@@ -1,0 +1,63 @@
+{
+  "engine": "visual-nav-multimap-6",
+  "code_sha256": "277f02f4cf50a4951f5bbb94cb55d77087e4cff1462cf8951ec078bffa5f55fb",
+  "profile_sha256": "bb3be04cec31c8635901291ac2e6e78a53b06c83d45fc48cd898d95166e6a501",
+  "video": "2026-09-13 16-53-26.mp4",
+  "sample_hz": 10,
+  "perception_mode": "product_async",
+  "visual_profile": null,
+  "samples": 1580,
+  "accepted": 1275,
+  "reasons": {
+    "no_player_icon": 59,
+    "waiting_visual_anchor": 215,
+    "confirming_position": 31,
+    "measured_global_contours": 1086,
+    "measured_atlas_frame": 97,
+    "measured_fixed_anchor": 17,
+    "measured_pose_within_deadline": 75
+  },
+  "note": "Coverage is not accuracy. Includes menus/no-icon frames; no live movement is tested.",
+  "accepted_percent": 80.7,
+  "processing_ms_percentiles": {
+    "50": 39.69,
+    "90": 95.16,
+    "99": 117.27
+  },
+  "tests_passed": 155,
+  "heldout_same_video": {
+    "accepted": 32,
+    "total": 39,
+    "independent_session": false
+  },
+  "wrong_map_checks": {
+    "false_accepts": 0,
+    "total": 40
+  },
+  "live_validated": false,
+  "automatic_map_selection": [
+    {
+      "video_time": 12,
+      "pending": "de_inferno",
+      "confirm_count": 1,
+      "map": null
+    },
+    {
+      "video_time": 34,
+      "pending": "de_inferno",
+      "confirm_count": 2,
+      "map": null
+    },
+    {
+      "video_time": 76,
+      "pending": "de_inferno",
+      "confirm_count": 3,
+      "map": "de_inferno"
+    }
+  ],
+  "limits": [
+    "Video replay exercises perception without game input or YOLO",
+    "Same recording provides calibration and nearby held-out frames",
+    "2D routing does not validate all 3D level transitions or all spawn points"
+  ]
+}

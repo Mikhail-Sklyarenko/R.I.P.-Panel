@@ -1,0 +1,12 @@
+{
+  "map_id": "de_vertigo_lower",
+  "script_id": "vertigo",
+  "display_name": "Vertigo lower",
+  "radar_size_px": 1024,
+  "coordinate_system": "radar_pixels",
+  "source_url": "https://github.com/MurkyYT/cs2-map-icons",
+  "radar_sha256": "8ef02a92243f83964c7806c41923134f12012fd9a49a44e268f7c0d89c783226",
+  "landmarks": {},
+  "source_sha256": "89ab966da946061906ab0d8876b9b45761291e8080149246611e12de526cd673",
+  "preprocessing": "RGBA composited on black: RGB multiplied by alpha, preserving raster coordinates"
+}

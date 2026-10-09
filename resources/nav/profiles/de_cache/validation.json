@@ -1,0 +1,101 @@
+{
+  "engine": "visual-nav-multimap-10",
+  "code_sha256": "53adb7a4a33e60cf0f6d5abb0daf4690bdd3e6abb67b34efad3c86521b8fa8f9",
+  "profile_sha256": "25440d1baeab6432e2af9a0497c316d222e5bdc397bbfb4fe28af6930abc712b",
+  "profile_path": "/Users/mihailsklarenko/FSM_PANEL v.3.0.1/farm-panel-prototype/resources/nav/profiles/de_cache",
+  "replay_profile_sha256": "ab10febce9e37b7d55c681891c23872d0f0850203a74b8ddab4534fadbeff938",
+  "post_replay_change": "Only walkable mask refined for ground beneath vent/bridge; pose replay does not consume the mask. Ground coverage recomputed with final mask.",
+  "tests_passed": 74,
+  "rebuild_files_identical": 85,
+  "preflight_packs": [
+    "cache_visual",
+    "dust2_dm",
+    "generic_dm",
+    "inferno_visual",
+    "mirage_dm",
+    "vertigo_visual"
+  ],
+  "video": "2026-09-13 16-59-35.mp4",
+  "video_sha256": "e790fdcf82fc34af22a8d1f7a27c9cc9844bc99c7be0632dc16245a54b1fb521",
+  "samples": 1940,
+  "accepted": 1694,
+  "accepted_pct": 87.32,
+  "fresh_at_processing_completion": 1649,
+  "ground_coverage": {
+    "inside_clearance": 1303,
+    "boundary_exit_available": 191,
+    "outside_floor": 200
+  },
+  "longest_localization_gap_sec": 2.9,
+  "reasons": {
+    "no_player_icon": 40,
+    "confirming_position": 25,
+    "measured_global_contours": 1365,
+    "measured_pose_within_deadline": 156,
+    "ambiguous_icon_heading": 60,
+    "waiting_visual_anchor": 120,
+    "measured_fixed_anchor": 173,
+    "low_registration_confidence": 1
+  },
+  "processing_ms": {
+    "median": 96.53,
+    "p90": 120.67,
+    "p99": 244.74
+  },
+  "discovery": [
+    {
+      "t": 9,
+      "winner": "de_cache",
+      "scores": {
+        "de_cache": 0.8371304974765682
+      },
+      "expected_layer": null,
+      "detected_layer": null
+    },
+    {
+      "t": 45,
+      "winner": "de_cache",
+      "scores": {
+        "de_cache": 0.7636783016262625
+      },
+      "expected_layer": null,
+      "detected_layer": null
+    },
+    {
+      "t": 77,
+      "winner": null,
+      "scores": {
+        "de_cache": 0.5554421854936855
+      },
+      "expected_layer": null,
+      "detected_layer": null
+    },
+    {
+      "t": 137,
+      "winner": "de_cache",
+      "scores": {
+        "de_cache": 0.7549963776560026
+      },
+      "expected_layer": null,
+      "detected_layer": null
+    },
+    {
+      "t": 177,
+      "winner": "de_cache",
+      "scores": {
+        "de_cache": 0.8509433962264152
+      },
+      "expected_layer": null,
+      "detected_layer": null
+    }
+  ],
+  "live_validated": false,
+  "full_map_ready": false,
+  "limitations": [
+    "Calibration video; coverage is not independently measured position accuracy.",
+    "No game input in replay. Live Windows traversal and random-spawn recovery need validation.",
+    "Closed squeaky door, jump boosts, vent crouching and ladder ascent are not supported; ground routes use alternatives.",
+    "Several test jobs overlapped part of replay; latency is not an isolated Windows benchmark.",
+    "Map recognition rejected one of five sampled views for low confidence; did not choose a wrong map."
+  ]
+}

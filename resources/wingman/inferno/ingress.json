@@ -1,0 +1,254 @@
+{
+  "map_id": "de_inferno",
+  "version": 4,
+  "source_video": "2026-09-20 20-01-41.mp4",
+  "source_sha256": "b910f7b89f31f3b547a167886032074ee4854c95d62b958b6bee9ebe3aceebec",
+  "entry_box": [
+    500,
+    640,
+    660,
+    705
+  ],
+  "live_validated": false,
+  "routes": [
+    {
+      "id": "long",
+      "points": [
+        [
+          700,
+          674
+        ],
+        [
+          724,
+          574
+        ],
+        [
+          876,
+          576
+        ],
+        [
+          882,
+          644
+        ],
+        [
+          848,
+          702
+        ]
+      ],
+      "mask": "ingress_long.png",
+      "evidence_seconds": [
+        46,
+        68
+      ],
+      "direction": "T_to_A",
+      "arrival_px": 8,
+      "actions": []
+    },
+    {
+      "id": "short",
+      "points": [
+        [
+          700,
+          674
+        ],
+        [
+          709,
+          729
+        ],
+        [
+          718,
+          753
+        ],
+        [
+          746,
+          774
+        ],
+        [
+          788,
+          774
+        ],
+        [
+          813,
+          779
+        ],
+        [
+          828,
+          754
+        ],
+        [
+          832,
+          734
+        ]
+      ],
+      "mask": "ingress_short.png",
+      "evidence_seconds": [
+        16,
+        23,
+        121,
+        132
+      ],
+      "direction": "T_to_A",
+      "arrival_px": 8,
+      "actions": []
+    },
+    {
+      "id": "apartments",
+      "points": [
+        [
+          587,
+          696
+        ],
+        [
+          593,
+          750
+        ],
+        [
+          596,
+          794
+        ],
+        [
+          607,
+          846
+        ],
+        [
+          611,
+          890
+        ],
+        [
+          611,
+          917
+        ],
+        [
+          631,
+          921
+        ],
+        [
+          654,
+          919
+        ],
+        [
+          671,
+          905
+        ],
+        [
+          679,
+          863
+        ],
+        [
+          709,
+          857
+        ],
+        [
+          741,
+          860
+        ],
+        [
+          790,
+          851
+        ],
+        [
+          809,
+          832
+        ],
+        [
+          835,
+          824
+        ],
+        [
+          854,
+          793
+        ],
+        [
+          884,
+          773
+        ],
+        [
+          850,
+          751
+        ]
+      ],
+      "mask": "ingress_apartments.png",
+      "evidence_seconds": [
+        94,
+        107,
+        223,
+        226
+      ],
+      "direction": "T_to_A",
+      "arrival_px": 8,
+      "actions": [
+        {
+          "id": "apartment_balcony_outbound",
+          "action": "jump",
+          "polygon": [
+            [
+              0.8074291300097751,
+              0.7839687194525904
+            ],
+            [
+              0.83088954056696,
+              0.7839687194525904
+            ],
+            [
+              0.83088954056696,
+              0.8132942326490714
+            ],
+            [
+              0.8074291300097751,
+              0.8132942326490714
+            ]
+          ],
+          "jump_entry": {
+            "polygon": [
+              [
+                0.8074291300097751,
+                0.7839687194525904
+              ],
+              [
+                0.83088954056696,
+                0.7839687194525904
+              ],
+              [
+                0.83088954056696,
+                0.8132942326490714
+              ],
+              [
+                0.8074291300097751,
+                0.8132942326490714
+              ]
+            ],
+            "direction_deg": -58
+          }
+        }
+      ],
+      "limits": [
+        "Committed outbound second-mid stair/corridor/balcony traversal only; no reverse route from A.",
+        "Interpolated 2D projected corridor, not a general apartment floor map; live validation pending."
+      ],
+      "entry_path": [
+        [
+          529,
+          677
+        ],
+        [
+          555,
+          680
+        ]
+      ],
+      "via": "T spawn -> second mid -> garage stairs -> apartments -> A balcony",
+      "checkpoints": [
+        5,
+        6,
+        8
+      ],
+      "landing_box": [
+        870,
+        785,
+        905,
+        825
+      ],
+      "landing_evidence": "2026-09-23 16-52-09.mp4, 35-95 s: lower A courtyard after outbound drop"
+    }
+  ],
+  "calibration_note": "Garage turn includes recorded doorway (631,921), walkthrough 101s. Outbound checkpoint prevents cutting the wall at y=902. Live traversal remains to be verified."
+}

@@ -6,8 +6,9 @@ import time
 
 
 class KeyLease:
-    def __init__(self, key_down, key_up, *, background=False, clock=time.monotonic):
+    def __init__(self, key_down, key_up, *, background=False, clock=time.monotonic, allowed=lambda: True):
         self._down, self._up, self.clock = key_down, key_up, clock
+        self.allowed = allowed
         self._keys = set()
         self._deadline = 0.
         self._lock = threading.RLock()
@@ -33,7 +34,7 @@ class KeyLease:
 
     def set_keys(self, keys):
         with self._lock:
-            wanted = set(keys) if self.clock() < self._deadline else set()
+            wanted = set(keys) if self.clock() < self._deadline and self.allowed() else set()
             for key in sorted(self._keys - wanted):
                 self._up(key)
                 self._keys.remove(key)
@@ -48,7 +49,7 @@ class KeyLease:
 
     def expire(self):
         with self._lock:
-            if self.clock() >= self._deadline:
+            if self.clock() >= self._deadline or not self.allowed():
                 self.release()
 
     def _watch(self):

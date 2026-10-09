@@ -131,6 +131,24 @@ def _run_nav_preflight_one(
                 warnings.append(
                     f"{pack.map_id}: no calibrated HUD atlas; direct radar-image matching may reject live frames"
                 )
+            if pack.map_id == 'de_cache':
+                from nav.cache_levels import CacheLevels, load_grounds
+                cache_levels=CacheLevels()
+                load_grounds(cache_levels.config)
+            if pack.map_id in ('de_vertigo','de_nuke'):
+                from nav.walkable import WalkableMap
+                layers = json.loads(resolve_visual_profile_file(pack.map_id,'layers.json').read_text(encoding='utf-8'))
+                expected_layers={'upper':pack.map_id,'lower':pack.map_id+'_lower'}
+                if pack.map_id=='de_nuke':
+                    expected_layers['ramp']='de_nuke_ramp'
+                if layers.get('map_id')!=pack.map_id or layers.get('layers')!=expected_layers:
+                    raise ValueError(f'Invalid navigation layer configuration for {pack.map_id}: '
+                                     f'expected {expected_layers}, got {layers.get("layers")}')
+                for layer_map in layers['layers'].values():
+                    if WalkableMap.load(layer_map) is None:
+                        raise ValueError('Missing navigation floor mask: '+layer_map)
+                    if not resolve_visual_profile_file(layer_map,'atlas.json').is_file():
+                        raise ValueError('Missing navigation floor atlas: '+layer_map)
             meta_path = resolve_map_meta_path(pack.map_id)
             radar_path = resolve_map_radar_path(pack.map_id)
             if not meta_path.is_file():

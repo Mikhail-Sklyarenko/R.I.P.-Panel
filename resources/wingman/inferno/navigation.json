@@ -1,0 +1,147 @@
+{
+  "map_id": "de_inferno",
+  "version": "wingman-inferno-fix-10",
+  "map_sha256": "e4929829f8475d2edcb44ee3537ffad094dc8008b4d6f5aa81e66e77ddb077ba",
+  "clearance_px": 4,
+  "scope": "Conservative A-side test region; full Wingman boundary not certified",
+  "experimental": true,
+  "live_validated": false,
+  "full_map_ready": false,
+  "mask_source": "Radar floor palette and explicitly excluded solid/outside regions",
+  "blocked_transitions": [
+    {
+      "name": "coffins_solid",
+      "points": [
+        [
+          625,
+          250
+        ],
+        [
+          701,
+          250
+        ],
+        [
+          701,
+          394
+        ],
+        [
+          625,
+          394
+        ]
+      ]
+    },
+    {
+      "name": "north_outside",
+      "points": [
+        [
+          640,
+          66
+        ],
+        [
+          1023,
+          66
+        ],
+        [
+          1023,
+          120
+        ],
+        [
+          640,
+          120
+        ]
+      ]
+    },
+    {
+      "name": "east_outside_decoration",
+      "points": [
+        [
+          947,
+          180
+        ],
+        [
+          1023,
+          180
+        ],
+        [
+          1023,
+          468
+        ],
+        [
+          947,
+          468
+        ]
+      ]
+    },
+    {
+      "name": "west_a_projection_not_ground_link",
+      "points": [
+        [
+          744,
+          670
+        ],
+        [
+          806,
+          670
+        ],
+        [
+          806,
+          879
+        ],
+        [
+          744,
+          879
+        ]
+      ],
+      "evidence": "2026-09-21 12-15-58.mp4: sustained collision near (730,730); conservatively exclude projected west-side shortcuts; approach A from north/east"
+    }
+  ],
+  "limitations": [
+    "2D floor projection: overlapping levels and one-way drops require live transition validation",
+    "No independent Windows traversal validation"
+  ],
+  "grid_step": 2,
+  "initial_hud_scale": 0.355,
+  "recorded_short_corridor": {
+    "points": [
+      [
+        700,
+        674
+      ],
+      [
+        709,
+        729
+      ],
+      [
+        718,
+        753
+      ],
+      [
+        746,
+        774
+      ],
+      [
+        788,
+        774
+      ],
+      [
+        813,
+        779
+      ],
+      [
+        828,
+        754
+      ],
+      [
+        832,
+        734
+      ]
+    ],
+    "width_px": 24,
+    "evidence_seconds": [
+      16,
+      23,
+      121,
+      132
+    ]
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "map_id": "de_inferno",
+  "version": 1,
+  "zones": [
+    {
+      "id": "apartments_red_door",
+      "action": "use_door",
+      "center": [
+        0.4789833822091887,
+        0.83088954056696
+      ],
+      "normal": [
+        0,
+        1
+      ],
+      "reach_px": 12
+    }
+  ],
+  "evidence": {
+    "video": "2026-09-15 15-25-10.mp4",
+    "seconds": [
+      184,
+      196
+    ],
+    "scope": "Near-side red panel observed; opposite-side live traversal not validated. Standard Use binding E required."
+  }
+}

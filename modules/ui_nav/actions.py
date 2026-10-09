@@ -267,3 +267,39 @@ def press_key(hwnd: int, key: str) -> None:
     win32api.keybd_event(vk_code, 0, 0, 0)
     win32api.keybd_event(vk_code, 0, win32con.KEYEVENTF_KEYUP, 0)
     time.sleep(0.1)
+
+
+_RELEASE_VKS = (
+    *(ord(c) for c in "WASDEQRFGBCXZ12345"), 0x09, 0x10, 0x11, 0x12, 0x1B, 0x20,
+    0xA0, 0xA1, 0xA2, 0xA3, 0xA4, 0xA5,
+)
+
+
+def release_all_inputs() -> None:
+    """Unconditional key-up/button-up for every bind the bot may hold (fleet safe stop).
+
+    Key-up events for keys that are not down are harmless in any window, so this
+    does not depend on focus and never raises.
+    """
+    if sys.platform != "win32":
+        return
+    try:
+        import win32api
+        import win32con
+    except ImportError:
+        return
+    for vk in _RELEASE_VKS:
+        try:
+            win32api.keybd_event(vk, win32api.MapVirtualKey(vk, 0), win32con.KEYEVENTF_KEYUP, 0)
+        except Exception:
+            _log.exception("release_all_inputs: key %s", vk)
+    for flag in (win32con.MOUSEEVENTF_LEFTUP, win32con.MOUSEEVENTF_RIGHTUP, win32con.MOUSEEVENTF_MIDDLEUP):
+        try:
+            win32api.mouse_event(flag, 0, 0, 0, 0)
+        except Exception:
+            _log.exception("release_all_inputs: mouse %s", flag)
+
+
+def release_combat_inputs() -> None:
+    """Clear held bot inputs after child termination. Never depends on CS2 focus."""
+    release_all_inputs()

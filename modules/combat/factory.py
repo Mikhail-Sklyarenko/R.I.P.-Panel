@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from typing import Any
 
 from config.schema import AppConfig, BotMode
@@ -11,6 +12,8 @@ from modules.combat.errors import CombatError
 
 
 def resolve_mode(config: AppConfig) -> BotMode:
+    if os.environ.get("CSGOBOT_NAV_MODE", "").strip().lower() == "expanded_roam":
+        return BotMode.AI
     if config.bot_mode != BotMode.AUTO:
         return config.bot_mode
     if csgobot_ai.is_installed() and csgobot_ai.python_executable() is not None:
@@ -42,15 +45,21 @@ def _run_bot_loop(ctx: dict[str, Any]) -> None:
             ok = csgobot_ai.start_ai(ctx)
             if ok:
                 return
+            if os.environ.get("CSGOBOT_NAV_MODE", "").strip().lower() == "expanded_roam":
+                if emit:
+                    emit(EventType.SESSION_FAILED,"Навигация и автострельба: боевой процесс не запустился; проверьте журнал csgobot")
+                ctx["stop_requested"] = True
+                return
             if emit:
                 emit(EventType.COMBAT_FALLBACK, "factory: ai failed → simple")
             simple.run_simple(ctx, minutes=cap_minutes)
             return
 
         raise CombatError(f"unknown bot_mode: {mode}")
-    except CombatError:
+    except Exception as exc:
+        csgobot_ai.stop_ai()
         if emit:
-            emit(EventType.SESSION_FAILED, "combat: factory error")
+            emit(EventType.SESSION_FAILED, f"combat: worker failed: {exc}")
         ctx["stop_requested"] = True
 
 

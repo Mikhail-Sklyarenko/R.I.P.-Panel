@@ -1,0 +1,31 @@
+{
+  "source": "2026-09-20 20-01-41.mp4",
+  "note": "Held-out timestamps from the same recording, not independent live validation. unknown means no supported overlay, not live round.",
+  "frames": {
+    "005.jpg": "buy_menu",
+    "020.jpg": "unknown",
+    "041.jpg": "unknown",
+    "060.jpg": "unknown",
+    "081.jpg": "round_over",
+    "082.jpg": "round_over",
+    "100.jpg": "unknown",
+    "120.jpg": "unknown",
+    "160.jpg": "unknown",
+    "180.jpg": "unknown",
+    "220.jpg": "unknown",
+    "260.jpg": "unknown",
+    "280.jpg": "unknown",
+    "320.jpg": "unknown",
+    "341.jpg": "round_over",
+    "342.jpg": "round_over",
+    "360.jpg": "unknown",
+    "380.jpg": "unknown",
+    "401.jpg": "halftime",
+    "402.jpg": "halftime",
+    "420.jpg": "unknown",
+    "441.jpg": "defusing",
+    "442.jpg": "defusing",
+    "479.jpg": "finished",
+    "480.jpg": "finished"
+  }
+}

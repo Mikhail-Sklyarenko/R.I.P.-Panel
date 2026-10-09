@@ -9,10 +9,7 @@ from modules.ui_nav.coords import NavCoords
 from modules.ui_nav.detectors import ScreenState, detect_probe_key, detect_state
 from modules.ui_nav.errors import UiNavTimeoutError
 
-_MAX_BLIND_CLICKS = 5
-_TEAM_OVERLAY_WAIT_SEC = 15.0
-_TEAM_OVERLAY_GRACE_SEC = 1.0
-_CLEAR_STREAK_REQUIRED = 2
+_CLEAR_STREAK_REQUIRED = 3
 
 
 class _TeamDriver(Protocol):
@@ -23,6 +20,9 @@ class _TeamDriver(Protocol):
 
 def past_team_select_screen(img, coords: NavCoords) -> bool:
     """True when team overlay is gone and player is on map (strict HUD or invuln)."""
+    if coords.base_width==1280:
+        from modules.ui_nav.menu_labels import play_button
+        if play_button(img) is not None:return False
     if detect_probe_key(img, coords, "team_select", min_match=1):
         return False
     if detect_probe_key(img, coords, "spawn_invuln", min_match=2):
@@ -72,89 +72,32 @@ def wait_team_select_done(
     should_stop: Callable[[], bool] | None = None,
     on_team_random_clicked: Callable[[], None] | None = None,
 ) -> int:
-    """
-    Click team_random while overlay visible; never LMB-spam after overlay was seen.
-
-    Waits for team overlay before blind clicks. After a confirmed overlay click,
-    optional on_team_random_clicked (console autobuy). No further LMB once overlay
-    was seen until spawn HUD confirms join.
-    """
+    """Act only on stable team UI; the legacy callback runs AFTER spawn confirmation."""
     deadline = time.monotonic() + max(5.0, timeout_sec)
-    last_click = 0.0
+    last_click = float('-inf')
     clicks = 0
-    started = time.monotonic()
-    saw_team_overlay = False
-    console_buy_fired = False
-    clear_streak = 0
-    overlay_wait_logged = False
-
+    clear_streak = team_streak = 0
     while time.monotonic() < deadline:
         if should_stop and should_stop():
-            raise UiNavTimeoutError("team select: stopped")
+            raise UiNavTimeoutError('team select: stopped')
         img = driver.capture()
-
         if past_team_select_screen(img, coords):
             clear_streak += 1
+            team_streak = 0
             if clear_streak >= _CLEAR_STREAK_REQUIRED:
-                if on_progress:
-                    on_progress("dm nav: team select cleared (spawn HUD)")
+                if on_progress:on_progress('dm nav: spawn HUD confirmed')
+                if on_team_random_clicked:on_team_random_clicked()
                 return clicks
         else:
             clear_streak = 0
-
-        team_visible = detect_probe_key(img, coords, "team_select", min_match=1)
-        if team_visible:
-            saw_team_overlay = True
-        elif not saw_team_overlay:
-            elapsed_wait = time.monotonic() - started
-            if elapsed_wait < _TEAM_OVERLAY_WAIT_SEC:
-                if not overlay_wait_logged and on_progress:
-                    on_progress("dm nav: waiting for team select overlay…")
-                    overlay_wait_logged = True
-                time.sleep(0.3)
-                continue
-
-        now = time.monotonic()
-        elapsed = now - started
-
-        may_blind = (
-            not saw_team_overlay
-            and not team_visible
-            and clicks < _MAX_BLIND_CLICKS
-            and elapsed >= _TEAM_OVERLAY_GRACE_SEC
-            and now - last_click >= click_retry_sec
-        )
-        may_team = team_visible and (now - last_click >= click_retry_sec)
-
-        if may_team or may_blind:
-            _click_team_random(
-                driver,
-                coords,
-                on_progress=on_progress,
-                log_step=log_step,
-                attempt=clicks + 1,
-                team_visible=team_visible,
-            )
-            last_click = now
-            clicks += 1
-            time.sleep(0.4)
-
-            if (
-                team_visible
-                and on_team_random_clicked
-                and not console_buy_fired
-            ):
-                if on_progress:
-                    on_progress("dm nav: autobuy console after team random")
-                try:
-                    on_team_random_clicked()
-                except Exception as exc:
-                    if on_progress:
-                        on_progress(f"dm nav: autobuy console warn ({exc})")
-                console_buy_fired = True
-
-        time.sleep(0.25)
-
-    raise UiNavTimeoutError(
-        f"timeout on team select screen ({timeout_sec:.0f}s); clicks={clicks}"
-    )
+            team_visible = detect_probe_key(img, coords, 'team_select')
+            team_streak = team_streak + 1 if team_visible else 0
+            now = time.monotonic()
+            if team_streak >= 3 and now-last_click >= max(1.,click_retry_sec):
+                _click_team_random(driver,coords,on_progress=on_progress,
+                    log_step=log_step,attempt=clicks+1,team_visible=True)
+                clicks += 1
+                last_click = now
+                team_streak = 0
+        time.sleep(.25)
+    raise UiNavTimeoutError(f'timeout waiting for confirmed spawn ({timeout_sec:.0f}s); clicks={clicks}')
