@@ -282,9 +282,9 @@ class WindowsBackend:
                 return CommandResult(cmd.command_id, ResultStatus.FAILED, Reason.CAPTURE_STALE.value, "no image")
             return CommandResult(cmd.command_id, ResultStatus.COMPLETED, "", path)
         if cmd.type is CommandType.RESTART_CS2:
-            return self._restart(cmd, steam=False)
+            return self._restart(cmd, ctx, steam=False)
         if cmd.type is CommandType.RESTART_STEAM:
-            return self._restart(cmd, steam=True)
+            return self._restart(cmd, ctx, steam=True)
         return self._ui(cmd, ctx)
 
     def _start_gameplay(self, cmd: Command, ctx: ExecContext) -> CommandResult:
@@ -335,8 +335,10 @@ class WindowsBackend:
         return CommandResult(cmd.command_id, ResultStatus.COMPLETED, "", fp.server_token,
                              {"players": list(fp.players), "server": fp.server_token})
 
-    def _restart(self, cmd: Command, *, steam: bool) -> CommandResult:
+    def _restart(self, cmd: Command, ctx: ExecContext, *, steam: bool) -> CommandResult:
         self.safe_stop("restart")
+        if ctx.cancel.is_set():
+            return CommandResult(cmd.command_id, ResultStatus.FAILED, Reason.OPERATOR_STOP.value, "cancelled")
         try:
             from modules.launcher import cleanup, cs2, steam as steam_mod
             if steam:
@@ -349,9 +351,13 @@ class WindowsBackend:
             return CommandResult(cmd.command_id, ResultStatus.FAILED, Reason.COMMAND_FAILED.value, repr(exc))
         deadline = self.clock() + 90.0
         while self.clock() < deadline:
+            if ctx.cancel.is_set():
+                return CommandResult(cmd.command_id, ResultStatus.FAILED, Reason.OPERATOR_STOP.value, "cancelled")
             if steam_running() and cs2_running():
                 return CommandResult(cmd.command_id, ResultStatus.COMPLETED)
             time.sleep(1.0)
+        if ctx.cancel.is_set():
+            return CommandResult(cmd.command_id, ResultStatus.FAILED, Reason.OPERATOR_STOP.value, "cancelled")
         return CommandResult(cmd.command_id, ResultStatus.FAILED, Reason.CS2_NOT_RUNNING.value, "timeout")
 
     def _ui(self, cmd: Command, ctx: ExecContext) -> CommandResult:
@@ -397,11 +403,11 @@ class WindowsBackend:
         if cmd.type is CommandType.ACCEPT_MATCH:
             return self._click_seq(cmd, ctx, ["accept_match"])
         if cmd.type is CommandType.LEAVE_MATCH:
-            return self._console_or_click(cmd, "disconnect", ["leave_lobby"])
+            return self._console_or_click(cmd, ctx, "disconnect", ["leave_lobby"])
         if cmd.type is CommandType.RETURN_TO_MENU:
-            return self._console_or_click(cmd, "disconnect", ["leave_lobby"])
+            return self._console_or_click(cmd, ctx, "disconnect", ["leave_lobby"])
         if cmd.type is CommandType.RECONNECT_MATCH:
-            return self._console_or_click(cmd, "retry", ["play"])
+            return self._console_or_click(cmd, ctx, "retry", ["play"])
         return CommandResult(cmd.command_id, ResultStatus.REJECTED, Reason.COMMAND_FAILED.value, cmd.type.value)
 
     def _click_seq(self, cmd: Command, ctx: ExecContext, names: list[str], *, paste: str = "") -> CommandResult:
@@ -438,13 +444,18 @@ class WindowsBackend:
         return CommandResult(cmd.command_id, ResultStatus.UNCONFIRMED, Reason.EFFECT_UNCONFIRMED.value,
                              "clicks issued; effect not observed")
 
-    def _console_or_click(self, cmd: Command, console: str, clicks: list[str]) -> CommandResult:
+    def _console_or_click(self, cmd: Command, ctx: ExecContext, console: str, clicks: list[str]) -> CommandResult:
+        if ctx.cancel.is_set():
+            return CommandResult(cmd.command_id, ResultStatus.FAILED, Reason.OPERATOR_STOP.value, "cancelled")
         try:
             from modules.ui_nav.cs2_console import run_cs2_console_commands
             from modules.ui_nav.window import find_cs2_hwnd
             with self.inputs.ui(cmd.type.value):
                 run_cs2_console_commands(find_cs2_hwnd(), console)
-            return CommandResult(cmd.command_id, ResultStatus.UNCONFIRMED, Reason.EFFECT_UNCONFIRMED.value, console)
         except Exception:
-            dummy = ExecContext(threading.Event(), time.time, lambda: "")
-            return self._click_seq(cmd, dummy, clicks)
+            if ctx.cancel.is_set():
+                return CommandResult(cmd.command_id, ResultStatus.FAILED, Reason.OPERATOR_STOP.value, "cancelled")
+            return self._click_seq(cmd, ctx, clicks)
+        if ctx.cancel.is_set():
+            return CommandResult(cmd.command_id, ResultStatus.FAILED, Reason.OPERATOR_STOP.value, "cancelled")
+        return CommandResult(cmd.command_id, ResultStatus.UNCONFIRMED, Reason.EFFECT_UNCONFIRMED.value, console)

@@ -28,6 +28,22 @@ OFFLINE_AFTER_SEC = 3.0
 URGENT = frozenset({CommandType.SAFE_STOP, CommandType.STOP_GAMEPLAY})
 
 
+class _CommandCancel:
+    """Cancel flag captured by one command. A later clear cannot revive it."""
+
+    def __init__(self, source: threading.Event, epoch: int, service: "AgentService"):
+        self._source = source
+        self._epoch = epoch
+        self._service = service
+        self._stuck = False
+
+    def is_set(self) -> bool:
+        if (self._stuck or self._source.is_set() or self._service.epoch != self._epoch
+                or self._service.session_stopped):
+            self._stuck = True
+        return self._stuck
+
+
 class AgentService:
     def __init__(self, agent_id: str, backend: GameBackend, transport: Transport, journal: CommandJournal, *,
                  token: str, build_version: str, resource_manifest: str, computer: str = "", inline: bool = False,
@@ -56,6 +72,7 @@ class AgentService:
         self.run_id = ""
         self.epoch = 0
         self.session_stopped = False
+        self._run_released = False
         self._shut_down = False
         self._draining = False
 
@@ -128,9 +145,9 @@ class AgentService:
         if self.offline:
             self.log("agent: coordinator link restored")
         self.offline, self.last_ok, self.last_error = False, now, ""
-        if not self.session_stopped:
-            self.cancel.clear()
         self._rotate_run(str(resp.get("run_id", "")))
+        if not self.session_stopped and self.run_id:
+            self.cancel.clear()
         self._set_lease(resp.get("gameplay"), now)
         server_time = float(resp.get("server_time", self.wall()))
         for raw in resp.get("commands") or ():
@@ -159,11 +176,13 @@ class AgentService:
                 return
             previous = self.run_id
             self.run_id = run_id
-            if not previous:
+            # The first bind has no session to drop. An empty gap after a real run does.
+            if not previous and not (run_id and self._run_released):
                 return
             pending = list(self.queue)
             self.queue.clear()
             self.epoch += 1
+            self._run_released = not bool(run_id)
             if run_id:
                 self.session_stopped = False
                 self.cancel.clear()
@@ -224,15 +243,20 @@ class AgentService:
             return
         self.journal.finish(CommandResult(cmd.command_id, ResultStatus.FAILED, reason, detail))
 
+    def _cancel_view(self, epoch: int) -> _CommandCancel:
+        return _CommandCancel(self.cancel, epoch, self)
+
     def _run(self, cmd: Command, epoch: int | None = None) -> None:
         if cmd.type not in URGENT:
             with self._lock:
-                stale = (self.cancel.is_set() or self.session_stopped
-                         or (epoch is not None and epoch != self.epoch))
+                bound = self.epoch if epoch is None else epoch
+                stale = self.cancel.is_set() or self.session_stopped or bound != self.epoch
             if stale:
                 self._fail(cmd, Reason.OPERATOR_STOP.value, "cancelled")
                 return
-        ctx = ExecContext(self.cancel, self.coordinator_time, lambda: self.lease_attempt)
+        else:
+            bound = self.epoch
+        ctx = ExecContext(self._cancel_view(bound), self.coordinator_time, lambda: self.lease_attempt)
         try:
             result = self.backend.execute(cmd, ctx)
         except Exception as exc:

@@ -694,3 +694,181 @@ def test_harness_duplicate_result_stays_terminal(tmp_path):
     assert not h.store.record_result(CommandResult(cmd.command_id, ResultStatus.COMPLETED),
                                      agent_id="pc2", run_id=h.plan.run_id)
     assert h.store.results(h.plan.run_id)[cmd.command_id].status is ResultStatus.COMPLETED
+
+
+# ----- cancellation hardening ------------------------------------------------------------
+
+def test_restart_does_not_report_success_after_cancel(monkeypatch):
+    import modules.fleet_agent.live as live
+    from modules.fleet_agent.live import WindowsBackend
+
+    clock = [0.0]
+    cancel = threading.Event()
+    backend = object.__new__(WindowsBackend)
+    backend.clock = lambda: clock[0]
+    backend.config = object()
+    backend.safe_stop = lambda reason: None
+
+    def _sleep(seconds: float) -> None:
+        clock[0] += seconds
+        cancel.set()
+
+    monkeypatch.setattr(live.time, "sleep", _sleep)
+    monkeypatch.setattr(live, "steam_running", lambda: clock[0] > 0)
+    monkeypatch.setattr(live, "cs2_running", lambda: clock[0] > 0)
+    monkeypatch.setattr("modules.launcher.cleanup.kill_cs2", lambda: None)
+    monkeypatch.setattr("modules.launcher.cs2.launch_cs2", lambda config: None)
+    result = backend.execute(
+        _cmd("restart", "run-a", "pc1", CommandType.RESTART_CS2),
+        ExecContext(cancel, lambda: clock[0], lambda: ""),
+    )
+    assert result.status is ResultStatus.FAILED
+    assert result.reason == "operator_stop"
+    assert clock[0] < 90.0
+
+
+def test_console_fallback_honors_the_command_cancel(monkeypatch):
+    from contextlib import nullcontext
+
+    import modules.fleet_agent.live as live
+    from modules.fleet_agent.live import WindowsBackend
+
+    clicks: list[tuple] = []
+    cancel = threading.Event()
+    backend = object.__new__(WindowsBackend)
+    backend.observer = type("Obs", (), {"calibrated": True, "click_point": staticmethod(lambda name: (1, 1))})()
+    backend.inputs = type("Inputs", (), {"ui": lambda self, name: nullcontext()})()
+    backend.observe = lambda: Observation("pc1", 1, identity=Identity.STEAM_LOCAL, screen=Screen.IN_MATCH)
+    backend._shot = lambda name: ""
+
+    def _console(*_args, **_kwargs):
+        cancel.set()
+        raise RuntimeError("console unavailable")
+
+    monkeypatch.setattr("modules.ui_nav.cs2_console.run_cs2_console_commands", _console)
+    monkeypatch.setattr("modules.ui_nav.window.find_cs2_hwnd", lambda: 1)
+    monkeypatch.setattr("modules.ui_nav.actions.click_client", lambda hwnd, point: clicks.append(point))
+    monkeypatch.setattr(live.time, "sleep", lambda _seconds: None)
+    result = backend.execute(
+        _cmd("leave", "run-a", "pc1", CommandType.LEAVE_MATCH),
+        ExecContext(cancel, lambda: 0.0, lambda: ""),
+    )
+    assert clicks == []
+    assert result.status is ResultStatus.FAILED
+    assert result.reason == "operator_stop"
+
+
+def test_safe_stop_survives_an_empty_run_until_the_next_run(tmp_path):
+    f = Fleet(tmp_path)
+    agent = f.agents["pc1"]
+    agent._rotate_run("run-a")
+    agent._accept(_cmd("queued", "run-a", "pc1", CommandType.INVITE, f.world.now), f.world.now)
+    agent._accept(_cmd("stop", "run-a", "pc1", CommandType.SAFE_STOP, f.world.now), f.world.now)
+    assert agent.session_stopped and agent.cancel.is_set()
+    stopped_epoch = agent.epoch
+    agent._rotate_run("")
+    assert agent.run_id == ""
+    assert agent.session_stopped and agent.cancel.is_set()
+    assert agent.epoch > stopped_epoch
+    assert agent.journal.known("queued")[1].status is ResultStatus.FAILED
+    empty_epoch = agent.epoch
+    agent._rotate_run("run-b")
+    assert agent.run_id == "run-b"
+    assert agent.session_stopped is False
+    assert agent.cancel.is_set() is False
+    assert agent.epoch > empty_epoch
+    agent._accept(_cmd("stale", "run-a", "pc1", CommandType.INVITE, f.world.now), f.world.now)
+    agent._accept(_cmd("fresh", "run-b", "pc1", CommandType.LEAVE_LOBBY, f.world.now), f.world.now)
+    agent.drain()
+    assert f.backends["pc1"].executed == ["stop", "fresh"]
+
+
+class _CancelProbe:
+    def __init__(self):
+        self.started = threading.Event()
+        self.saw = threading.Event()
+        self.release = threading.Event()
+        self.resumed = False
+        self.stops: list[str] = []
+
+    def observe(self) -> Observation:
+        return Observation("pc1", 1)
+
+    def execute(self, cmd: Command, ctx: ExecContext) -> CommandResult:
+        self.started.set()
+        while not ctx.cancel.is_set():
+            threading.Event().wait(0.005)
+        self.saw.set()
+        self.release.wait(2)
+        if not ctx.cancel.is_set():
+            self.resumed = True
+            return CommandResult(cmd.command_id, ResultStatus.COMPLETED, detail="resumed")
+        return CommandResult(cmd.command_id, ResultStatus.FAILED, "operator_stop", "cancelled")
+
+    def set_gameplay(self, attempt_id: str) -> None:
+        return None
+
+    def safe_stop(self, reason: str) -> None:
+        self.stops.append(reason)
+
+
+def test_link_restore_does_not_resume_the_cancelled_command(tmp_path):
+    backend = _CancelProbe()
+    transport = _Script({"ok": True, "accepted_results": [], "commands": [], "run_id": "run-a", "server_time": 1.0})
+    agent = _service(tmp_path, backend, transport)
+    agent._rotate_run("run-a")
+    agent._accept(_cmd("live", "run-a", "pc1", CommandType.INVITE), 1.0)
+    worker = threading.Thread(target=agent.drain)
+    worker.start()
+    assert backend.started.wait(2)
+    agent._link_down(agent.clock(), "down", hard=True)
+    assert backend.saw.wait(2)
+    assert agent.tick() is True
+    backend.release.set()
+    worker.join(2)
+    assert backend.resumed is False
+    assert agent.journal.known("live")[1].status is ResultStatus.FAILED
+    assert not worker.is_alive()
+
+
+class _RunGate:
+    def __init__(self):
+        self.started = threading.Event()
+        self.proceed = threading.Event()
+        self.continued = False
+
+    def observe(self) -> Observation:
+        return Observation("pc1", 1)
+
+    def execute(self, cmd: Command, ctx: ExecContext) -> CommandResult:
+        self.started.set()
+        self.proceed.wait(2)
+        if ctx.cancel.is_set():
+            return CommandResult(cmd.command_id, ResultStatus.FAILED, "operator_stop", "cancelled")
+        self.continued = True
+        return CommandResult(cmd.command_id, ResultStatus.COMPLETED)
+
+    def set_gameplay(self, attempt_id: str) -> None:
+        return None
+
+    def safe_stop(self, reason: str) -> None:
+        return None
+
+
+def test_run_change_cancels_the_inflight_command(tmp_path):
+    backend = _RunGate()
+    transport = _Script({"ok": True, "accepted_results": [], "commands": [], "run_id": "run-b", "server_time": 2.0})
+    agent = _service(tmp_path, backend, transport)
+    agent._rotate_run("run-a")
+    agent._accept(_cmd("live", "run-a", "pc1", CommandType.INVITE), 1.0)
+    worker = threading.Thread(target=agent.drain)
+    worker.start()
+    assert backend.started.wait(2)
+    assert agent.tick() is True
+    backend.proceed.set()
+    worker.join(2)
+    assert backend.continued is False
+    assert agent.run_id == "run-b"
+    assert agent.session_stopped is False
+    assert agent.journal.known("live")[1].status is ResultStatus.FAILED
+    assert not worker.is_alive()
