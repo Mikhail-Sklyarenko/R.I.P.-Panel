@@ -74,6 +74,7 @@ class RunCtx:
     reconnect_at: dict[str, float] = field(default_factory=dict)
     play_at: dict[str, float] = field(default_factory=dict)
     recreate_after: bool = False
+    operator_stopped: list[str] = field(default_factory=list)
     budget_state: dict[str, list[float]] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -130,8 +131,15 @@ class RunMachine:
         if self.state not in (RunState.STOPPED, RunState.STOPPING):
             self.goto(RunState.STOPPING, now, Reason.OPERATOR_STOP)
 
+    def note_operator_stop(self, agent_id: str) -> None:
+        """One client's operator SAFE_STOP. This run must not give that client gameplay again."""
+        if agent_id not in self.ctx.operator_stopped:
+            self.ctx.operator_stopped.append(agent_id)
+
     def gameplay_admitted(self, agent_id: str, links: dict[str, Link]) -> str:
         """Match attempt id the agent may play in, or empty: the lease is derived each heartbeat."""
+        if agent_id in self.ctx.operator_stopped:
+            return ""
         if self.state is not RunState.IN_MATCH or links.get(agent_id) is not Link.HEALTHY:
             return ""
         return self.ctx.attempt_id
@@ -344,6 +352,8 @@ class RunMachine:
             if (o.gsi.map_phase == "gameover" or o.worker_exit == "match_finished"
                     or o.screen is Screen.MATCH_RESULT):
                 finished.append(a)
+            elif a in self.ctx.operator_stopped:
+                pass
             elif links.get(a) is Link.HEALTHY and (o.screen in MENU_SCREENS or not o.cs2_running):
                 # Client dropped out mid-match (crash/kick): bounded restart + reconnect.
                 last = self.ctx.reconnect_at.get(a, 0.0)

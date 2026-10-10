@@ -138,6 +138,8 @@ class Coordinator:
             now = self.clock()
             cmd = Command(f"{self.plan.run_id}/operator/{int(now * 1000)}/{agent_id}/{ctype.value}",
                           self.plan.run_id, agent_id, ctype, {}, "", 1, 240.0, now)
+            if ctype is CommandType.SAFE_STOP and self.run is not None:
+                self.run.note_operator_stop(agent_id)
             self.store.add_commands([cmd])
             self.operator_ids.add(cmd.command_id)
             self.store.event("operator", run_id=self.plan.run_id, agent_id=agent_id, detail=ctype.value)

@@ -80,14 +80,27 @@ class AgentService:
     def coordinator_time(self) -> float:
         return self.wall() + self.clock_offset
 
+    def _gameplay_blocked(self) -> bool:
+        return self.session_stopped or self._stop.is_set()
+
     def _set_lease(self, gameplay: dict[str, Any] | None, now: float) -> None:
         with self._lock:
-            if gameplay and gameplay.get("attempt_id"):
+            if self._gameplay_blocked():
+                self.lease_attempt, self.lease_until = "", 0.0
+            elif gameplay and gameplay.get("attempt_id"):
                 self.lease_attempt = str(gameplay["attempt_id"])
                 self.lease_until = now + float(gameplay.get("ttl_sec", 1.5))
             else:
                 self.lease_attempt, self.lease_until = "", 0.0
+            grant = self.lease_attempt
         self._push_lease()
+        with self._lock:
+            # SAFE_STOP can land while set_gameplay is still applying the old attempt.
+            blocked = self._gameplay_blocked() or self.lease_attempt != grant
+            if blocked:
+                self.lease_attempt, self.lease_until = "", 0.0
+        if blocked and grant:
+            self._push_lease()
 
     def enforce_lease(self) -> None:
         with self._lock:
@@ -228,6 +241,7 @@ class AgentService:
             self.cancel.set()
             if latch:
                 self.session_stopped = True
+                self.lease_attempt, self.lease_until = "", 0.0
             pending = list(self.queue)
             self.queue.clear()
         self._fail_queued(pending, reason, detail)
@@ -256,7 +270,9 @@ class AgentService:
                 return
         else:
             bound = self.epoch
-        ctx = ExecContext(self._cancel_view(bound), self.coordinator_time, lambda: self.lease_attempt)
+        view = self._cancel_view(bound)
+        cancelled_before = view.is_set()
+        ctx = ExecContext(view, self.coordinator_time, lambda: self.lease_attempt)
         try:
             result = self.backend.execute(cmd, ctx)
         except Exception as exc:
@@ -265,6 +281,12 @@ class AgentService:
             result = CommandResult(cmd.command_id, ResultStatus.FAILED, Reason.COMMAND_FAILED.value, repr(exc))
         if result.command_id != cmd.command_id:
             result = replace(result, command_id=cmd.command_id)
+        if result.succeeded and view.is_set() and not cancelled_before:
+            detail = "effect not confirmed after cancel"
+            if result.detail:
+                detail = f"{detail}: {result.detail}"
+            result = replace(result, status=ResultStatus.UNCONFIRMED, reason=Reason.EFFECT_UNCONFIRMED.value,
+                             detail=detail)
         self.journal.finish(result)
 
     def drain(self) -> None:

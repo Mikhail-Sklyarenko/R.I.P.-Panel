@@ -872,3 +872,191 @@ def test_run_change_cancels_the_inflight_command(tmp_path):
     assert agent.session_stopped is False
     assert agent.journal.known("live")[1].status is ResultStatus.FAILED
     assert not worker.is_alive()
+
+
+def _match_obs(agent: str, sid: str, *, screen: Screen = Screen.IN_MATCH, worker: bool = False) -> Observation:
+    from core.wingman_fleet import MVP_MAP, MVP_MODE
+    return Observation(
+        agent, 1, steam_running=True, cs2_running=True, steam_id64=sid, identity=Identity.STEAM_LOCAL,
+        screen=screen, worker_running=worker,
+        gsi=GsiView(age_sec=0.0, steam_id64=sid, mode=MVP_MODE, map_id=MVP_MAP, map_phase="live"),
+    )
+
+
+def test_operator_safe_stop_stops_lease_and_run_machine_does_not_restore(tmp_path):
+    store = FleetStore(tmp_path / "c.db")
+    coord = Coordinator(store, token=TOKEN, clock=lambda: 10.0)
+    plan = make_roster().build_plan(build_version="b", resource_manifest="m", now=10.0)
+    coord.start_run(plan)
+    coord.run.ctx.state = RunState.IN_MATCH
+    coord.run.ctx.attempt_id = "wave-1"
+    names = {member.agent_id: member.steam_id64 for pair in plan.pairs for member in (pair.leader, pair.follower)}
+
+    def beat(agent: str, seq: int):
+        return coord.handle_heartbeat({
+            "token": TOKEN, "boot_id": f"boot-{agent}",
+            "observation": to_dict(Observation(agent, seq, protocol=PROTOCOL_VERSION, steam_running=True,
+                                               cs2_running=True, screen=Screen.IN_MATCH)),
+        })
+
+    assert beat("pc1", 1)[1]["gameplay"]["attempt_id"] == "wave-1"
+    assert beat("pc2", 1)[1]["gameplay"]["attempt_id"] == "wave-1"
+    coord.agent_command("pc1", CommandType.SAFE_STOP)
+    stopped = beat("pc1", 2)[1]
+    assert stopped["gameplay"] is None
+    assert any(command["type"] == "safe_stop" for command in stopped["commands"])
+    assert beat("pc1", 3)[1]["gameplay"] is None
+    assert beat("pc2", 2)[1]["gameplay"]["attempt_id"] == "wave-1"
+
+    agents = plan.agent_ids
+    links = {agent: Link.HEALTHY for agent in agents}
+    playing = {agent: _match_obs(agent, names[agent]) for agent in agents}
+    coord.run.ctx.play_at = {agent: 0.0 for agent in agents}
+    resumed = coord.run.step(100.0, playing, links, {}, 100.0)
+    assert [command.agent_id for command in resumed if command.type is CommandType.START_GAMEPLAY] == ["pc2", "pc3", "pc4"]
+    dropped = {agent: _match_obs(agent, names[agent]) for agent in agents}
+    dropped["pc1"] = _match_obs("pc1", names["pc1"], screen=Screen.MAIN_MENU)
+    coord.run.ctx.issued = {}
+    recovered = coord.run.step(200.0, dropped, links, {}, 200.0)
+    assert not any(command.agent_id == "pc1" and command.type in (
+        CommandType.RECONNECT_MATCH, CommandType.RESTART_CS2, CommandType.START_GAMEPLAY)
+        for command in recovered)
+    fresh = RunMachine(plan, {}, RunCtx(state=RunState.IN_MATCH, attempt_id="wave-2"))
+    assert fresh.gameplay_admitted("pc1", links) == "wave-2"
+    assert coord.run.gameplay_admitted("pc1", links) == ""
+    store.close()
+
+
+def test_safe_stop_blocks_lease_across_link_loss_until_a_new_run(tmp_path):
+    from modules.fleet_agent.input_supervisor import InputOwner, InputSupervisor
+    from modules.fleet_agent.live import WindowsBackend
+
+    live = object.__new__(WindowsBackend)
+    live._lock = threading.RLock()
+    live._lease = ""
+    live.log = lambda _message: None
+    live.admission = tmp_path / "admission.json"
+    live.inputs = InputSupervisor(release=lambda: None)
+
+    class _Chain:
+        def observe(self) -> Observation:
+            return Observation("pc1", 1)
+
+        def execute(self, cmd: Command, ctx: ExecContext) -> CommandResult:
+            if cmd.type is CommandType.SAFE_STOP:
+                live.set_gameplay("")
+            return CommandResult(cmd.command_id, ResultStatus.COMPLETED)
+
+        def set_gameplay(self, attempt_id: str) -> None:
+            live.set_gameplay(attempt_id)
+
+        def safe_stop(self, reason: str) -> None:
+            live.set_gameplay("")
+
+    body = {"ok": True, "accepted_results": [], "commands": [], "run_id": "run-a", "server_time": 1.0,
+            "gameplay": {"attempt_id": "wave", "ttl_sec": 1.5}}
+    agent = _service(tmp_path, _Chain(), _Script(body))
+    agent._rotate_run("run-a")
+    assert agent.tick() is True
+    assert live.inputs.owner is InputOwner.GAMEPLAY
+    assert live.inputs.gameplay_attempt == "wave"
+    agent._accept(_cmd("stop", "run-a", "pc1", CommandType.SAFE_STOP), 1.0)
+    assert agent.session_stopped
+    assert agent.tick() is True
+    assert live.inputs.owner is InputOwner.NONE
+    assert live.inputs.gameplay_attempt == ""
+    agent._link_down(agent.clock(), "down", hard=True)
+    assert agent.tick() is True
+    assert live.inputs.owner is InputOwner.NONE
+    body["run_id"] = "run-b"
+    body["gameplay"] = {"attempt_id": "wave-b", "ttl_sec": 1.5}
+    assert agent.tick() is True
+    assert agent.session_stopped is False
+    assert live.inputs.owner is InputOwner.GAMEPLAY
+    assert live.inputs.gameplay_attempt == "wave-b"
+
+
+class _BlockLease:
+    def __init__(self):
+        self.current = ""
+        self.grants: list[str] = []
+        self.entered = threading.Event()
+        self.release = threading.Event()
+
+    def observe(self) -> Observation:
+        return Observation("pc1", 1)
+
+    def execute(self, cmd: Command, ctx: ExecContext) -> CommandResult:
+        if cmd.type is CommandType.SAFE_STOP:
+            self.set_gameplay("")
+        return CommandResult(cmd.command_id, ResultStatus.COMPLETED)
+
+    def set_gameplay(self, attempt_id: str) -> None:
+        if attempt_id:
+            self.entered.set()
+            assert self.release.wait(2)
+        self.current = attempt_id
+        self.grants.append(attempt_id)
+
+    def safe_stop(self, reason: str) -> None:
+        self.set_gameplay("")
+
+
+def test_safe_stop_during_lease_apply_cannot_leave_gameplay_granted(tmp_path):
+    backend = _BlockLease()
+    transport = _Script({"ok": True, "accepted_results": [], "commands": [], "run_id": "run-a",
+                         "server_time": 1.0, "gameplay": {"attempt_id": "wave", "ttl_sec": 1.5}})
+    agent = _service(tmp_path, backend, transport)
+    agent._rotate_run("run-a")
+    worker = threading.Thread(target=agent.tick)
+    worker.start()
+    assert backend.entered.wait(2)
+    agent._accept(_cmd("stop", "run-a", "pc1", CommandType.SAFE_STOP), 1.0)
+    backend.release.set()
+    worker.join(2)
+    assert not worker.is_alive()
+    assert agent.session_stopped
+    assert backend.current == ""
+    assert backend.grants[-1] == ""
+    assert "wave" in backend.grants
+
+
+class _LateSuccess:
+    def __init__(self):
+        self.started = threading.Event()
+        self.release = threading.Event()
+
+    def observe(self) -> Observation:
+        return Observation("pc1", 1)
+
+    def execute(self, cmd: Command, ctx: ExecContext) -> CommandResult:
+        if cmd.type is CommandType.SAFE_STOP:
+            return CommandResult(cmd.command_id, ResultStatus.COMPLETED)
+        self.started.set()
+        assert self.release.wait(2)
+        return CommandResult(cmd.command_id, ResultStatus.COMPLETED, detail="clicked")
+
+    def set_gameplay(self, attempt_id: str) -> None:
+        return None
+
+    def safe_stop(self, reason: str) -> None:
+        return None
+
+
+def test_late_success_after_cancel_stays_unconfirmed(tmp_path):
+    backend = _LateSuccess()
+    agent = _service(tmp_path, backend, _Script())
+    agent._rotate_run("run-a")
+    agent._accept(_cmd("click", "run-a", "pc1", CommandType.INVITE), 1.0)
+    worker = threading.Thread(target=agent.drain)
+    worker.start()
+    assert backend.started.wait(2)
+    agent._accept(_cmd("stop", "run-a", "pc1", CommandType.SAFE_STOP), 1.0)
+    backend.release.set()
+    worker.join(2)
+    result = agent.journal.known("click")[1]
+    assert result.status is ResultStatus.UNCONFIRMED
+    assert result.succeeded is False
+    assert result.reason == "effect_unconfirmed"
+    assert agent.journal.known("stop")[1].status is ResultStatus.COMPLETED
+    assert not worker.is_alive()
