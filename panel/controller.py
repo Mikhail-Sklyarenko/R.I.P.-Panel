@@ -478,6 +478,12 @@ class PanelController:
                     f"аккаунт={row['local_account_id'] or '—'} steam={row['steam_id64'] or '—'} "
                     f"резерв={row['reservation_status'] or '—'} личность={row['identity'] or 'не проверена'}"
                 )
+                for account in desk.accounts_for(row["agent_id"]) if row["agent_id"] else ():
+                    lines.append(
+                        f"    {account['local_account_id']} {account['display_name']} "
+                        f"{account['steam_id64'] or 'без SteamID64'} {account['binding_status']} "
+                        f"{account['availability_status']}"
+                    )
         if st.get("run_id"):
             lines.append(f"run {st['run_id']}  {st.get('run_state', '')}  {st.get('run_reason', '')}")
             lines.append(f"циклы {st.get('cycles', 0)}  волна {st.get('wave', 0)}")

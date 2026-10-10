@@ -252,6 +252,11 @@ class Coordinator:
                 )
             elif cmd.type is CommandType.RELEASE_ASSIGNMENT:
                 book.note_release(preparation_id, agent_id, ok=result.succeeded, detail=result.detail)
+            elif cmd.type is CommandType.VERIFY_ASSIGNMENT:
+                book.note_identity(
+                    preparation_id, agent_id, str(cmd.params.get("observed_steam_id64") or ""),
+                    now=self.clock(), fresh=result.succeeded and result.evidence.get("status") == "verified",
+                )
         except Exception as exc:
             self.store.event("assignment", run_id=preparation_id, agent_id=agent_id, detail=str(exc)[:240])
 

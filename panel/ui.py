@@ -481,7 +481,9 @@ class PanelView:
                 "friend_code": ctk.StringVar(value=e.get("friend_code", "")),
             }
             self._fleet_slots[slot] = vars_
-            for key, width in (("agent_id", 70), ("steam_id64", 140), ("display_name", 80), ("friend_code", 70)):
+            vars_["local_account_id"] = ctk.StringVar(value="")
+            for key, width in (("agent_id", 70), ("steam_id64", 140), ("display_name", 80),
+                               ("friend_code", 70), ("local_account_id", 120)):
                 ctk.CTkEntry(box, textvariable=vars_[key], width=width).pack(side="left", padx=2)
         ctk.CTkButton(parent, text="Сохранить слоты и конфиг", command=self._save_fleet).pack(
             fill="x", padx=8, pady=4
@@ -526,7 +528,10 @@ class PanelView:
         for slot, vars_ in self._fleet_slots.items():
             agent_id = vars_["agent_id"].get().strip()
             accounts = desk.accounts_for(agent_id) if desk is not None else []
-            account = next((item for item in accounts if item["steam_id64"] and item["enabled"]), None)
+            wanted = vars_["local_account_id"].get().strip()
+            account = next((item for item in accounts if item["local_account_id"] == wanted), None)
+            if account is None:
+                account = next((item for item in accounts if item["steam_id64"] and item["enabled"]), None)
             rows.append({
                 "slot_id": slot,
                 "agent_id": agent_id,
