@@ -22,11 +22,11 @@ Existing tables `runs`, `commands`, `events`, `friendships`, `agents` stay. New 
 - `preparations` and `preparation_slots`. Partial unique indexes `assignment_one_agent` and `assignment_one_steam` apply to statuses `prepared`, `committed`, `active`, `reconcile_required`.
 - `assignment_events` is the transition log.
 - `agent_credentials` stores a SHA-256 of a per-agent token, not the token, plus `registration_generation`.
-- `agent_presence` stores `boot_id`, `protocol`, `last_seen`, `process_generation`, and `registration_generation`. It is the admitted session and the availability row used by draft, prepare, and READY. A catalog cache row can still be shown after it goes stale; it is not that proof.
+- `agent_presence` stores `boot_id`, `protocol`, `last_seen`, `process_generation`, `registration_generation`, and `last_sequence`. It is the admitted session and the availability row used by draft, prepare, and READY. `last_sequence` is the last heartbeat sequence accepted for that session. A catalog cache row can still be shown after it goes stale; it is not that proof.
 - `verification_seq(preparation_id, agent_id, next_seq)` allocates VERIFY order. It is not a wall clock.
 - `catalog_cache` stores the public snapshot fields only.
-- `catalog_heads` keeps `boot_id` and `sequence`. Once `process_generation` is admitted, the snapshot must name that session. An empty boot id does not reset the fence.
-- `PRAGMA user_version` is 4 after `AssignmentBook` opens the file. A higher version refuses to open. Opening twice does not drop rows.
+- `catalog_heads` keeps `boot_id`, `sequence`, and `registration_generation`. Catalog generation is monotonic only inside that registration. Once `process_generation` is admitted, the snapshot must name that session. An empty boot id does not reset the fence.
+- `PRAGMA user_version` is 5 after `AssignmentBook` opens the file. Version 4 is migrated in place by adding `agent_presence.last_sequence` and `catalog_heads.registration_generation`. A higher version refuses to open. Opening twice does not drop rows. The journal stays at `user_version` 2.
 
 `RunPlan` is still the immutable run snapshot in `runs.plan_json`. A preparation is not a run. `FleetRoster` JSON remains the slot layout and is not proof of READY.
 

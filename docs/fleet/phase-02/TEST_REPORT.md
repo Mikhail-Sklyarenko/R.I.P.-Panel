@@ -57,3 +57,9 @@ CustomTkinter created a withdrawn window on a 1920x1080 display. The Wingman tab
 Branch `fix/fleet-phase02-message-fencing`. The 02.7 profile plus `tests/test_fleet_phase028.py` passed as `167 passed in 48.49s`. The base profile on `cce9210` was `146 passed`. The new file is 21 tests. See `ACCEPTANCE_02_8.md` and `FINDINGS_02_8.md`.
 
 The full suite excluding `tests/test_csgobot*.py` was `11 failed, 982 passed, 3 skipped` in 857.23s. The same 11 names as Phase 02.7 failed. The pass count rose by 21, which is the new fencing file. `four_pc_proven` stays false.
+
+## Identity integrity
+
+Branch `fix/fleet-phase02-identity-integrity`. The 02.8 profile plus `tests/test_fleet_identity_integrity.py` passed as `181 passed in 52.99s`. The 02.8 profile on `bb00bc0` was `167 passed`. The new file is 14 tests. See `FINAL_IDENTITY_INTEGRITY.md`.
+
+The full suite excluding `tests/test_csgobot*.py` was `11 failed, 995 passed, 3 skipped` in 1061.60s. It collected 13 of the 14 new tests; `test_already_applied_does_not_restore_ready` was added while that process was running and passed in the 181 profile above. The same 11 names as Phase 02.8 failed. No new failure appeared outside that list. `four_pc_proven` stays false. Windows UI and four physical PCs were not run.

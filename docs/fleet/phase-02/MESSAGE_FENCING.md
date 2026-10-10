@@ -61,12 +61,13 @@ The newest stored sequence wins. An older result is kept when its id matches the
 | absent | A, fresh | `Identity.GSI` for A. GSI is acceptable only when no local id is present |
 | absent | absent | `UNCONFIRMED` |
 | B | B, fresh, expected A | `MISMATCH` |
+| B | A, fresh, expected A | `MISMATCH`. The matching GSI id is not a proof |
 
-A conflict between two current sources is never resolved by picking the convenient one. VERIFY does not start Steam or CS2.
+A conflict between two current sources is never resolved by picking the convenient one. The probe status is stored as `identity_status` and is not rewritten from the detail text. VERIFY does not start Steam or CS2.
 
 ## Upgrade order
 
-1. Replace the coordinator. `PRAGMA user_version` moves to 4. Old rows stay. Unfinished commands stay unfinished. `operator_stops` stays.
+1. Replace the coordinator. `PRAGMA user_version` moves to 5. Old rows stay. Unfinished commands stay unfinished. `operator_stops` stays. `last_sequence` starts at 0 until the next accepted heartbeat.
 2. Replace the four agents. Each journal moves to `user_version` 2 and claims a new `process_generation` on start. A journal newer than this program refuses to open.
 3. Enroll again only where the credential changed or the local journal was wiped. `POST /v1/enroll` returns `agent_token` and `registration_generation`. The agent stores the generation next to the DPAPI token.
 4. Confirm each heartbeat is HTTP 200 and that presence shows the new generation.
