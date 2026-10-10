@@ -148,11 +148,11 @@ def test_cleartext_lan_is_refused_and_lan_ready_is_only_configuration(tmp_path):
 def test_result_crash_does_not_ack_and_retry_applies_once(tmp_path):
     book = _book(tmp_path)
     prep = book.draft(_selection(), links={f"pc{i}": "healthy" for i in range(1, 5)})
-    book.begin_prepare(prep)
+    book.begin_prepare(prep, {f"pc{i}": "healthy" for i in range(1, 5)})
     book.enqueue(prep, "prepare")
     coord = Coordinator(book.store, token=TOKEN, clock=lambda: 100.0)
     coord.assignments = book
-    book.register_agent("pc1", "secret")
+    book.register_agent("pc1", "token-pc1")
     real = book.note_prepare
     state = {"failed": False}
 
@@ -165,7 +165,7 @@ def test_result_crash_does_not_ack_and_retry_applies_once(tmp_path):
     book.note_prepare = boom
     result = CommandResult(f"{prep}/prepare/pc1", ResultStatus.COMPLETED, evidence={"status": "prepared"})
     payload = {
-        "token": TOKEN, "boot_id": "boot", "agent_token": "secret",
+        "token": TOKEN, "boot_id": "boot", "agent_token": "token-pc1",
         "observation": to_dict(Observation("pc1", 1)),
         "results": [to_dict(result)],
     }
@@ -230,7 +230,7 @@ def test_one_offline_agent_blocks_ready_and_a_foreign_result_is_ignored(tmp_path
          "expected_catalog_revision": item[4]}
         for index, item in enumerate(agents, start=1)
     ], links={f"pc{i}": "healthy" for i in range(1, 5)})
-    book.begin_prepare(prep)
+    book.begin_prepare(prep, {f"pc{i}": "healthy" for i in range(1, 5)})
     book.enqueue(prep, "prepare")
     for _ in range(2):
         for agent, _transport, *_rest in agents[1:]:

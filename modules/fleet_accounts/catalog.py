@@ -139,7 +139,10 @@ class AccountCatalog:
 
     def sync_logins(self, index_logins: list[str], vault_logins: list[str] | None = None) -> list[str]:
         """Link catalog rows to vault-index logins. Never deletes a row automatically."""
-        vault = {item.strip().lower() for item in (vault_logins or index_logins) if item.strip()}
+        if vault_logins is None:
+            vault = {item.strip().lower() for item in index_logins if item.strip()}
+        else:
+            vault = {item.strip().lower() for item in vault_logins if item.strip()}
         issues: list[str] = []
         seen: set[str] = set()
         with self._tx():
@@ -455,6 +458,16 @@ class AccountCatalog:
                 (Availability.RECONCILE_REQUIRED.value, time.time(), preparation_id),
             )
             self._touch(row["local_account_id"], availability_status=Availability.RECONCILE_REQUIRED.value, bump=False)
+
+    def active_committed(self) -> sqlite3.Row | None:
+        """The reservation a restarted agent may restore. This is not an identity proof."""
+        with self._lock:
+            return self.db.execute(
+                "SELECT r.* FROM reservations r "
+                "JOIN active_reservation a ON a.preparation_id = r.preparation_id "
+                "WHERE r.status IN (?, ?)",
+                (Availability.COMMITTED.value, Availability.ACTIVE.value),
+            ).fetchone()
 
     def reservation(self, preparation_id: str) -> sqlite3.Row | None:
         with self._lock:

@@ -5,7 +5,9 @@ Thread-safe; the HTTP server calls `handle_heartbeat`, a background loop calls
 """
 from __future__ import annotations
 
+import hmac
 import json
+import secrets
 import threading
 import time
 import uuid
@@ -44,11 +46,15 @@ class AgentLinkState:
 
 
 class Coordinator:
-    def __init__(self, store: FleetStore, *, token: str, clock: Callable[[], float] = time.time,
-                 log: Callable[[str], None] | None = None):
+    def __init__(self, store: FleetStore, *, token: str, operator_token: str = "",
+                 clock: Callable[[], float] = time.time, log: Callable[[str], None] | None = None):
         if len(token) < 24:
             raise ValueError("fleet token must contain at least 24 characters")
-        self.store, self.token, self.clock = store, token, clock
+        if not operator_token:
+            operator_token = secrets.token_hex(24)
+        if len(operator_token) < 24 or hmac.compare_digest(operator_token, token):
+            raise ValueError("operator token must be distinct from the fleet token")
+        self.store, self.token, self.operator_token, self.clock = store, token, operator_token, clock
         self.log = log or (lambda _msg: None)
         self.lock = threading.RLock()
         self.agents: dict[str, AgentLinkState] = {}
@@ -203,6 +209,7 @@ class Coordinator:
                 book.remember_catalog(agent_id, catalog)
             if book is not None:
                 book.note_boot(agent_id, boot_id)
+                book.note_presence(agent_id, protocol=int(obs.protocol), seen_at=now, boot_id=boot_id)
             accepted: list[str] = []
             for r in results:
                 result_run = self._result_run(r, agent_id, active_run)

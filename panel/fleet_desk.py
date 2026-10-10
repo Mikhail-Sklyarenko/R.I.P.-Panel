@@ -88,7 +88,7 @@ class FleetDesk:
         links = links or {}
         try:
             self.preparation_id = self.book.draft(chosen, links=links)
-            self.book.begin_prepare(self.preparation_id)
+            self.book.begin_prepare(self.preparation_id, links)
             queued = self.book.enqueue(self.preparation_id, "prepare")
             state = self.book.status(self.preparation_id)["status"]
             self.error = ""

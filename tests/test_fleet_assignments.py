@@ -7,6 +7,7 @@ from core.wingman_fleet.assignments import AssignmentBook, AssignmentError
 from core.wingman_fleet.store import FleetStore
 
 STEAM = [str(76561197960265728 + index) for index in range(1, 5)]
+LINKS = {f"pc{index}": "healthy" for index in range(1, 5)}
 
 
 def _book(tmp_path) -> AssignmentBook:
@@ -14,6 +15,7 @@ def _book(tmp_path) -> AssignmentBook:
     book = AssignmentBook(store, clock=lambda: 100.0)
     for index, steam in enumerate(STEAM, start=1):
         agent = f"pc{index}"
+        book.register_agent(agent, f"token-{agent}")
         book.remember_catalog(agent, {
             "agent_id": agent,
             "catalog_revision": 3,
@@ -26,6 +28,7 @@ def _book(tmp_path) -> AssignmentBook:
                 "availability_status": "available",
             }],
         })
+        book.note_presence(agent, protocol=3, seen_at=100.0)
     return book
 
 
@@ -45,7 +48,7 @@ def _selection(**overrides):
 
 
 def _prepare_all(book: AssignmentBook, prep: str) -> None:
-    book.begin_prepare(prep)
+    book.begin_prepare(prep, LINKS)
     for index in range(1, 5):
         assert book.note_prepare(prep, f"pc{index}", ok=True) in ("preparing", "prepared")
 
@@ -108,8 +111,8 @@ def test_duplicate_steam_agent_and_offline_are_rejected(tmp_path):
 
 def test_prepare_commit_and_release_are_idempotent_and_fenced(tmp_path):
     book = _book(tmp_path)
-    prep = book.draft(_selection())
-    book.begin_prepare(prep)
+    prep = book.draft(_selection(), links=LINKS)
+    book.begin_prepare(prep, LINKS)
     book.note_prepare(prep, "pc1", ok=True)
     assert book.note_prepare(prep, "pc1", ok=True) == "preparing"
     for index in range(2, 5):
@@ -134,25 +137,25 @@ def test_prepare_commit_and_release_are_idempotent_and_fenced(tmp_path):
 
 def test_one_rejection_does_not_become_ready_and_blocks_reuse_until_release(tmp_path):
     book = _book(tmp_path)
-    prep = book.draft(_selection())
-    book.begin_prepare(prep)
+    prep = book.draft(_selection(), links=LINKS)
+    book.begin_prepare(prep, LINKS)
     book.note_prepare(prep, "pc1", ok=True)
     book.note_prepare(prep, "pc2", ok=True)
     assert book.note_prepare(prep, "pc3", ok=False, detail="disk") == "aborting"
     assert book.ready(prep) is False
     with pytest.raises(AssignmentError):
-        book.draft(_selection())
+        book.draft(_selection(), links=LINKS)
     assert book.begin_release(prep) == "aborting"
     for index in range(1, 5):
         book.note_release(prep, f"pc{index}", ok=True)
-    again = book.draft(_selection())
+    again = book.draft(_selection(), links=LINKS)
     assert again != prep
     book.store.close()
 
 
 def test_commit_decision_survives_restart_without_acks(tmp_path):
     book = _book(tmp_path)
-    prep = book.draft(_selection())
+    prep = book.draft(_selection(), links=LINKS)
     _prepare_all(book, prep)
     book.decide_commit(prep, run_id="run-kept")
     path = book.store.path
@@ -176,7 +179,7 @@ def test_stale_catalog_and_active_run_block_changes(tmp_path):
     plan = make_roster().build_plan(build_version="b", resource_manifest="m", now=1.0)
     book.store.save_run(plan)
     with pytest.raises(AssignmentError):
-        book.draft(_selection())
+        book.draft(_selection(), links=LINKS)
     book.store.close()
 
 
@@ -194,7 +197,7 @@ def test_agent_credentials_do_not_transfer(tmp_path):
 
 def test_identity_mismatch_never_reports_ready(tmp_path):
     book = _book(tmp_path)
-    prep = book.draft(_selection())
+    prep = book.draft(_selection(), links=LINKS)
     _prepare_all(book, prep)
     book.decide_commit(prep, run_id="run-id")
     for index in range(1, 5):

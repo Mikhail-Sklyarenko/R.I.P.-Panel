@@ -81,7 +81,9 @@ class AgentService:
         self._fail_closed = False
         self._shut_down = False
         self._draining = False
+        self._expected_generation = 0
         self._restore_session()
+        self._restore_expected_identity()
 
     def _restore_session(self) -> None:
         try:
@@ -98,6 +100,36 @@ class AgentService:
             self.session_stopped = True
             self.cancel.set()
             self._run_released = False
+
+    def _restore_expected_identity(self) -> None:
+        """Reapply a committed expected SteamID64. This does not mark the account verified."""
+        catalog = self.catalog
+        if catalog is None or not hasattr(catalog, "active_committed"):
+            return
+        row = catalog.active_committed()
+        if row is None:
+            return
+        steam = str(row["steam_id64"] or "")
+        if not steam:
+            return
+        try:
+            self._install_expected(steam, int(row["generation"] or 0))
+        except Exception:
+            self.last_error = "expected identity was not restored"
+
+    def _install_expected(self, steam_id64: str, generation: int) -> None:
+        if int(generation) < int(self._expected_generation):
+            return
+        apply = getattr(self.backend, "apply_identity_assignment", None)
+        if apply is None:
+            return
+        apply(steam_id64)
+        self._expected_generation = int(generation)
+
+    def _identity_locked(self) -> bool:
+        if self.lease_attempt:
+            return True
+        return bool(getattr(self.backend, "_lease", ""))
 
     def _persist_session(self) -> None:
         if self._fail_closed:
@@ -384,11 +416,24 @@ class AgentService:
                     coordinator_generation=int(params.get("coordinator_generation") or params["generation"]),
                 )
             elif cmd.type is CommandType.COMMIT_ASSIGNMENT:
+                if self._identity_locked():
+                    return CommandResult(
+                        cmd.command_id, ResultStatus.FAILED, "assignment_rejected",
+                        "identity cannot change during an active session",
+                    )
                 status = self.catalog.commit(
                     preparation_id=str(params["preparation_id"]),
                     generation=int(params["generation"]),
                     run_id=str(params["run_id"]),
                 )
+                steam = str(params.get("steam_id64") or "")
+                if steam:
+                    try:
+                        self._install_expected(steam, int(params["generation"]))
+                    except RuntimeError as exc:
+                        return CommandResult(
+                            cmd.command_id, ResultStatus.FAILED, "assignment_rejected", str(exc),
+                        )
             elif cmd.type is CommandType.RELEASE_ASSIGNMENT:
                 status = self.catalog.release(str(params["preparation_id"]))
             elif cmd.type is CommandType.RECONCILE_ASSIGNMENT:

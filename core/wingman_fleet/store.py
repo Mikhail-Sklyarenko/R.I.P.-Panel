@@ -47,6 +47,8 @@ class FleetStore:
         if str(path) != ":memory:":
             self.path.parent.mkdir(parents=True, exist_ok=True)
         self._lock = threading.RLock()
+        self._tx_owner: int | None = None
+        self._tx_depth = 0
         self.db = sqlite3.connect(str(path), check_same_thread=False, isolation_level=None)
         self.db.execute("PRAGMA journal_mode=WAL")
         self.db.execute("PRAGMA synchronous=NORMAL")
@@ -55,19 +57,39 @@ class FleetStore:
 
     @contextmanager
     def transaction(self) -> Iterator[sqlite3.Connection]:
-        """One IMMEDIATE transaction. isolation_level=None does not group statements by itself."""
+        """One IMMEDIATE transaction owned by the calling thread.
+
+        A nested call on that same thread joins the open transaction and does not
+        commit or roll it back. Another thread waits on the lock instead of
+        writing into the open transaction.
+        """
+        me = threading.get_ident()
         with self._lock:
+            if self._tx_owner == me:
+                self._tx_depth += 1
+                try:
+                    yield self.db
+                finally:
+                    self._tx_depth -= 1
+                return
+            if self.db.in_transaction:
+                self.db.execute("ROLLBACK")
             self.db.execute("BEGIN IMMEDIATE")
+            self._tx_owner = me
+            self._tx_depth = 1
             try:
                 yield self.db
+                self.db.execute("COMMIT")
             except BaseException:
                 try:
-                    self.db.execute("ROLLBACK")
+                    if self.db.in_transaction:
+                        self.db.execute("ROLLBACK")
                 except sqlite3.Error:
                     pass
                 raise
-            else:
-                self.db.execute("COMMIT")
+            finally:
+                self._tx_owner = None
+                self._tx_depth = 0
 
     def _migrate_runs(self) -> None:
         with self._lock:

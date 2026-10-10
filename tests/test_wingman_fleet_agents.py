@@ -169,7 +169,7 @@ def test_http_server_roundtrip(tmp_path):
         assert agent.tick()
         assert abs(agent.clock_offset) < 1.0
         req = urllib.request.Request(f"http://127.0.0.1:{server.port}/v1/status",
-                                     headers={"X-Fleet-Token": TOKEN})
+                                     headers={"X-Operator-Token": coord.operator_token})
         with urllib.request.urlopen(req, timeout=2) as resp:
             status = json.loads(resp.read())
         assert status["agents"]["pc1"]["link"] == "healthy"

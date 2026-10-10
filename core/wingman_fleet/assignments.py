@@ -9,6 +9,7 @@ import uuid
 from contextlib import contextmanager
 from typing import Any, Iterator
 
+from core.wingman_fleet import PROTOCOL_VERSION
 from core.wingman_fleet.accounts import parse_steam_id64
 from core.wingman_fleet.roster import SLOT_LAYOUT
 from core.wingman_fleet.store import FleetStore
@@ -85,6 +86,11 @@ class AssignmentBook:
                 agent_id TEXT PRIMARY KEY,
                 token_hash TEXT NOT NULL,
                 revoked INTEGER NOT NULL DEFAULT 0);
+            CREATE TABLE IF NOT EXISTS agent_presence(
+                agent_id TEXT PRIMARY KEY,
+                boot_id TEXT NOT NULL DEFAULT '',
+                protocol INTEGER NOT NULL DEFAULT 0,
+                last_seen REAL NOT NULL DEFAULT 0);
             CREATE TABLE IF NOT EXISTS catalog_heads(
                 agent_id TEXT PRIMARY KEY,
                 catalog_generation INTEGER NOT NULL,
@@ -127,9 +133,7 @@ class AssignmentBook:
 
     @contextmanager
     def _tx(self) -> Iterator[Any]:
-        if self.store.db.in_transaction:
-            yield self.store.db
-            return
+        """Join only the transaction owned by this thread. Never adopt another thread's."""
         with self.store.transaction():
             yield self.store.db
 
@@ -231,11 +235,15 @@ class AssignmentBook:
         boot_id = str(snapshot.get("boot_id") or "")
         with self.store._lock:
             head = self.store.db.execute(
-                "SELECT catalog_generation, sequence FROM catalog_heads WHERE agent_id=?", (agent_id,)
+                "SELECT catalog_generation, sequence, boot_id FROM catalog_heads WHERE agent_id=?", (agent_id,)
             ).fetchone()
-        if head is not None and (
-            generation < int(head["catalog_generation"])
-            or (generation == int(head["catalog_generation"]) and sequence < int(head["sequence"]))
+        if head is not None and generation < int(head["catalog_generation"]):
+            return
+        stored_boot = str(head["boot_id"] or "") if head is not None else ""
+        new_process = bool(boot_id) and boot_id != stored_boot
+        if (
+            head is not None and not new_process and generation == int(head["catalog_generation"])
+            and sequence < int(head["sequence"])
         ):
             return
         with self._tx():
@@ -287,9 +295,9 @@ class AssignmentBook:
             self._event(preparation_id, "draft", "selection stored")
         return preparation_id
 
-    def begin_prepare(self, preparation_id: str) -> list[Any]:
+    def begin_prepare(self, preparation_id: str, links: dict[str, str] | None = None) -> list[Any]:
         prep = self._require(preparation_id)
-        self._validate_selection(self._selection_from_slots(preparation_id), {})
+        self._validate_selection(self._selection_from_slots(preparation_id), {} if links is None else links)
         if prep["status"] == "draft":
             self._move(preparation_id, "draft", "validating")
             prep = self._require(preparation_id)
@@ -349,6 +357,9 @@ class AssignmentBook:
         expected_generation = int(slot["assignment_generation"])
         if generation is not None and int(generation) != expected_generation:
             return self._require(preparation_id)["status"]
+        live_boot = self._live_boot(agent_id)
+        if live_boot and str(boot_id or "") != live_boot:
+            return self._require(preparation_id)["status"]
         if int(slot["verification_seq"] or 0) > int(seq):
             return self._require(preparation_id)["status"]
         observed = parse_steam_id64(observed_steam_id64) if observed_steam_id64 else ""
@@ -371,15 +382,44 @@ class AssignmentBook:
                 (link, agent_id),
             )
 
-    def note_boot(self, agent_id: str, boot_id: str) -> None:
-        """A new process is not allowed to keep the previous identity proof."""
+    def note_presence(self, agent_id: str, *, protocol: int, seen_at: float, boot_id: str = "") -> None:
+        """Record the heartbeat that proves an agent is present. This is not an identity proof."""
         with self._tx():
             self.store.db.execute(
-                "UPDATE preparation_slots SET verification_status='unverified', verification_error='agent restarted' "
-                "WHERE agent_id=? AND verification_boot_id<>? AND verification_boot_id<>'' "
-                "AND reservation_status='committed'",
+                "INSERT INTO agent_presence(agent_id, boot_id, protocol, last_seen) VALUES(?,?,?,?) "
+                "ON CONFLICT(agent_id) DO UPDATE SET protocol=excluded.protocol, last_seen=excluded.last_seen, "
+                "boot_id=CASE WHEN excluded.boot_id<>'' THEN excluded.boot_id ELSE agent_presence.boot_id END",
+                (agent_id, boot_id, int(protocol), float(seen_at)),
+            )
+
+    def note_boot(self, agent_id: str, boot_id: str) -> None:
+        """A new process drops the previous identity proof, including its sequence."""
+        if not boot_id:
+            return
+        with self._tx():
+            previous = self._live_boot(agent_id)
+            self.store.db.execute(
+                "INSERT INTO agent_presence(agent_id, boot_id, protocol, last_seen) VALUES(?,?,0,0) "
+                "ON CONFLICT(agent_id) DO UPDATE SET boot_id=excluded.boot_id",
                 (agent_id, boot_id),
             )
+            if not previous or previous != boot_id:
+                self.store.db.execute(
+                    "UPDATE preparation_slots SET verification_status='unverified', verification_error='agent restarted', "
+                    "verification_seq=0, verification_id='', identity_at=0, identity_observed='' "
+                    "WHERE agent_id=? AND verification_boot_id<>? AND verification_boot_id<>'' "
+                    "AND reservation_status='committed'",
+                    (agent_id, boot_id),
+                )
+        preparation_id = self.current()
+        if preparation_id:
+            self._refresh_ready(preparation_id, self.clock())
+
+    def _live_boot(self, agent_id: str) -> str:
+        row = self.store.db.execute(
+            "SELECT boot_id FROM agent_presence WHERE agent_id=?", (agent_id,)
+        ).fetchone()
+        return str(row["boot_id"] or "") if row is not None else ""
 
     def _verification_status(self, expected: str, observed: str, *, fresh: bool, source: str) -> tuple[str, str]:
         if not fresh:
@@ -558,9 +598,29 @@ class AssignmentBook:
             return False
         if row["link_state"] not in ("", "healthy"):
             return False
-        if links is not None and links.get(row["agent_id"]) != "healthy":
+        if self.registration_state(row["agent_id"]) != "registered":
             return False
+        if self._presence_link(row["agent_id"], now) != "healthy":
+            return False
+        if links:
+            supplied = links.get(row["agent_id"])
+            if supplied is not None and supplied != "healthy":
+                return False
         return True
+
+    def _presence_link(self, agent_id: str, now: float) -> str:
+        from core.wingman_fleet.coordinator import OFFLINE_AFTER_SEC, SUSPECT_AFTER_SEC
+        row = self.store.db.execute(
+            "SELECT protocol, last_seen FROM agent_presence WHERE agent_id=?", (agent_id,)
+        ).fetchone()
+        if row is None or int(row["protocol"] or 0) != PROTOCOL_VERSION:
+            return "offline"
+        age = now - float(row["last_seen"] or 0)
+        if age < 0 or age > OFFLINE_AFTER_SEC:
+            return "offline"
+        if age > SUSPECT_AFTER_SEC:
+            return "suspect"
+        return "healthy"
 
     def _identities_fresh(self, preparation_id: str, now: float, links: dict[str, str] | None = None) -> bool:
         slots = self.slots(preparation_id)
@@ -610,9 +670,6 @@ class AssignmentBook:
         for slot in slots:
             if slot["slot_id"] not in expected:
                 raise AssignmentError("unknown slot")
-            link = links.get(slot["agent_id"])
-            if link is not None and link != "healthy":
-                raise AssignmentError(f"{slot['agent_id']} is not online")
             cached = self._cached(slot["agent_id"], slot["local_account_id"])
             if cached is None:
                 raise AssignmentError(f"{slot['agent_id']} has no catalog entry for that account")
@@ -626,6 +683,31 @@ class AssignmentBook:
                 raise AssignmentError("catalog revision is stale")
             if cached["binding_status"] == "unbound":
                 raise AssignmentError("account is unbound")
+            self._require_present(slot["agent_id"], links)
+
+    def _require_present(self, agent_id: str, links: dict[str, str]) -> None:
+        from core.wingman_fleet.coordinator import SUSPECT_AFTER_SEC
+        if links.get(agent_id) != "healthy":
+            raise AssignmentError(f"{agent_id} is not online")
+        if self.registration_state(agent_id) != "registered":
+            raise AssignmentError(f"{agent_id} is not registered")
+        row = self.store.db.execute(
+            "SELECT protocol, last_seen FROM agent_presence WHERE agent_id=?", (agent_id,)
+        ).fetchone()
+        now = self.clock()
+        if row is None or int(row["protocol"] or 0) != PROTOCOL_VERSION:
+            raise AssignmentError(f"{agent_id} is not on protocol {PROTOCOL_VERSION}")
+        age = now - float(row["last_seen"] or 0)
+        if age < 0 or age > SUSPECT_AFTER_SEC:
+            raise AssignmentError(f"{agent_id} heartbeat is not fresh")
+        head = self.store.db.execute(
+            "SELECT received_at FROM catalog_heads WHERE agent_id=?", (agent_id,)
+        ).fetchone()
+        if head is None:
+            raise AssignmentError(f"{agent_id} has no catalog snapshot")
+        catalog_age = now - float(head["received_at"] or 0)
+        if catalog_age < 0 or catalog_age > self.identity_ttl_sec:
+            raise AssignmentError(f"{agent_id} catalog snapshot is not fresh")
 
     def _normalize(self, selections: list[dict[str, Any]]) -> list[dict[str, Any]]:
         normalized = []

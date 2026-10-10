@@ -1,8 +1,8 @@
 """LAN HTTP endpoint of the coordinator plus the FSM tick loop.
 
 POST /v1/heartbeat   agent observation + results -> commands, server_time, gameplay lease
-GET  /v1/status      panel view (token header)
-POST /v1/operator    {"pair_id", "action"} or {"agent_id", "command"} (token header)
+GET  /v1/status      panel view (operator token)
+POST /v1/operator    {"pair_id", "action"} or {"agent_id", "command"} (operator token)
 """
 from __future__ import annotations
 
@@ -23,11 +23,13 @@ MAX_BODY = 512 * 1024
 TICK_SEC = 0.25
 
 
-def _header_token_ok(headers: Any, token: str) -> bool:
-    supplied = headers.get("X-Fleet-Token", "")
-    auth = headers.get("Authorization", "")
-    if auth.startswith("Bearer "):
-        supplied = auth[7:]
+def _operator_token_ok(headers: Any, token: str) -> bool:
+    """Operator routes accept only the operator secret, never the fleet or agent token."""
+    supplied = headers.get("X-Operator-Token", "")
+    if not supplied:
+        auth = headers.get("Authorization", "")
+        if auth.startswith("Bearer "):
+            supplied = auth[7:]
     return bool(supplied) and hmac.compare_digest(supplied, token)
 
 
@@ -67,7 +69,7 @@ class _Handler(BaseHTTPRequestHandler):
             self._send(200, {"ok": True, "server_time": time.time()})
             return
         if path == "/v1/status":
-            if not _header_token_ok(self.headers, self.coordinator.token):
+            if not _operator_token_ok(self.headers, self.coordinator.operator_token):
                 self._send(403, {"ok": False, "error": "unauthorized"})
                 return
             self._send(200, {"ok": True, **self.coordinator.status()})
@@ -98,7 +100,7 @@ class _Handler(BaseHTTPRequestHandler):
                 self._send(code, body)
             return
         if path == "/v1/operator":
-            if not _header_token_ok(self.headers, self.coordinator.token):
+            if not _operator_token_ok(self.headers, self.coordinator.operator_token):
                 self._send(403, {"ok": False, "error": "unauthorized"})
                 return
             payload = self._body()

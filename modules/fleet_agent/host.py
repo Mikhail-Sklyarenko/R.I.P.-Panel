@@ -68,7 +68,23 @@ class FleetHost:
         roster.token, roster.port = token, int(cfg.wingman_fleet_port)
         self.save_roster(roster)
         self.store = FleetStore(get_wingman_fleet_db_path())
-        self.coordinator = Coordinator(self.store, token=token, log=self.log)
+        from config.paths import get_operator_token_path
+        operator_token = ""
+        operator_path = get_operator_token_path()
+        if operator_path.is_file():
+            try:
+                from modules.fleet_agent.credentials import load_agent_token
+                operator_token = load_agent_token(operator_path)
+            except Exception:
+                self.log("fleet: operator credentials could not be read")
+                operator_token = ""
+        self.coordinator = Coordinator(self.store, token=token, operator_token=operator_token, log=self.log)
+        if not operator_token:
+            try:
+                from modules.fleet_agent.credentials import store_agent_token
+                store_agent_token(operator_path, self.coordinator.operator_token)
+            except Exception:
+                self.log("fleet: operator credentials were not stored")
         from core.wingman_fleet.assignments import AssignmentBook
         self.assignments = AssignmentBook(self.store)
         self.coordinator.assignments = self.assignments

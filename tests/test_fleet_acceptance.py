@@ -245,7 +245,7 @@ def test_four_simulated_agents_commit_and_freeze_a_run_plan(tmp_path):
          "expected_catalog_revision": revision}
         for index, (agent_id, local_id, steam, revision) in enumerate(chosen, start=1)
     ], links={f"pc{i}": "healthy" for i in range(1, 5)})
-    book.begin_prepare(prep)
+    book.begin_prepare(prep, {f"pc{i}": "healthy" for i in range(1, 5)})
     book.enqueue(prep, "prepare")
     for _ in range(2):
         for agent in agents:
