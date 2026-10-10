@@ -66,6 +66,20 @@ class CommandType(str, Enum):
     RESTART_STEAM = "restart_steam"
     SCREENSHOT = "screenshot"
     SAFE_STOP = "safe_stop"
+    PREPARE_ASSIGNMENT = "prepare_assignment"
+    COMMIT_ASSIGNMENT = "commit_assignment"
+    RELEASE_ASSIGNMENT = "release_assignment"
+    VERIFY_ASSIGNMENT = "verify_assignment"
+    RECONCILE_ASSIGNMENT = "reconcile_assignment"
+
+
+ASSIGNMENT_COMMANDS = frozenset({
+    CommandType.PREPARE_ASSIGNMENT,
+    CommandType.COMMIT_ASSIGNMENT,
+    CommandType.RELEASE_ASSIGNMENT,
+    CommandType.VERIFY_ASSIGNMENT,
+    CommandType.RECONCILE_ASSIGNMENT,
+})
 
 
 class ResultStatus(str, Enum):

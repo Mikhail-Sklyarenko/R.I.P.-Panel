@@ -13,7 +13,7 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Iterable, Iterator
 
-from core.wingman_fleet.models import Command, CommandResult, ResultStatus, RunPlan, dumps
+from core.wingman_fleet.models import ASSIGNMENT_COMMANDS, Command, CommandResult, ResultStatus, RunPlan, dumps
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS runs(
@@ -174,6 +174,23 @@ class FleetStore:
                 "SELECT command_json FROM commands WHERE agent_id=? AND run_id=? AND status IN"
                 " ('pending','accepted') ORDER BY issued_at, rowid", (agent_id, run_id)).fetchall()
         return [Command.from_dict(json.loads(r[0])) for r in rows]
+
+    def command_owner(self, command_id: str):
+        with self._lock:
+            return self.db.execute(
+                "SELECT agent_id, run_id, type FROM commands WHERE command_id=?", (command_id,)
+            ).fetchone()
+
+    def pending_assignments(self, agent_id: str) -> list[Command]:
+        marks = ",".join("?" for _ in ASSIGNMENT_COMMANDS)
+        values = [item.value for item in ASSIGNMENT_COMMANDS]
+        with self._lock:
+            rows = self.db.execute(
+                "SELECT command_json FROM commands WHERE agent_id=? AND status IN ('pending','accepted') "
+                f"AND type IN ({marks}) ORDER BY issued_at, rowid",
+                (agent_id, *values),
+            ).fetchall()
+        return [Command.from_dict(json.loads(row[0])) for row in rows]
 
     def _owned_row(self, result: CommandResult, agent_id: str, run_id: str):
         if not agent_id or not run_id:

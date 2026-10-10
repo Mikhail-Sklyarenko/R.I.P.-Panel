@@ -15,8 +15,9 @@ from dataclasses import replace
 from typing import Any, Callable
 
 from core.wingman_fleet import PROTOCOL_VERSION
+from core.wingman_fleet.accounts import CatalogError
 from core.wingman_fleet.models import (
-    Command, CommandResult, CommandType, Observation, ResultStatus, Screen, to_dict,
+    ASSIGNMENT_COMMANDS, Command, CommandResult, CommandType, Observation, ResultStatus, Screen, to_dict,
 )
 from core.wingman_fleet.reasons import Reason
 from modules.fleet_agent.backend import ExecContext, GameBackend
@@ -48,9 +49,11 @@ class AgentService:
     def __init__(self, agent_id: str, backend: GameBackend, transport: Transport, journal: CommandJournal, *,
                  token: str, build_version: str, resource_manifest: str, computer: str = "", inline: bool = False,
                  clock: Callable[[], float] = time.monotonic, wall: Callable[[], float] = time.time,
-                 log: Callable[[str], None] | None = None):
+                 log: Callable[[str], None] | None = None, catalog: Any = None, agent_token: str = ""):
         self.agent_id, self.backend, self.transport, self.journal = agent_id, backend, transport, journal
         self.token = token
+        self.catalog = catalog
+        self.agent_token = agent_token
         self.build_version, self.resource_manifest = build_version, resource_manifest
         self.computer = computer
         self.inline, self.clock, self.wall = inline, clock, wall
@@ -177,6 +180,10 @@ class AgentService:
         results = self.journal.unacked()
         payload = {"boot_id": self.boot_id, "computer": self.computer, "token": self.token,
                    "observation": to_dict(obs), "results": [to_dict(r) for r in results]}
+        if self.agent_token:
+            payload["agent_token"] = self.agent_token
+        if self.catalog is not None:
+            payload["catalog"] = self.catalog.snapshot().as_dict()
         t0 = self.wall()
         try:
             resp = self.transport.heartbeat(payload)
@@ -260,8 +267,11 @@ class AgentService:
             self.journal.finish(CommandResult(cmd.command_id, ResultStatus.EXPIRED, Reason.COMMAND_TIMEOUT.value,
                                               "received after its deadline"))
             return
-        if self.run_id and cmd.run_id and cmd.run_id != self.run_id:
+        if cmd.type not in ASSIGNMENT_COMMANDS and self.run_id and cmd.run_id and cmd.run_id != self.run_id:
             self._fail(cmd, Reason.OPERATOR_STOP.value, "stale run")
+            return
+        if cmd.type in ASSIGNMENT_COMMANDS:
+            self._run(cmd)
             return
         if cmd.type in URGENT:
             # SAFE_STOP latches the session. STOP_GAMEPLAY only drops the queue.
@@ -324,7 +334,10 @@ class AgentService:
         cancelled_before = view.is_set()
         ctx = ExecContext(view, self.coordinator_time, lambda: self.lease_attempt)
         try:
-            result = self.backend.execute(cmd, ctx)
+            if cmd.type in ASSIGNMENT_COMMANDS:
+                result = self._apply_assignment(cmd)
+            else:
+                result = self.backend.execute(cmd, ctx)
         except Exception as exc:
             self.log(f"agent: {cmd.type.value} crashed: {exc!r}")
             self.backend.safe_stop(f"{cmd.type.value} crashed")
@@ -338,6 +351,43 @@ class AgentService:
             result = replace(result, status=ResultStatus.UNCONFIRMED, reason=Reason.EFFECT_UNCONFIRMED.value,
                              detail=detail)
         self.journal.finish(result)
+
+    def _apply_assignment(self, cmd: Command) -> CommandResult:
+        """Local catalog only. This never starts Steam, CS2, or a gameplay lease."""
+        if self.catalog is None:
+            return CommandResult(cmd.command_id, ResultStatus.FAILED, "no_catalog", "local catalog is not configured")
+        params = cmd.params
+        try:
+            if cmd.type is CommandType.PREPARE_ASSIGNMENT:
+                status = self.catalog.prepare(
+                    preparation_id=str(params["preparation_id"]),
+                    local_account_id=str(params["local_account_id"]),
+                    steam_id64=str(params["steam_id64"]),
+                    catalog_revision=int(params["catalog_revision"]),
+                    generation=int(params["generation"]),
+                    coordinator_generation=int(params.get("coordinator_generation") or params["generation"]),
+                )
+            elif cmd.type is CommandType.COMMIT_ASSIGNMENT:
+                status = self.catalog.commit(
+                    preparation_id=str(params["preparation_id"]),
+                    generation=int(params["generation"]),
+                    run_id=str(params["run_id"]),
+                )
+            elif cmd.type is CommandType.RELEASE_ASSIGNMENT:
+                status = self.catalog.release(str(params["preparation_id"]))
+            elif cmd.type is CommandType.RECONCILE_ASSIGNMENT:
+                self.catalog.mark_reconcile(str(params["preparation_id"]))
+                status = "reconcile_required"
+            elif cmd.type is CommandType.VERIFY_ASSIGNMENT:
+                status = self.catalog.note_identity(
+                    str(params["local_account_id"]), str(params.get("observed_steam_id64") or ""),
+                    source=str(params.get("source") or "gsi"), now=float(params.get("now") or self.wall()),
+                )
+            else:
+                return CommandResult(cmd.command_id, ResultStatus.FAILED, "bad_command", cmd.type.value)
+        except (CatalogError, KeyError, TypeError, ValueError) as exc:
+            return CommandResult(cmd.command_id, ResultStatus.FAILED, "assignment_rejected", str(exc))
+        return CommandResult(cmd.command_id, ResultStatus.COMPLETED, evidence={"status": status})
 
     def drain(self) -> None:
         with self._lock:

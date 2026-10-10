@@ -53,6 +53,9 @@ class FleetHost:
         self.save_roster(roster)
         self.store = FleetStore(get_wingman_fleet_db_path())
         self.coordinator = Coordinator(self.store, token=token, log=self.log)
+        from core.wingman_fleet.assignments import AssignmentBook
+        self.assignments = AssignmentBook(self.store)
+        self.coordinator.assignments = self.assignments
         self.server = FleetServer(self.coordinator, host="0.0.0.0", port=roster.port).start()
         url = f"http://{local_ip()}:{self.server.port}"
         self.log(f"fleet coordinator: {url}")
@@ -75,11 +78,21 @@ class FleetHost:
         self.backend = WindowsBackend(agent_id=agent_id, expected_steam_id64=expected,
                                        computer=_machine(), log=self.log)
         journal = CommandJournal(get_wingman_agent_journal_path(agent_id))
+        from core.wingman_fleet.accounts import CatalogError
+        from modules.fleet_accounts.catalog import AccountCatalog
+        from config.paths import get_accounts_index_path, get_data_dir
+        catalog = AccountCatalog(get_data_dir() / "fleet_catalog.db", agent_id=agent_id)
+        index_path = get_accounts_index_path()
+        if index_path.is_file():
+            try:
+                catalog.sync_index_payload(index_path.read_text(encoding="utf-8"))
+            except CatalogError as exc:
+                self.log(f"fleet catalog: {exc}")
         url = (cfg.wingman_fleet_url or f"http://127.0.0.1:{roster.port}").rstrip("/")
         self.agent = AgentService(
             agent_id, self.backend, HttpTransport(url), journal, token=token,
             build_version=APP_VERSION, resource_manifest=default_manifest(), computer=_machine(),
-            log=self.log,
+            log=self.log, catalog=catalog,
         )
         self._thread = threading.Thread(target=self.agent.run_forever, daemon=True, name="fleet-agent")
         self._thread.start()
@@ -114,6 +127,8 @@ class FleetHost:
             "coordinator": bool(self.server),
             "agent": self.agent.snapshot() if self.agent else None,
             "url": f"http://{local_ip()}:{self.server.port}" if self.server else load_config().wingman_fleet_url,
+            "transport": "http-no-tls",
+            "lan_ready": False,
         }
         if self.coordinator is not None:
             st.update(self.coordinator.status())

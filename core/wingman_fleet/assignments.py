@@ -19,9 +19,9 @@ _TRANSITIONS: dict[str, frozenset[str]] = {
     "preparing": frozenset({"prepared", "aborting", "reconcile_required", "failed"}),
     "prepared": frozenset({"committing", "aborting", "failed"}),
     "committing": frozenset({"committed", "reconcile_required"}),
-    "committed": frozenset({"verifying_identity", "reconcile_required", "released"}),
+    "committed": frozenset({"verifying_identity", "reconcile_required", "released", "aborting"}),
     "verifying_identity": frozenset({"ready", "committed", "reconcile_required"}),
-    "ready": frozenset({"committed", "reconcile_required", "released"}),
+    "ready": frozenset({"committed", "reconcile_required", "released", "aborting"}),
     "aborting": frozenset({"released", "reconcile_required", "failed"}),
     "reconcile_required": frozenset({"preparing", "committing", "committed", "released", "failed"}),
     "failed": frozenset({"released"}),
@@ -113,6 +113,25 @@ class AssignmentBook:
     def revoke_agent(self, agent_id: str) -> None:
         with self.store.transaction():
             self.store.db.execute("UPDATE agent_credentials SET revoked=1 WHERE agent_id=?", (agent_id,))
+
+    def has_credential(self, agent_id: str) -> bool:
+        with self.store._lock:
+            row = self.store.db.execute(
+                "SELECT revoked FROM agent_credentials WHERE agent_id=?", (agent_id,)
+            ).fetchone()
+        return row is not None and not row["revoked"]
+
+    def current(self) -> str:
+        with self.store._lock:
+            row = self.store.db.execute(
+                "SELECT preparation_id FROM preparations WHERE status NOT IN ('released', 'failed') "
+                "ORDER BY created_at DESC LIMIT 1"
+            ).fetchone()
+        return str(row["preparation_id"]) if row is not None else ""
+
+    def current_ready(self, now: float | None = None) -> bool:
+        preparation_id = self.current()
+        return bool(preparation_id) and self.ready(preparation_id, now)
 
     def authenticate(self, agent_id: str, token: str) -> bool:
         with self.store._lock:
@@ -233,6 +252,65 @@ class AssignmentBook:
             )
             self._event(preparation_id, "identity", f"{agent_id}:{'match' if matched else 'mismatch'}")
         return self._refresh_ready(preparation_id, now)
+
+    def begin_release(self, preparation_id: str) -> str:
+        """Ask agents to drop the reservation. The group is not released until they answer."""
+        prep = self._require(preparation_id)
+        if prep["status"] == "released":
+            return "released"
+        if self._blocking_run() and prep["run_id"] and prep["status"] in ("committed", "ready", "verifying_identity"):
+            raise AssignmentError("cannot release assignments that belong to the active run")
+        if prep["status"] != "aborting":
+            self._move(preparation_id, prep["status"], "aborting")
+        return "aborting"
+
+    def note_release(self, preparation_id: str, agent_id: str, *, ok: bool, detail: str = "") -> str:
+        if not ok:
+            self._move(preparation_id, self._require(preparation_id)["status"], "reconcile_required", force=True)
+            return "reconcile_required"
+        with self.store.transaction():
+            self.store.db.execute(
+                "UPDATE preparation_slots SET reservation_status='released' "
+                "WHERE preparation_id=? AND agent_id=?",
+                (preparation_id, agent_id),
+            )
+            rows = list(self.store.db.execute(
+                "SELECT reservation_status FROM preparation_slots WHERE preparation_id=?",
+                (preparation_id,),
+            ).fetchall())
+            if len(rows) == 4 and all(row[0] == "released" for row in rows):
+                self.store.db.execute(
+                    "UPDATE preparations SET status='released', updated_at=? WHERE preparation_id=?",
+                    (self.clock(), preparation_id),
+                )
+            self._event(preparation_id, "release", f"{agent_id}:{detail}")
+        return self._require(preparation_id)["status"]
+
+    def enqueue(self, preparation_id: str, kind: str) -> int:
+        from core.wingman_fleet.models import Command, CommandType
+        prep = self._require(preparation_id)
+        commands = []
+        for slot in self.slots(preparation_id):
+            params = {
+                "preparation_id": preparation_id,
+                "local_account_id": slot["local_account_id"],
+                "steam_id64": slot["steam_id64"],
+                "catalog_revision": int(slot["expected_catalog_revision"]),
+                "generation": int(slot["assignment_generation"]),
+                "coordinator_generation": int(prep["coordinator_generation"]),
+                "run_id": prep["run_id"],
+            }
+            command_type = {
+                "prepare": CommandType.PREPARE_ASSIGNMENT,
+                "commit": CommandType.COMMIT_ASSIGNMENT,
+                "release": CommandType.RELEASE_ASSIGNMENT,
+                "reconcile": CommandType.RECONCILE_ASSIGNMENT,
+            }[kind]
+            commands.append(Command(
+                f"{preparation_id}/{kind}/{slot['agent_id']}",
+                preparation_id, slot["agent_id"], command_type, params, "", 1, 240.0, self.clock(),
+            ))
+        return len(self.store.add_commands(commands))
 
     def release(self, preparation_id: str) -> str:
         prep = self._require(preparation_id)

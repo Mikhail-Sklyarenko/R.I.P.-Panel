@@ -14,7 +14,7 @@ from typing import Any, Callable
 
 from core.wingman_fleet import PROTOCOL_VERSION
 from core.wingman_fleet.models import (
-    Command, CommandResult, CommandType, Link, Observation, RunPlan, to_dict,
+    ASSIGNMENT_COMMANDS, Command, CommandResult, CommandType, Link, Observation, RunPlan, to_dict,
 )
 from core.wingman_fleet.pair_fsm import HALTED, PairCtx, PairMachine
 from core.wingman_fleet.reasons import describe
@@ -180,6 +180,10 @@ class Coordinator:
         except (KeyError, TypeError, ValueError) as exc:
             return 400, {"ok": False, "error": f"bad payload: {exc}"}
         agent_id = obs.agent_id
+        book = getattr(self, "assignments", None)
+        if book is not None and book.has_credential(agent_id):
+            if not book.authenticate(agent_id, str(payload.get("agent_token") or "")):
+                return 403, {"ok": False, "error": "unauthorized"}
         with self.lock:
             now = self.clock()
             st = self.agents.setdefault(agent_id, AgentLinkState(agent_id))
@@ -192,14 +196,20 @@ class Coordinator:
             st.protocol = obs.protocol
             st.last_seen, st.observation, st.received_at = now, obs, now
             active_run = self.plan.run_id if self.plan else ""
+            catalog = payload.get("catalog")
+            if book is not None and isinstance(catalog, dict):
+                book.remember_catalog(agent_id, catalog)
             accepted: list[str] = []
             for r in results:
-                stored = self.store.record_result(r, agent_id=agent_id, run_id=active_run)
+                result_run = self._result_run(r, agent_id, active_run)
+                stored = self.store.record_result(r, agent_id=agent_id, run_id=result_run)
                 if stored and r.terminal and not r.succeeded:
-                    self.store.event("command_result", run_id=active_run,
+                    self.store.event("command_result", run_id=result_run,
                                      agent_id=agent_id, reason=r.reason, detail=f"{r.command_id}: {r.detail}",
                                      data=r.evidence or None)
-                if stored or self.store.result_is_stored(r, agent_id=agent_id, run_id=active_run):
+                if stored:
+                    self._fold_assignment_result(r, agent_id)
+                if stored or self.store.result_is_stored(r, agent_id=agent_id, run_id=result_run):
                     accepted.append(r.command_id)
             if obs.protocol != PROTOCOL_VERSION:
                 return 200, {"ok": False, "error": "protocol_mismatch", "server_time": now,
@@ -208,13 +218,54 @@ class Coordinator:
             commands, gameplay, run_id = [], None, ""
             if self.plan is not None and agent_id in self.plan.agent_ids:
                 run_id = self.plan.run_id
-                commands = [to_dict(c) for c in self.store.pending_for(agent_id, run_id)]
+                commands = [to_dict(c) for c in self._commands_for(agent_id, run_id)]
                 attempt = self.run.gameplay_admitted(agent_id, self.links(now)) if self.run else ""
                 if attempt:
                     gameplay = {"attempt_id": attempt, "ttl_sec": GAMEPLAY_TTL_SEC}
+            if not commands:
+                commands = [to_dict(c) for c in self.store.pending_assignments(agent_id)]
             return 200, {"ok": True, "server_time": now, "run_id": run_id, "commands": commands,
                          "gameplay": gameplay, "protocol": PROTOCOL_VERSION,
                          "accepted_results": accepted}
+
+    def _fold_assignment_result(self, result: CommandResult, agent_id: str) -> None:
+        book = getattr(self, "assignments", None)
+        if book is None:
+            return
+        row = self.store.command_owner(result.command_id)
+        if row is None or row[0] != agent_id or row[2] not in {item.value for item in ASSIGNMENT_COMMANDS}:
+            return
+        raw = self.store.db.execute(
+            "SELECT command_json FROM commands WHERE command_id=?", (result.command_id,)
+        ).fetchone()
+        if raw is None:
+            return
+        cmd = Command.from_dict(json.loads(raw[0]))
+        preparation_id = str(cmd.params.get("preparation_id") or cmd.run_id)
+        try:
+            if cmd.type is CommandType.PREPARE_ASSIGNMENT:
+                book.note_prepare(preparation_id, agent_id, ok=result.succeeded, detail=result.detail)
+            elif cmd.type is CommandType.COMMIT_ASSIGNMENT:
+                book.note_commit(
+                    preparation_id, agent_id, ok=result.succeeded,
+                    generation=int(cmd.params.get("generation") or 0), detail=result.detail,
+                )
+            elif cmd.type is CommandType.RELEASE_ASSIGNMENT:
+                book.note_release(preparation_id, agent_id, ok=result.succeeded, detail=result.detail)
+        except Exception as exc:
+            self.store.event("assignment", run_id=preparation_id, agent_id=agent_id, detail=str(exc)[:240])
+
+    def _result_run(self, result: CommandResult, agent_id: str, active_run: str) -> str:
+        row = self.store.command_owner(result.command_id)
+        if row is not None and row[0] == agent_id and row[2] in {item.value for item in ASSIGNMENT_COMMANDS}:
+            return str(row[1])
+        return active_run
+
+    def _commands_for(self, agent_id: str, run_id: str) -> list[Command]:
+        gameplay = self.store.pending_for(agent_id, run_id)
+        seen = {cmd.command_id for cmd in gameplay}
+        extra = [cmd for cmd in self.store.pending_assignments(agent_id) if cmd.command_id not in seen]
+        return gameplay + extra
 
     # ----- FSM tick ------------------------------------------------------------------
     def tick(self) -> list[Command]:

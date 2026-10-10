@@ -55,6 +55,7 @@ class WindowsBackend:
         from config.paths import get_data_dir, get_logs_dir
         self.agent_id = agent_id
         self.expected = expected_steam_id64
+        self._pending_identity = ""
         self.computer = computer
         self.log = log or (lambda m: _log.info("%s", m))
         self.clock = clock
@@ -245,6 +246,33 @@ class WindowsBackend:
                 from modules.combat import csgobot_ai
                 if csgobot_ai._PROCESS is not None:
                     csgobot_ai.stop_ai()
+
+    def prepare_identity_assignment(self, steam_id64: str) -> None:
+        from core.wingman_fleet.accounts import parse_steam_id64
+        self._pending_identity = parse_steam_id64(steam_id64)
+
+    def apply_identity_assignment(self, steam_id64: str) -> None:
+        """Install the expected id. Calling this does not prove the account is signed in."""
+        from core.wingman_fleet.accounts import parse_steam_id64
+        steam_id64 = parse_steam_id64(steam_id64)
+        with self._lock:
+            if self._lease:
+                raise RuntimeError("identity cannot change while gameplay is leased")
+            pending = getattr(self, "_pending_identity", "")
+            if pending and pending != steam_id64:
+                raise RuntimeError("pending identity does not match the committed id")
+            self.expected = steam_id64
+            self._pending_identity = ""
+
+    def verify_active_identity(self):
+        return self.identity.probe(expected_steam_id64=self.expected)
+
+    def clear_inactive_assignment(self) -> None:
+        with self._lock:
+            if self._lease:
+                raise RuntimeError("identity cannot be cleared while gameplay is leased")
+            self.expected = ""
+            self._pending_identity = ""
 
     def safe_stop(self, reason: str) -> None:
         self.log(f"fleet: safe_stop ({reason})")

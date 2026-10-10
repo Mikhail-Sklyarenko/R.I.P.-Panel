@@ -445,7 +445,7 @@ def test_protocol_v2_serves_all_four_agents_and_drops_an_old_agent(tmp_path):
             "token": TOKEN, "boot_id": f"boot-{agent_id}",
             "observation": to_dict(Observation(agent_id, 1, protocol=PROTOCOL_VERSION)),
         })
-        assert code == 200 and resp["ok"] is True and resp["protocol"] == 2
+        assert code == 200 and resp["ok"] is True and resp["protocol"] == PROTOCOL_VERSION
         assert [command["agent_id"] for command in resp["commands"]] == [agent_id]
     code, old = coord.handle_heartbeat({
         "token": TOKEN, "boot_id": "legacy",

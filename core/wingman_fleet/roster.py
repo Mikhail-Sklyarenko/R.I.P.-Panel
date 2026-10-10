@@ -83,14 +83,28 @@ class FleetRoster:
             problems.append("у каждого аккаунта должно быть отображаемое имя CS2")
         return problems
 
-    def build_plan(self, *, build_version: str, resource_manifest: str, now: float | None = None) -> RunPlan:
+    def build_plan(self, *, build_version: str, resource_manifest: str, now: float | None = None,
+                   run_id: str = "") -> RunPlan:
         problems = self.validate()
         if problems:
             raise RosterError("; ".join(problems))
         a = self.accounts()
         pairs = (PairProfile("pair-1", 1, a[1], a[2]), PairProfile("pair-2", 2, a[3], a[4]))
-        return RunPlan(new_id("run"), now or time.time(), pairs, build_version, resource_manifest,
+        return RunPlan(run_id or new_id("run"), now or time.time(), pairs, build_version, resource_manifest,
                        RetryPolicy.from_dict(self.retry))
+
+    def replace_slots(self, slots: dict[int, dict[str, Any]]) -> None:
+        """Replace the whole slot map or leave it untouched when validation fails."""
+        if set(slots) != {1, 2, 3, 4}:
+            raise RosterError("a roster update must contain all four slots")
+        trial = FleetRoster(self.token, self.port, {int(k): dict(v) for k, v in slots.items()}, dict(self.retry))
+        agents = [str(item.get("agent_id") or "") for item in trial.slots.values()]
+        steams = [str(item.get("steam_id64") or "") for item in trial.slots.values() if item.get("steam_id64")]
+        if len(set(agents)) != 4:
+            raise RosterError("agent_id values must be unique")
+        if len(steams) != len(set(steams)):
+            raise RosterError("steam_id64 values must be unique")
+        self.slots = trial.slots
 
 
 def resource_manifest_hash(paths: list[Path]) -> str:
