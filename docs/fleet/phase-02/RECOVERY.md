@@ -17,7 +17,13 @@ The command, the idempotency key, and `operator_stops` commit in one `BEGIN IMME
 
 ## Split network
 
-A lost ACK leaves the coordinator at the last durable state. The result write and the book update are one transaction, so a crash between them does not acknowledge the result. The next delivery applies it. It does not mark the missing agent committed or released. The operator action is reconcile, then repeat the same command id. An older `assignment_generation` is ignored for release and rejected for commit. A new agent `boot_id` clears the identity proof.
+A lost ACK leaves the coordinator at the last durable state. The result write and the book update are one transaction, so a crash between them does not acknowledge the result. The next delivery applies it. It does not mark the missing agent committed or released. The operator action is reconcile, then repeat the same command id. An older `assignment_generation` is ignored for release and rejected for commit.
+
+A new agent `boot_id` clears `verification_status`, `verification_seq`, `verification_id`, and `identity_at`. A VERIFY result that still carries the previous boot is ignored. READY returns only after a measurement from the current boot.
+
+`FleetStore.transaction` records the owning thread. A nested call on that thread joins the open transaction and does not commit or roll it back. Another thread waits on the lock. It does not write into the open transaction. The owner's rollback discards only the owner's writes.
+
+After a confirmed COMMIT, the agent applies the expected SteamID64 on its local backend and restores that expected id from the committed reservation after restart. The apply is refused while a gameplay lease is held. It does not mark the account verified and does not start Steam. A catalog snapshot from the new boot is accepted at the same generation when the sequence restarts.
 
 ## Active run
 

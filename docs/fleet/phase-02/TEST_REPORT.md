@@ -31,3 +31,23 @@ Not run:
 Branch `fix/fleet-phase02-acceptance`. The same profile plus `tests/test_fleet_acceptance.py` and `tests/test_fleet_phase026.py` passed as `136 passed in 25.32s`. Localhost HTTPS with an ephemeral certificate is included. `lan_ready` is computed from the SECURE_LAN configuration and is not a four-PC result. `four_pc_proven` stays false.
 
 The full suite excluding `tests/test_csgobot*.py` (those files fail at import) was `11 failed, 938 passed, 3 skipped` on the tree before the last documentation pass. The 11 failures are outside the fleet assignment modules: combat mode selection, menu-wait logging, a mouse mock, nav goal id, orchestrator idle, path-picker monkeypatch, simulated window width, and a missing `tools.replay_wingman`. They are not treated as fleet passes.
+
+## Phase 02.7
+
+Branch `fix/fleet-phase02-final-hardening`. The 02.6 profile plus `tests/test_fleet_phase027.py` passed as `146 passed in 27.82s`. The eight audit findings and the restart lifecycle are in `FINDINGS_02_7.md`. `four_pc_proven` stays false.
+
+The full suite excluding `tests/test_csgobot*.py` was `11 failed, 961 passed, 3 skipped` in 489.78s. The pass count is higher than the 02.6 intermediate `938` because the fleet tests were added. The same 11 failures remain, all outside fleet assignment:
+
+- `tests/test_combat.py::test_resolve_mode_auto_without_csgobot`
+- `tests/test_combat.py::test_auto_emits_fallback_when_ai_missing`
+- `tests/test_cs2_main_menu_wait.py::test_dm_runner_logs_menu_probe_warn`
+- `tests/test_dm_recovery.py::test_release_only_sends_keyups_without_stealing_focus`
+- `tests/test_nav_farm_runtime.py::test_real_controller_yields_keys_and_mouse_to_combat`
+- `tests/test_orchestrator.py::test_orchestrator_two_accounts_sequential_done`
+- `tests/test_path_picker.py::test_pick_steam_path_updates_config`
+- `tests/test_path_picker.py::test_pick_cancel_does_not_change_config`
+- `tests/test_path_picker.py::test_pick_invalid_basename_not_saved`
+- `tests/test_utils.py::test_list_and_move_cs_windows_sim`
+- `tests/test_wingman.py::test_complete_synthetic_cycle`
+
+CustomTkinter created a withdrawn window on a 1920x1080 display. The Wingman tab buttons were not clicked, and Steam was not started.

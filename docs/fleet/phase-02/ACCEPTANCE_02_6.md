@@ -49,7 +49,7 @@ Last completed result of that command before the two extra tests in `test_fleet_
 | A31 | SAFE_STOP still latches and survives restart | `tests/test_fleet_reliability.py::test_operator_stop_survives_coordinator_restart_before_any_lease`, `test_agent_stop_latch_survives_process_restart` |
 | A32 | A green simulation is not a four-PC proof | `tests/test_fleet_phase026.py::test_identity_assignment_does_not_mark_verified_or_four_pc` |
 
-A23 is enforced by the server routes and by the authorize tests. There is no separate test that an agent token calls `/v1/operator`.
+A23 in this table describes the 02.6 rule. Phase 02.7 replaces it: operator routes require a separate operator token and reject the fleet token and every agent token. See `FINDINGS_02_7.md`.
 
 ## Status
 

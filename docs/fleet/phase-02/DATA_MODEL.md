@@ -8,7 +8,7 @@ Sidecar to `accounts.index.json`. The login is the join key and is not part of t
 - `meta.catalog_generation` is the catalog-wide counter. It is not `MAX(catalog_revision)`. `catalog_revision` remains the per-account counter.
 - Partial unique index `accounts_one_steam` on non-empty `steam_id64`.
 - `binding_history` records previous and new SteamID64 and the source. No secrets.
-- `sync_issues` records index/vault divergence. Rows are not deleted automatically.
+- `sync_issues` records index/vault divergence. Rows are not deleted automatically. `vault_logins is None` means the vault was not read, so index logins stay present. `vault_logins == []` means the vault was read and is empty, so those index logins are marked absent and kept.
 - `reservations` plus `active_reservation` (single row) enforce one open reservation per computer.
 - `meta.schema_version` is 1. Opening an existing file again is a no-op. A newer schema than this program raises.
 
@@ -22,7 +22,9 @@ Existing tables `runs`, `commands`, `events`, `friendships`, `agents` stay. New 
 - `preparations` and `preparation_slots`. Partial unique indexes `assignment_one_agent` and `assignment_one_steam` apply to statuses `prepared`, `committed`, `active`, `reconcile_required`.
 - `assignment_events` is the transition log.
 - `agent_credentials` stores a SHA-256 of a per-agent token, not the token.
+- `agent_presence` stores `boot_id`, `protocol`, and `last_seen`. It is the availability row used by draft, prepare, and READY. A catalog cache row can still be shown after it goes stale; it is not that proof.
 - `catalog_cache` stores the public snapshot fields only.
+- `catalog_heads` keeps `boot_id` and `sequence`. A new non-empty boot may replace a snapshot at the same generation. An empty boot id does not.
 
 `RunPlan` is still the immutable run snapshot in `runs.plan_json`. A preparation is not a run. `FleetRoster` JSON remains the slot layout and is not proof of READY.
 
