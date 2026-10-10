@@ -166,6 +166,7 @@ def test_result_crash_does_not_ack_and_retry_applies_once(tmp_path):
     result = CommandResult(f"{prep}/prepare/pc1", ResultStatus.COMPLETED, evidence={"status": "prepared"})
     payload = {
         "token": TOKEN, "boot_id": "boot", "agent_token": "token-pc1",
+        "process_generation": 1, "registration_generation": 1,
         "observation": to_dict(Observation("pc1", 1)),
         "results": [to_dict(result)],
     }
@@ -218,7 +219,7 @@ def test_one_offline_agent_blocks_ready_and_a_foreign_result_is_ignored(tmp_path
         agent = AgentService(
             agent_id, _Quiet(), transport, CommandJournal(tmp_path / f"{agent_id}.journal"),
             token=TOKEN, build_version="b", resource_manifest="m", inline=True,
-            agent_token=token, catalog=catalog,
+            agent_token=token, catalog=catalog, registration_generation=1,
         )
         agent.identity_probe = (lambda steam=steam: _Identity(steam))
         agents.append((agent, transport, local_id, steam, int(catalog.get(local_id)["catalog_revision"])))
@@ -239,6 +240,8 @@ def test_one_offline_agent_blocks_ready_and_a_foreign_result_is_ignored(tmp_path
     foreign = CommandResult(f"{prep}/prepare/pc2", ResultStatus.COMPLETED, evidence={"status": "prepared"})
     code, body = coord.handle_heartbeat({
         "token": TOKEN, "boot_id": agents[0][0].boot_id, "agent_token": agents[0][0].agent_token,
+        "process_generation": agents[0][0].process_generation,
+        "registration_generation": agents[0][0].registration_generation,
         "observation": to_dict(Observation("pc1", 3)),
         "results": [to_dict(foreign)],
     })

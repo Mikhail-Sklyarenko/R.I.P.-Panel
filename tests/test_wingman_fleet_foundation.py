@@ -229,7 +229,8 @@ def test_transport_outage_keeps_the_result(tmp_path):
     assert [r.command_id for r in agent.journal.unacked()] == ["r2"]
 
 
-def test_protocol_mismatch_records_result_but_sends_no_commands(tmp_path):
+def test_protocol_mismatch_stores_nothing_and_sends_no_commands(tmp_path):
+    """Protocol 4 rejects a mismatched heartbeat before any write, including its results."""
     store = FleetStore(tmp_path / "c.db")
     coord = Coordinator(store, token=TOKEN, clock=lambda: 10.0)
     plan = make_roster().build_plan(build_version="b", resource_manifest="m", now=10.0)
@@ -242,8 +243,8 @@ def test_protocol_mismatch_records_result_but_sends_no_commands(tmp_path):
     })
     assert code == 200 and resp["ok"] is False and resp["error"] == "protocol_mismatch"
     assert resp["commands"] == []
-    assert resp["accepted_results"] == [cmd.command_id]
-    assert store.results(plan.run_id)[cmd.command_id].status is ResultStatus.COMPLETED
+    assert resp["accepted_results"] == []
+    assert cmd.command_id not in store.results(plan.run_id)
     store.close()
 
 

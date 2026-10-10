@@ -32,8 +32,8 @@ def load_agent_token(path: Path) -> str:
     return token
 
 
-def claim_enrollment_token(base_url: str, agent_id: str, code: str, *, ca_file: str = "") -> str:
-    """Exchange a one-time code. The returned token is for the caller to store."""
+def claim_enrollment(base_url: str, agent_id: str, code: str, *, ca_file: str = "") -> tuple[str, int]:
+    """Exchange a one-time code for an agent token and its registration generation."""
     url = base_url.rstrip("/") + "/v1/enroll"
     if url.startswith("https://"):
         context = https_context(ca_file)
@@ -49,8 +49,18 @@ def claim_enrollment_token(base_url: str, agent_id: str, code: str, *, ca_file: 
     except Exception as exc:
         raise CredentialError("enrollment was rejected") from exc
     token = str(body.get("agent_token") or "")
-    if not body.get("ok") or not token:
+    try:
+        generation = int(body.get("registration_generation") or 0)
+    except (TypeError, ValueError):
+        generation = 0
+    if not body.get("ok") or not token or generation < 1:
         raise CredentialError("enrollment was rejected")
+    return token, generation
+
+
+def claim_enrollment_token(base_url: str, agent_id: str, code: str, *, ca_file: str = "") -> str:
+    """Exchange a one-time code. The returned token is for the caller to store."""
+    token, _generation = claim_enrollment(base_url, agent_id, code, ca_file=ca_file)
     return token
 
 

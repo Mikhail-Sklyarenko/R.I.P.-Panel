@@ -54,12 +54,14 @@ def test_coordinator_accepts_assignment_result_without_an_active_run(tmp_path):
     assert denied == 403
     code, resp = coord.handle_heartbeat({
         "token": TOKEN, "boot_id": "boot", "agent_token": "agent-secret",
+        "process_generation": 1, "registration_generation": 1,
         "observation": to_dict(Observation("pc1", 1)),
     })
     assert code == 200 and resp["ok"] is True
     assert [item["command_id"] for item in resp["commands"]] == ["prep/prepare/pc1"]
     code, resp = coord.handle_heartbeat({
         "token": TOKEN, "boot_id": "boot", "agent_token": "agent-secret",
+        "process_generation": 1, "registration_generation": 1,
         "observation": to_dict(Observation("pc1", 2)),
         "results": [to_dict(CommandResult("prep/prepare/pc1", ResultStatus.FAILED, "assignment_rejected", "disk"))],
     })

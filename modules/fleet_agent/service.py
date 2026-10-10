@@ -17,7 +17,7 @@ from typing import Any, Callable
 from core.wingman_fleet import PROTOCOL_VERSION
 from core.wingman_fleet.accounts import CatalogError
 from core.wingman_fleet.models import (
-    ASSIGNMENT_COMMANDS, Command, CommandResult, CommandType, Observation, ResultStatus, Screen, to_dict,
+    ASSIGNMENT_COMMANDS, Command, CommandResult, CommandType, Identity, Observation, ResultStatus, Screen, to_dict,
 )
 from core.wingman_fleet.reasons import Reason
 from modules.fleet_agent.backend import ExecContext, GameBackend
@@ -49,16 +49,19 @@ class AgentService:
     def __init__(self, agent_id: str, backend: GameBackend, transport: Transport, journal: CommandJournal, *,
                  token: str, build_version: str, resource_manifest: str, computer: str = "", inline: bool = False,
                  clock: Callable[[], float] = time.monotonic, wall: Callable[[], float] = time.time,
-                 log: Callable[[str], None] | None = None, catalog: Any = None, agent_token: str = ""):
+                 log: Callable[[str], None] | None = None, catalog: Any = None, agent_token: str = "",
+                 registration_generation: int = 0):
         self.agent_id, self.backend, self.transport, self.journal = agent_id, backend, transport, journal
         self.token = token
         self.catalog = catalog
         self.agent_token = agent_token
+        self.registration_generation = int(registration_generation or 0)
         self.build_version, self.resource_manifest = build_version, resource_manifest
         self.computer = computer
         self.inline, self.clock, self.wall = inline, clock, wall
         self.log = log or (lambda _m: None)
         self.boot_id = uuid.uuid4().hex
+        self.process_generation = 0
         self.sequence = 0
         self.clock_offset = 0.0
         self.lease_attempt = ""
@@ -83,7 +86,21 @@ class AgentService:
         self._draining = False
         self._expected_generation = 0
         self._restore_session()
+        self._claim_process()
         self._restore_expected_identity()
+
+    def _claim_process(self) -> None:
+        from modules.fleet_agent.journal import JournalCorrupt
+        try:
+            self.process_generation = self.journal.claim_process_generation()
+            if self.registration_generation <= 0:
+                self.registration_generation = self.journal.load_registration()
+        except JournalCorrupt as exc:
+            self.process_generation = 0
+            self._fail_closed = True
+            self.session_stopped = True
+            self.cancel.set()
+            self.last_error = f"journal corrupt: {exc}"
 
     def _restore_session(self) -> None:
         try:
@@ -206,16 +223,25 @@ class AgentService:
 
     # ----- heartbeat -----------------------------------------------------------------
     def tick(self) -> bool:
+        if self._fail_closed or self.process_generation < 1:
+            self.last_error = self.last_error or "process generation is not available"
+            return False
         now = self.clock()
         self.enforce_lease()
         obs = self.observe()
         results = self.journal.unacked()
-        payload = {"boot_id": self.boot_id, "computer": self.computer, "token": self.token,
-                   "observation": to_dict(obs), "results": [to_dict(r) for r in results]}
+        payload = {
+            "boot_id": self.boot_id, "computer": self.computer, "token": self.token,
+            "process_generation": self.process_generation,
+            "registration_generation": self.registration_generation,
+            "observation": to_dict(obs), "results": [to_dict(r) for r in results],
+        }
         if self.agent_token:
             payload["agent_token"] = self.agent_token
         if self.catalog is not None:
-            payload["catalog"] = self.catalog.snapshot(boot_id=self.boot_id, sequence=self.sequence).as_dict()
+            snapshot = self.catalog.snapshot(boot_id=self.boot_id, sequence=self.sequence).as_dict()
+            snapshot["process_generation"] = self.process_generation
+            payload["catalog"] = snapshot
         t0 = self.wall()
         try:
             resp = self.transport.heartbeat(payload)
@@ -390,15 +416,24 @@ class AgentService:
     def _measure_identity(self) -> tuple[str, str]:
         """The coordinator never supplies the observed SteamID64. This PC measures it."""
         probe = getattr(self, "identity_probe", None)
-        if probe is None and hasattr(self.backend, "verify_active_identity"):
+        if probe is None and not str(getattr(self.backend, "expected", "") or ""):
+            return "", "unconfirmed"
+        if probe is None and hasattr(self.backend, "measure_identity"):
+            probe = self.backend.measure_identity
+        elif probe is None and hasattr(self.backend, "verify_active_identity"):
             probe = self.backend.verify_active_identity
         if probe is None:
             return "", "unconfirmed"
         found = probe()
-        source = getattr(getattr(found, "identity", None), "value", "") or "unconfirmed"
-        if source not in ("steam_local", "gsi"):
+        identity = getattr(found, "identity", None)
+        source = getattr(identity, "value", "") or "unconfirmed"
+        steam = str(getattr(found, "steam_id64", "") or "")
+        if identity is Identity.MISMATCH and steam:
+            detail = str(getattr(found, "detail", "") or "")
+            source = "gsi" if "GSI" in detail else "steam_local"
+        elif source not in ("steam_local", "gsi"):
             source = "unconfirmed"
-        return str(getattr(found, "steam_id64", "") or ""), source
+        return steam, source
 
     def _apply_assignment(self, cmd: Command) -> CommandResult:
         """Local catalog only. This never starts Steam, CS2, or a gameplay lease."""
@@ -450,9 +485,10 @@ class AgentService:
                         "status": status,
                         "observed_steam_id64": observed,
                         "source": source,
-                        "fresh": status == "verified",
+                        "fresh": status in {"verified", "mismatch"},
                         "verification_id": str(params.get("verification_id") or ""),
                         "boot_id": self.boot_id,
+                        "process_generation": self.process_generation,
                     },
                 )
             else:

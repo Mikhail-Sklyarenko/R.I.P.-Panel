@@ -110,12 +110,20 @@ class WindowsBackend:
         except Exception as exc:
             self.log(f"fleet: GSI not installed ({exc})")
 
-    def _check_identity(self) -> tuple[bool, str]:
-        found = self.identity.probe(
-            gsi_steam_id64=self.gsi.view().steam_id64 if self.gsi else "",
-            gsi_fresh=bool(self.gsi and self.gsi.view().fresh),
+    def _identity_view(self):
+        return self.gsi.view() if self.gsi is not None else None
+
+    def measure_identity(self):
+        """One GSI snapshot plus the local Steam identity. Expected id is not proof."""
+        view = self._identity_view()
+        return self.identity.probe(
+            gsi_steam_id64=getattr(view, "steam_id64", "") if view is not None else "",
+            gsi_fresh=bool(getattr(view, "fresh", False)) if view is not None else False,
             expected_steam_id64=self.expected,
         )
+
+    def _check_identity(self) -> tuple[bool, str]:
+        found = self.measure_identity()
         return found.identity is not Identity.MISMATCH and found.identity is not Identity.UNCONFIRMED, found.detail
 
     def _check_gsi(self) -> tuple[bool, str]:
@@ -137,9 +145,10 @@ class WindowsBackend:
     # ----- observation ---------------------------------------------------------------
     def observe(self) -> Observation:
         steam, cs2 = steam_running(), cs2_running()
-        gsi = self.gsi.view() if self.gsi else GsiView()
-        found = self.identity.probe(gsi_steam_id64=gsi.steam_id64, gsi_fresh=gsi.fresh,
-                                    expected_steam_id64=self.expected)
+        gsi = self._identity_view() or GsiView()
+        found = self.identity.probe(
+            gsi_steam_id64=gsi.steam_id64, gsi_fresh=gsi.fresh, expected_steam_id64=self.expected,
+        )
         image = None
         capture_age = float("inf")
         try:
@@ -265,7 +274,7 @@ class WindowsBackend:
             self._pending_identity = ""
 
     def verify_active_identity(self):
-        return self.identity.probe(expected_steam_id64=self.expected)
+        return self.measure_identity()
 
     def clear_inactive_assignment(self) -> None:
         with self._lock:

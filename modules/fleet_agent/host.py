@@ -185,7 +185,7 @@ class FleetHost:
 
     def claim_agent(self, code: str) -> str:
         """Claim a one-time enrollment code and store the agent token with DPAPI."""
-        from modules.fleet_agent.credentials import claim_enrollment_token, store_agent_token
+        from modules.fleet_agent.credentials import claim_enrollment, store_agent_token
         cfg = load_config()
         agent_id = (cfg.wingman_fleet_agent_id or "").strip()
         if not agent_id:
@@ -193,8 +193,13 @@ class FleetHost:
         roster = self.roster()
         url = (cfg.wingman_fleet_url or f"http://127.0.0.1:{roster.port}").rstrip("/")
         ca_file = cfg.wingman_fleet_tls_ca.strip() if url.startswith("https://") else ""
-        token = claim_enrollment_token(url, agent_id, code.strip(), ca_file=ca_file)
+        token, generation = claim_enrollment(url, agent_id, code.strip(), ca_file=ca_file)
         store_agent_token(get_agent_token_path(agent_id), token)
+        journal = CommandJournal(get_wingman_agent_journal_path(agent_id))
+        try:
+            journal.bind_registration(generation)
+        finally:
+            journal.close()
         self.log(f"fleet agent {agent_id} enrolled")
         return agent_id
 

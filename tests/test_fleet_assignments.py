@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import pytest
 
+from core.wingman_fleet import PROTOCOL_VERSION
 from core.wingman_fleet.assignments import AssignmentBook, AssignmentError
 from core.wingman_fleet.store import FleetStore
 
@@ -28,7 +29,7 @@ def _book(tmp_path) -> AssignmentBook:
                 "availability_status": "available",
             }],
         })
-        book.note_presence(agent, protocol=3, seen_at=100.0)
+        book.note_presence(agent, protocol=PROTOCOL_VERSION, seen_at=100.0)
     return book
 
 

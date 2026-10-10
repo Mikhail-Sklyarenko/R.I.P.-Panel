@@ -87,11 +87,15 @@ class _Handler(BaseHTTPRequestHandler):
                 self._send(403, {"ok": False, "error": "enrollment unavailable"})
                 return
             try:
-                token = book.claim_enrollment(str(payload["agent_id"]), str(payload["code"]))
+                agent_id = str(payload["agent_id"])
+                token = book.claim_enrollment(agent_id, str(payload["code"]))
             except (KeyError, TypeError, RuntimeError):
                 self._send(403, {"ok": False, "error": "enrollment rejected"})
                 return
-            self._send(200, {"ok": True, "agent_token": token})
+            self._send(200, {
+                "ok": True, "agent_token": token,
+                "registration_generation": book.registration_generation(agent_id),
+            })
             return
         if path == "/v1/heartbeat":
             payload = self._body()

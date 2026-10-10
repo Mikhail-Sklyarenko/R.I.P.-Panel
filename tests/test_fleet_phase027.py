@@ -102,6 +102,7 @@ def test_operator_authority_is_not_granted_by_agent_or_fleet_tokens(tmp_path):
         enrolled = body["agent_token"]
         beat, beat_body = coord.handle_heartbeat({
             "token": TOKEN, "boot_id": "boot", "agent_token": enrolled,
+            "process_generation": 1, "registration_generation": book.registration_generation("pc2"),
             "observation": to_dict(Observation("pc2", 1)),
         })
         assert beat == 200 and beat_body["ok"] is True
@@ -120,6 +121,7 @@ def test_operator_authority_is_not_granted_by_agent_or_fleet_tokens(tmp_path):
         assert again != enrolled
         restored, restored_body = coord.handle_heartbeat({
             "token": TOKEN, "boot_id": "boot-2", "agent_token": again,
+            "process_generation": 1, "registration_generation": book.registration_generation("pc2"),
             "observation": to_dict(Observation("pc2", 4)),
         })
         assert restored == 200 and restored_body["ok"] is True
@@ -204,6 +206,7 @@ def test_heartbeat_and_revoke_do_not_deadlock(tmp_path):
             for seq in range(1, 25):
                 coord.handle_heartbeat({
                     "token": TOKEN, "boot_id": "boot", "agent_token": "token-pc1",
+                    "process_generation": 1, "registration_generation": 1,
                     "observation": to_dict(Observation("pc1", seq)),
                 })
         except BaseException as exc:
@@ -252,6 +255,7 @@ def test_old_verify_after_restart_does_not_restore_ready(tmp_path):
     })
     code, body = coord.handle_heartbeat({
         "token": TOKEN, "boot_id": "boot-b", "agent_token": "token-pc1",
+        "process_generation": 1, "registration_generation": 1,
         "observation": to_dict(Observation("pc1", 1)),
         "results": [to_dict(result)],
     })
@@ -433,7 +437,7 @@ def test_restarted_coordinator_and_agents_keep_the_committed_identity(tmp_path):
         agent = AgentService(
             agent_id, backend, InProcessTransport(coord), CommandJournal(tmp_path / f"{agent_id}.journal"),
             token=TOKEN, build_version="b", resource_manifest="m", inline=True,
-            agent_token=token, catalog=catalog,
+            agent_token=token, catalog=catalog, registration_generation=1,
         )
         agent.identity_probe = lambda steam=steam: SteamIdentity(Identity.GSI, steam)
         agents.append(agent)
@@ -476,7 +480,7 @@ def test_restarted_coordinator_and_agents_keep_the_committed_identity(tmp_path):
         follower = AgentService(
             agent_id, fresh, InProcessTransport(restarted), agents[index].journal,
             token=TOKEN, build_version="b", resource_manifest="m", inline=True,
-            agent_token=token, catalog=catalog,
+            agent_token=token, catalog=catalog, registration_generation=1,
         )
         follower.identity_probe = agents[index].identity_probe
         assert fresh.expected == steam and fresh.verified is False

@@ -21,6 +21,7 @@ from core.wingman_fleet.models import (
 from core.wingman_fleet.pair_fsm import HALTED, PairCtx, PairMachine
 from core.wingman_fleet.reasons import describe
 from core.wingman_fleet.run_fsm import RunCtx, RunMachine, RunState
+from core.wingman_fleet.assignments import AssignmentError
 from core.wingman_fleet.store import FleetStore
 
 SUSPECT_AFTER_SEC = 1.5
@@ -194,22 +195,44 @@ class Coordinator:
                 return 403, {"ok": False, "error": "unauthorized"}
         with self.lock:
             now = self.clock()
-            st = self.agents.setdefault(agent_id, AgentLinkState(agent_id))
             boot_id = str(payload.get("boot_id", ""))
-            if (st.observation is not None and obs.sequence <= st.observation.sequence
-                    and boot_id == st.boot_id):
-                return 409, {"ok": False, "error": "out-of-order heartbeat"}
+            if obs.protocol != PROTOCOL_VERSION:
+                return 200, {"ok": False, "error": "protocol_mismatch", "server_time": now,
+                             "protocol": PROTOCOL_VERSION, "commands": [], "gameplay": None,
+                             "accepted_results": []}
+            if book is not None:
+                try:
+                    process_generation = int(payload["process_generation"])
+                    registration_generation = int(payload["registration_generation"])
+                except (KeyError, TypeError, ValueError):
+                    return 400, {"ok": False, "error": "session_rejected", "commands": []}
+                decision = book.session_decision(
+                    agent_id, registration_generation=registration_generation,
+                    process_generation=process_generation, boot_id=boot_id,
+                )
+                if decision == "registration_rejected":
+                    return 403, {"ok": False, "error": "unauthorized", "commands": []}
+                if decision:
+                    return 409, {"ok": False, "error": decision, "commands": []}
+            current = self.agents.get(agent_id)
+            if (current is not None and current.observation is not None
+                    and obs.sequence <= current.observation.sequence and boot_id == current.boot_id):
+                return 409, {"ok": False, "error": "out-of-order heartbeat", "commands": []}
+            st = self.agents.setdefault(agent_id, AgentLinkState(agent_id))
             st.boot_id = boot_id
             st.computer = str(payload.get("computer", ""))
             st.protocol = obs.protocol
             st.last_seen, st.observation, st.received_at = now, obs, now
             active_run = self.plan.run_id if self.plan else ""
             catalog = payload.get("catalog")
-            if book is not None and isinstance(catalog, dict):
-                book.remember_catalog(agent_id, catalog)
             if book is not None:
-                book.note_boot(agent_id, boot_id)
-                book.note_presence(agent_id, protocol=int(obs.protocol), seen_at=now, boot_id=boot_id)
+                book.install_session(
+                    agent_id, process_generation=process_generation,
+                    registration_generation=registration_generation, boot_id=boot_id,
+                    protocol=int(obs.protocol), seen_at=now,
+                )
+                if isinstance(catalog, dict):
+                    book.remember_catalog(agent_id, catalog)
             accepted: list[str] = []
             for r in results:
                 result_run = self._result_run(r, agent_id, active_run)
@@ -222,22 +245,35 @@ class Coordinator:
                     if assignment:
                         with self.store.transaction():
                             stored = self.store.record_result(r, agent_id=agent_id, run_id=result_run)
-                            self._fold_assignment_result(r, agent_id)
+                            if stored and r.terminal:
+                                self._fold_assignment_result(r, agent_id)
+                            elif stored:
+                                pass
+                            elif self.store.terminal_result_matches(r, agent_id=agent_id, run_id=result_run):
+                                stored = False
+                            elif self.store.result_is_stored(r, agent_id=agent_id, run_id=result_run):
+                                self.store.event(
+                                    "result_conflict", run_id=result_run, agent_id=agent_id,
+                                    detail=r.command_id,
+                                )
+                                raise AssignmentError("result content does not match the stored result")
                     else:
                         stored = self.store.record_result(r, agent_id=agent_id, run_id=result_run)
                 except Exception as exc:
                     self.store.event("assignment", run_id=result_run, agent_id=agent_id, detail=str(exc)[:240])
                     continue
+                duplicate = (
+                    not stored and assignment
+                    and self.store.terminal_result_matches(r, agent_id=agent_id, run_id=result_run)
+                )
                 if stored and r.terminal and not r.succeeded:
                     self.store.event("command_result", run_id=result_run,
                                      agent_id=agent_id, reason=r.reason, detail=f"{r.command_id}: {r.detail}",
                                      data=r.evidence or None)
-                if stored or self.store.result_is_stored(r, agent_id=agent_id, run_id=result_run):
+                if (stored and r.terminal) or duplicate or (
+                    stored and not assignment and r.terminal
+                ) or (not assignment and self.store.result_is_stored(r, agent_id=agent_id, run_id=result_run)):
                     accepted.append(r.command_id)
-            if obs.protocol != PROTOCOL_VERSION:
-                return 200, {"ok": False, "error": "protocol_mismatch", "server_time": now,
-                             "protocol": PROTOCOL_VERSION, "commands": [], "gameplay": None,
-                             "accepted_results": accepted}
             commands, gameplay, run_id = [], None, ""
             if self.plan is not None and agent_id in self.plan.agent_ids:
                 run_id = self.plan.run_id
@@ -280,10 +316,18 @@ class Coordinator:
             )
         elif cmd.type is CommandType.VERIFY_ASSIGNMENT:
             evidence = result.evidence or {}
+            expected_id = str(cmd.params.get("verification_id") or "")
+            if not expected_id or str(evidence.get("verification_id") or "") != expected_id:
+                raise AssignmentError("verification_id does not match the command")
+            slot = book._slot_for_agent(preparation_id, agent_id)
+            if int(cmd.params.get("generation") or 0) != int(slot["assignment_generation"]):
+                raise AssignmentError("assignment generation does not match")
+            if not book.evidence_matches_session(agent_id, evidence):
+                return
             book.note_identity(
                 preparation_id, agent_id, str(evidence.get("observed_steam_id64") or ""),
                 now=self.clock(),
-                fresh=bool(result.succeeded and evidence.get("fresh") and evidence.get("status") == "verified"),
+                fresh=bool(evidence.get("fresh")),
                 source=str(evidence.get("source") or ""),
                 generation=int(cmd.params.get("generation") or 0),
                 boot_id=str(evidence.get("boot_id") or ""),

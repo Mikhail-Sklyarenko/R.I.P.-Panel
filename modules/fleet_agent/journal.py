@@ -34,7 +34,25 @@ class CommandJournal:
         self.db.execute("PRAGMA journal_mode=WAL")
         self.db.executescript(_SCHEMA)
         self._lock = threading.RLock()
+        self._migrate()
         self._recover_interrupted()
+
+    def _migrate(self) -> None:
+        with self._lock:
+            session_cols = {row[1] for row in self.db.execute("PRAGMA table_info(agent_session)").fetchall()}
+            if "process_generation" not in session_cols:
+                self.db.execute(
+                    "ALTER TABLE agent_session ADD COLUMN process_generation INTEGER NOT NULL DEFAULT 0"
+                )
+            if "registration_generation" not in session_cols:
+                self.db.execute(
+                    "ALTER TABLE agent_session ADD COLUMN registration_generation INTEGER NOT NULL DEFAULT 0"
+                )
+            version = int(self.db.execute("PRAGMA user_version").fetchone()[0])
+            if version > 2:
+                raise JournalCorrupt("journal schema is newer than this program")
+            if version < 2:
+                self.db.execute("PRAGMA user_version=2")
 
     def _recover_interrupted(self) -> None:
         """A command running when the agent died is reported failed, never silently re-run."""
@@ -83,6 +101,76 @@ class CommandJournal:
     def prune(self, older_than_sec: float = 7 * 86400) -> None:
         with self._lock:
             self.db.execute("DELETE FROM journal WHERE acked=1 AND received_at<?", (time.time() - older_than_sec,))
+
+    def claim_process_generation(self) -> int:
+        """Atomically allocate the next process generation. Failure must fail closed."""
+        with self._lock:
+            self.db.execute("BEGIN IMMEDIATE")
+            try:
+                row = self.db.execute(
+                    "SELECT process_generation FROM agent_session WHERE id=1"
+                ).fetchone()
+                if row is None:
+                    generation = 1
+                    self.db.execute(
+                        "INSERT INTO agent_session(id, run_id, stopped, generation, process_generation, "
+                        "registration_generation, updated_at) VALUES(1,'',0,0,?,0,?)",
+                        (generation, time.time()),
+                    )
+                else:
+                    current = row[0]
+                    if isinstance(current, bool) or not isinstance(current, int) or int(current) < 0:
+                        raise JournalCorrupt("process generation is damaged")
+                    generation = int(current) + 1
+                    self.db.execute(
+                        "UPDATE agent_session SET process_generation=?, updated_at=? WHERE id=1",
+                        (generation, time.time()),
+                    )
+                self.db.execute("COMMIT")
+                return generation
+            except BaseException:
+                try:
+                    self.db.execute("ROLLBACK")
+                except sqlite3.Error:
+                    pass
+                raise
+
+    def bind_registration(self, generation: int) -> None:
+        if int(generation) < 1:
+            raise JournalCorrupt("registration generation is damaged")
+        with self._lock:
+            self.db.execute("BEGIN IMMEDIATE")
+            try:
+                row = self.db.execute("SELECT id FROM agent_session WHERE id=1").fetchone()
+                if row is None:
+                    self.db.execute(
+                        "INSERT INTO agent_session(id, run_id, stopped, generation, process_generation, "
+                        "registration_generation, updated_at) VALUES(1,'',0,0,0,?,?)",
+                        (int(generation), time.time()),
+                    )
+                else:
+                    self.db.execute(
+                        "UPDATE agent_session SET registration_generation=?, updated_at=? WHERE id=1",
+                        (int(generation), time.time()),
+                    )
+                self.db.execute("COMMIT")
+            except BaseException:
+                self.db.execute("ROLLBACK")
+                raise
+
+    def load_registration(self) -> int:
+        with self._lock:
+            try:
+                row = self.db.execute(
+                    "SELECT registration_generation FROM agent_session WHERE id=1"
+                ).fetchone()
+            except sqlite3.DatabaseError as exc:
+                raise JournalCorrupt(str(exc)) from exc
+        if row is None or row[0] is None:
+            return 0
+        if isinstance(row[0], bool) or not isinstance(row[0], int) or int(row[0]) < 0:
+            raise JournalCorrupt("registration generation is damaged")
+        return int(row[0])
 
     def load_session(self) -> tuple[str, bool, int]:
         """Return (run_id, stopped, generation). A damaged row fails closed."""

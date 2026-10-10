@@ -9,6 +9,7 @@ from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 
+from core.wingman_fleet import PROTOCOL_VERSION
 from core.wingman_fleet.assignments import AssignmentBook, AssignmentError
 from core.wingman_fleet.coordinator import Coordinator
 from core.wingman_fleet.models import CommandType, Identity, Observation
@@ -200,7 +201,7 @@ def test_https_accepts_a_trusted_certificate_and_rejects_a_bad_one(tmp_path):
     server.start()
     try:
         body = HttpTransport(f"https://127.0.0.1:{server.port}", ca_file=str(cert)).heartbeat({
-            "token": TOKEN, "boot_id": "tls", "observation": {"agent_id": "pc1", "sequence": 1, "protocol": 3},
+            "token": TOKEN, "boot_id": "tls", "observation": {"agent_id": "pc1", "sequence": 1, "protocol": PROTOCOL_VERSION},
         })
         assert body["ok"] is True
         other_dir = tmp_path / "other"
@@ -208,7 +209,7 @@ def test_https_accepts_a_trusted_certificate_and_rejects_a_bad_one(tmp_path):
         other, other_key = _cert(other_dir)
         with pytest.raises(TransportError):
             HttpTransport(f"https://127.0.0.1:{server.port}", ca_file=str(other)).heartbeat({
-                "token": TOKEN, "boot_id": "tls2", "observation": {"agent_id": "pc1", "sequence": 2, "protocol": 3},
+                "token": TOKEN, "boot_id": "tls2", "observation": {"agent_id": "pc1", "sequence": 2, "protocol": PROTOCOL_VERSION},
             })
     finally:
         server.stop()
@@ -234,7 +235,8 @@ def test_four_simulated_agents_commit_and_freeze_a_run_plan(tmp_path):
         catalog.set_enabled(chosen_id, True)
         agent = AgentService(
             agent_id, _Quiet(), InProcessTransport(coord), CommandJournal(tmp_path / f"{agent_id}.journal"),
-            token=TOKEN, build_version="b", resource_manifest="m", inline=True, agent_token=token, catalog=catalog,
+            token=TOKEN, build_version="b", resource_manifest="m", inline=True, agent_token=token,
+            catalog=catalog, registration_generation=1,
         )
         agent.identity_probe = lambda steam=steam: SteamIdentity(Identity.GSI, steam)
         agents.append(agent)

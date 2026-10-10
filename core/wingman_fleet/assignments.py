@@ -85,12 +85,20 @@ class AssignmentBook:
             CREATE TABLE IF NOT EXISTS agent_credentials(
                 agent_id TEXT PRIMARY KEY,
                 token_hash TEXT NOT NULL,
-                revoked INTEGER NOT NULL DEFAULT 0);
+                revoked INTEGER NOT NULL DEFAULT 0,
+                registration_generation INTEGER NOT NULL DEFAULT 0);
             CREATE TABLE IF NOT EXISTS agent_presence(
                 agent_id TEXT PRIMARY KEY,
                 boot_id TEXT NOT NULL DEFAULT '',
                 protocol INTEGER NOT NULL DEFAULT 0,
-                last_seen REAL NOT NULL DEFAULT 0);
+                last_seen REAL NOT NULL DEFAULT 0,
+                process_generation INTEGER NOT NULL DEFAULT 0,
+                registration_generation INTEGER NOT NULL DEFAULT 0);
+            CREATE TABLE IF NOT EXISTS verification_seq(
+                preparation_id TEXT NOT NULL,
+                agent_id TEXT NOT NULL,
+                next_seq INTEGER NOT NULL,
+                PRIMARY KEY(preparation_id, agent_id));
             CREATE TABLE IF NOT EXISTS catalog_heads(
                 agent_id TEXT PRIMARY KEY,
                 catalog_generation INTEGER NOT NULL,
@@ -125,11 +133,19 @@ class AssignmentBook:
             ("preparation_slots", "link_state", "TEXT NOT NULL DEFAULT ''"),
             ("preparations", "plan_json", "TEXT NOT NULL DEFAULT ''"),
             ("catalog_heads", "vault_status", "TEXT NOT NULL DEFAULT ''"),
+            ("agent_credentials", "registration_generation", "INTEGER NOT NULL DEFAULT 0"),
+            ("agent_presence", "process_generation", "INTEGER NOT NULL DEFAULT 0"),
+            ("agent_presence", "registration_generation", "INTEGER NOT NULL DEFAULT 0"),
         ):
             try:
                 self.store.db.execute(f"ALTER TABLE {table} ADD COLUMN {name} {decl}")
             except sqlite3.OperationalError:
                 pass
+        version = int(self.store.db.execute("PRAGMA user_version").fetchone()[0])
+        if version > 4:
+            raise AssignmentError("fleet schema is newer than this program")
+        if version < 4:
+            self.store.db.execute("PRAGMA user_version=4")
 
     @contextmanager
     def _tx(self) -> Iterator[Any]:
@@ -143,14 +159,24 @@ class AssignmentBook:
         digest = hashlib.sha256(token.encode("utf-8")).hexdigest()
         with self._tx():
             row = self.store.db.execute(
-                "SELECT token_hash, revoked FROM agent_credentials WHERE agent_id=?", (agent_id,)
+                "SELECT token_hash, revoked, registration_generation FROM agent_credentials WHERE agent_id=?",
+                (agent_id,),
             ).fetchone()
             if row is not None and row[1] == 0 and not hmac.compare_digest(row[0], digest):
                 raise AssignmentError("agent_id is already registered to different credentials")
+            previous = int(row["registration_generation"]) if row is not None else 0
+            changed = row is None or int(row["revoked"]) != 0 or not hmac.compare_digest(row["token_hash"], digest)
+            generation = previous + 1 if changed else max(previous, 1)
+            if changed and row is not None:
+                self.store.db.execute(
+                    "UPDATE agent_presence SET process_generation=0, boot_id='' WHERE agent_id=?",
+                    (agent_id,),
+                )
             self.store.db.execute(
-                "INSERT INTO agent_credentials(agent_id, token_hash, revoked) VALUES(?,?,0) "
-                "ON CONFLICT(agent_id) DO UPDATE SET token_hash=excluded.token_hash, revoked=0",
-                (agent_id, digest),
+                "INSERT INTO agent_credentials(agent_id, token_hash, revoked, registration_generation) "
+                "VALUES(?,?,0,?) ON CONFLICT(agent_id) DO UPDATE SET token_hash=excluded.token_hash, "
+                "revoked=0, registration_generation=excluded.registration_generation",
+                (agent_id, digest, generation),
             )
 
     def revoke_agent(self, agent_id: str) -> None:
@@ -239,6 +265,16 @@ class AssignmentBook:
             ).fetchone()
         if head is not None and generation < int(head["catalog_generation"]):
             return
+        presence = self.store.db.execute(
+            "SELECT boot_id, process_generation FROM agent_presence WHERE agent_id=?", (agent_id,)
+        ).fetchone()
+        if presence is not None and int(presence["process_generation"] or 0) > 0:
+            snap_process = int(snapshot.get("process_generation") or 0)
+            snap_boot = str(snapshot.get("boot_id") or "")
+            if snap_process != int(presence["process_generation"]) or (
+                snap_boot and str(presence["boot_id"] or "") and snap_boot != str(presence["boot_id"])
+            ):
+                return
         stored_boot = str(head["boot_id"] or "") if head is not None else ""
         new_process = bool(boot_id) and boot_id != stored_boot
         if (
@@ -360,7 +396,8 @@ class AssignmentBook:
         live_boot = self._live_boot(agent_id)
         if live_boot and str(boot_id or "") != live_boot:
             return self._require(preparation_id)["status"]
-        if int(slot["verification_seq"] or 0) > int(seq):
+        stored_seq = int(slot["verification_seq"] or 0)
+        if stored_seq > int(seq) or (stored_seq == int(seq) and stored_seq > 0):
             return self._require(preparation_id)["status"]
         observed = parse_steam_id64(observed_steam_id64) if observed_steam_id64 else ""
         status, error = self._verification_status(slot["steam_id64"], observed, fresh=fresh, source=source)
@@ -382,15 +419,80 @@ class AssignmentBook:
                 (link, agent_id),
             )
 
-    def note_presence(self, agent_id: str, *, protocol: int, seen_at: float, boot_id: str = "") -> None:
+    def note_presence(self, agent_id: str, *, protocol: int, seen_at: float, boot_id: str = "",
+                      process_generation: int = -1, registration_generation: int = -1) -> None:
         """Record the heartbeat that proves an agent is present. This is not an identity proof."""
+        process_value = int(process_generation)
+        registration_value = int(registration_generation)
         with self._tx():
             self.store.db.execute(
-                "INSERT INTO agent_presence(agent_id, boot_id, protocol, last_seen) VALUES(?,?,?,?) "
+                "INSERT INTO agent_presence(agent_id, boot_id, protocol, last_seen, process_generation, "
+                "registration_generation) VALUES(?,?,?,?,CASE WHEN ?>=0 THEN ? ELSE 0 END,CASE WHEN ?>=0 THEN ? ELSE 0 END) "
                 "ON CONFLICT(agent_id) DO UPDATE SET protocol=excluded.protocol, last_seen=excluded.last_seen, "
-                "boot_id=CASE WHEN excluded.boot_id<>'' THEN excluded.boot_id ELSE agent_presence.boot_id END",
-                (agent_id, boot_id, int(protocol), float(seen_at)),
+                "boot_id=CASE WHEN excluded.boot_id<>'' THEN excluded.boot_id ELSE agent_presence.boot_id END, "
+                "process_generation=CASE WHEN ?>=0 THEN ? ELSE agent_presence.process_generation END, "
+                "registration_generation=CASE WHEN ?>=0 THEN ? ELSE agent_presence.registration_generation END",
+                (agent_id, boot_id, int(protocol), float(seen_at),
+                 process_value, process_value, registration_value, registration_value,
+                 process_value, process_value, registration_value, registration_value),
             )
+
+    def registration_generation(self, agent_id: str) -> int:
+        with self.store._lock:
+            row = self.store.db.execute(
+                "SELECT registration_generation FROM agent_credentials WHERE agent_id=? AND revoked=0",
+                (agent_id,),
+            ).fetchone()
+        return int(row["registration_generation"]) if row is not None else 0
+
+    def session_decision(self, agent_id: str, *, registration_generation: int, process_generation: int,
+                         boot_id: str) -> str:
+        """Return an error code, or '' when this heartbeat may change state. Does not write."""
+        if self.registration_generation(agent_id) != int(registration_generation):
+            return "registration_rejected"
+        if int(process_generation) < 1 or not boot_id:
+            return "session_rejected"
+        row = self.store.db.execute(
+            "SELECT boot_id, process_generation FROM agent_presence WHERE agent_id=?", (agent_id,)
+        ).fetchone()
+        stored_gen = int(row["process_generation"] or 0) if row is not None else 0
+        stored_boot = str(row["boot_id"] or "") if row is not None else ""
+        if stored_gen and int(process_generation) < stored_gen:
+            return "stale_process"
+        if stored_gen and int(process_generation) == stored_gen and stored_boot and stored_boot != boot_id:
+            return "boot_conflict"
+        return ""
+
+    def evidence_matches_session(self, agent_id: str, evidence: dict[str, Any]) -> bool:
+        row = self.store.db.execute(
+            "SELECT boot_id, process_generation FROM agent_presence WHERE agent_id=?", (agent_id,)
+        ).fetchone()
+        if row is None:
+            return False
+        live_boot = str(row["boot_id"] or "")
+        live_gen = int(row["process_generation"] or 0)
+        if live_gen <= 0 or "process_generation" not in evidence:
+            return False
+        if int(evidence.get("process_generation") or 0) != live_gen:
+            return False
+        ev_boot = str(evidence.get("boot_id") or "")
+        return not live_boot or ev_boot == live_boot
+
+    def install_session(self, agent_id: str, *, process_generation: int, registration_generation: int,
+                        boot_id: str, protocol: int, seen_at: float) -> None:
+        previous_boot = self._live_boot(agent_id)
+        previous_gen = 0
+        row = self.store.db.execute(
+            "SELECT process_generation FROM agent_presence WHERE agent_id=?", (agent_id,)
+        ).fetchone()
+        if row is not None:
+            previous_gen = int(row["process_generation"] or 0)
+        if boot_id and (previous_boot != boot_id or (previous_gen and int(process_generation) > previous_gen)):
+            self.note_boot(agent_id, boot_id)
+        self.note_presence(
+            agent_id, protocol=protocol, seen_at=seen_at, boot_id=boot_id,
+            process_generation=int(process_generation), registration_generation=int(registration_generation),
+        )
 
     def note_boot(self, agent_id: str, boot_id: str) -> None:
         """A new process drops the previous identity proof, including its sequence."""
@@ -469,39 +571,58 @@ class AssignmentBook:
             self._event(preparation_id, "release", f"{agent_id}:{detail}")
         return self._require(preparation_id)["status"]
 
+    def _allocate_verification_seq(self, preparation_id: str, agent_id: str) -> int:
+        row = self.store.db.execute(
+            "SELECT next_seq FROM verification_seq WHERE preparation_id=? AND agent_id=?",
+            (preparation_id, agent_id),
+        ).fetchone()
+        if row is None:
+            self.store.db.execute(
+                "INSERT INTO verification_seq(preparation_id, agent_id, next_seq) VALUES(?,?,?)",
+                (preparation_id, agent_id, 2),
+            )
+            return 1
+        seq = int(row["next_seq"])
+        self.store.db.execute(
+            "UPDATE verification_seq SET next_seq=? WHERE preparation_id=? AND agent_id=?",
+            (seq + 1, preparation_id, agent_id),
+        )
+        return seq
+
     def enqueue(self, preparation_id: str, kind: str) -> int:
         from core.wingman_fleet.models import Command, CommandType
         prep = self._require(preparation_id)
         commands = []
-        for slot in self.slots(preparation_id):
-            params = {
-                "preparation_id": preparation_id,
-                "local_account_id": slot["local_account_id"],
-                "steam_id64": slot["steam_id64"],
-                "catalog_revision": int(slot["expected_catalog_revision"]),
-                "generation": int(slot["assignment_generation"]),
-                "coordinator_generation": int(prep["coordinator_generation"]),
-                "run_id": prep["run_id"],
-            }
-            command_type = {
-                "prepare": CommandType.PREPARE_ASSIGNMENT,
-                "commit": CommandType.COMMIT_ASSIGNMENT,
-                "release": CommandType.RELEASE_ASSIGNMENT,
-                "reconcile": CommandType.RECONCILE_ASSIGNMENT,
-                "verify": CommandType.VERIFY_ASSIGNMENT,
-            }[kind]
-            verification_id = uuid.uuid4().hex if kind == "verify" else ""
-            if verification_id:
-                params["verification_id"] = verification_id
-                params["seq"] = int(self.clock() * 1000)
-            command_id = (
-                f"{preparation_id}/verify/{verification_id}/{slot['agent_id']}"
-                if verification_id else f"{preparation_id}/{kind}/{slot['agent_id']}"
-            )
-            commands.append(Command(
-                command_id, preparation_id, slot["agent_id"], command_type, params, "", 1, 240.0, self.clock(),
-            ))
-        return len(self.store.add_commands(commands))
+        with self.store.transaction():
+            for slot in self.slots(preparation_id):
+                params = {
+                    "preparation_id": preparation_id,
+                    "local_account_id": slot["local_account_id"],
+                    "steam_id64": slot["steam_id64"],
+                    "catalog_revision": int(slot["expected_catalog_revision"]),
+                    "generation": int(slot["assignment_generation"]),
+                    "coordinator_generation": int(prep["coordinator_generation"]),
+                    "run_id": prep["run_id"],
+                }
+                command_type = {
+                    "prepare": CommandType.PREPARE_ASSIGNMENT,
+                    "commit": CommandType.COMMIT_ASSIGNMENT,
+                    "release": CommandType.RELEASE_ASSIGNMENT,
+                    "reconcile": CommandType.RECONCILE_ASSIGNMENT,
+                    "verify": CommandType.VERIFY_ASSIGNMENT,
+                }[kind]
+                verification_id = uuid.uuid4().hex if kind == "verify" else ""
+                if verification_id:
+                    params["verification_id"] = verification_id
+                    params["seq"] = self._allocate_verification_seq(preparation_id, slot["agent_id"])
+                command_id = (
+                    f"{preparation_id}/verify/{verification_id}/{slot['agent_id']}"
+                    if verification_id else f"{preparation_id}/{kind}/{slot['agent_id']}"
+                )
+                commands.append(Command(
+                    command_id, preparation_id, slot["agent_id"], command_type, params, "", 1, 240.0, self.clock(),
+                ))
+            return len(self.store.add_commands(commands))
 
     def release(self, preparation_id: str) -> str:
         raise AssignmentError("direct release is closed; wait for four agent acknowledgements")

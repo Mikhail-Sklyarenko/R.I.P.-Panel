@@ -5,6 +5,7 @@ was already issued (the deterministic command id is the idempotency key).
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import sqlite3
 import threading
@@ -14,6 +15,19 @@ from pathlib import Path
 from typing import Any, Iterable, Iterator
 
 from core.wingman_fleet.models import ASSIGNMENT_COMMANDS, Command, CommandResult, ResultStatus, RunPlan, dumps
+
+def _result_fingerprint(result: CommandResult) -> str:
+    body = json.dumps(
+        {
+            "status": result.status.value,
+            "reason": result.reason,
+            "detail": result.detail,
+            "evidence": result.evidence,
+        },
+        sort_keys=True, separators=(",", ":"), ensure_ascii=False,
+    )
+    return hashlib.sha256(body.encode("utf-8")).hexdigest()
+
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS runs(
@@ -239,6 +253,20 @@ class FleetStore:
             self.db.execute("UPDATE commands SET status=?, result_json=?, updated_at=? WHERE command_id=?",
                             (result.status.value, dumps(result), time.time(), result.command_id))
             return True
+
+    def terminal_result_matches(self, result: CommandResult, *, agent_id: str, run_id: str) -> bool:
+        """True only when this exact terminal body is already stored for the owner."""
+        with self._lock:
+            owned = self._owned_row(result, agent_id, run_id)
+            if owned is None or owned[0] in ("pending", ResultStatus.ACCEPTED.value):
+                return False
+            row = self.db.execute(
+                "SELECT result_json FROM commands WHERE command_id=?", (result.command_id,)
+            ).fetchone()
+            if row is None or not row[0]:
+                return False
+            stored = CommandResult.from_dict(json.loads(row[0]))
+            return _result_fingerprint(stored) == _result_fingerprint(result)
 
     def result_is_stored(self, result: CommandResult, *, agent_id: str, run_id: str) -> bool:
         """True when this agent already has a terminal result for its own command."""
