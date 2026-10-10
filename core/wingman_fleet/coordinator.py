@@ -8,6 +8,7 @@ from __future__ import annotations
 import json
 import threading
 import time
+import uuid
 from dataclasses import dataclass
 from typing import Any, Callable
 
@@ -78,6 +79,8 @@ class Coordinator:
             self.pairs[p.pair_id] = m
         run_ctx = RunCtx.from_dict(state["run"]) if "run" in state else None
         self.run = RunMachine(plan, self.pairs, run_ctx, on_transition=self._transition)
+        for agent_id in self.store.operator_stopped_agents(plan.run_id):
+            self.run.note_operator_stop(agent_id)
 
     def start_run(self, plan: RunPlan) -> None:
         with self.lock:
@@ -125,8 +128,8 @@ class Coordinator:
             self.store.event("operator", run_id=self.plan.run_id, pair_id=pair_id, detail=action)
             self._persist(force=True)
 
-    def agent_command(self, agent_id: str, ctype: CommandType) -> Command:
-        """Operator-issued command; refused while that agent holds a gameplay lease."""
+    def agent_command(self, agent_id: str, ctype: CommandType, *, request_key: str = "") -> Command:
+        """Operator-issued command. SAFE_STOP is durable before this method returns."""
         with self.lock:
             if ctype not in OPERATOR_COMMANDS:
                 raise ValueError(f"{ctype.value} is not an operator command")
@@ -136,14 +139,21 @@ class Coordinator:
                     and self.run.state is RunState.IN_MATCH):
                 raise RuntimeError("перезапуск во время матча запрещён — сначала безопасная остановка")
             now = self.clock()
-            cmd = Command(f"{self.plan.run_id}/operator/{int(now * 1000)}/{agent_id}/{ctype.value}",
-                          self.plan.run_id, agent_id, ctype, {}, "", 1, 240.0, now)
+            key = request_key or uuid.uuid4().hex
+            cmd = Command(
+                f"{self.plan.run_id}/operator/{uuid.uuid4().hex}/{agent_id}/{ctype.value}",
+                self.plan.run_id, agent_id, ctype, {}, "", 1, 240.0, now,
+            )
+            # Durable write first. A failed transaction leaves memory and the caller unchanged.
+            stored = self.store.accept_operator_command(
+                cmd, key, latch_stop=ctype is CommandType.SAFE_STOP and self.run is not None,
+            )
             if ctype is CommandType.SAFE_STOP and self.run is not None:
                 self.run.note_operator_stop(agent_id)
-            self.store.add_commands([cmd])
-            self.operator_ids.add(cmd.command_id)
-            self.store.event("operator", run_id=self.plan.run_id, agent_id=agent_id, detail=ctype.value)
-            return cmd
+            self.operator_ids.add(stored.command_id)
+            if stored.command_id == cmd.command_id:
+                self.store.event("operator", run_id=self.plan.run_id, agent_id=agent_id, detail=ctype.value)
+            return stored
 
     # ----- network -------------------------------------------------------------------
     def links(self, now: float | None = None) -> dict[str, Link]:

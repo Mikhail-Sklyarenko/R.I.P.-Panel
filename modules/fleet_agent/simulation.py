@@ -381,7 +381,7 @@ class SimBackend:
         self.executed.append(cmd.command_id)
         return self.world.execute(self.agent_id, cmd)
 
-    def set_gameplay(self, attempt_id: str) -> None:
+    def set_gameplay(self, attempt_id: str, generation: int = 0) -> None:
         self.lease = attempt_id
         if not attempt_id and self.client.worker_running:
             self.client.worker_running = False

@@ -66,6 +66,7 @@ class WindowsBackend:
         self._capture = capture
         self._lock = threading.RLock()
         self._lease = ""
+        self._lease_generation = 0
         self._worker_exit = ""
         self._last_screen = Screen.UNKNOWN
         self._screen_since = clock()
@@ -220,8 +221,13 @@ class WindowsBackend:
                 pass
 
     # ----- lease / worker ------------------------------------------------------------
-    def set_gameplay(self, attempt_id: str) -> None:
+    def set_gameplay(self, attempt_id: str, generation: int = 0) -> None:
         with self._lock:
+            current = getattr(self, "_lease_generation", 0)
+            if generation > 0 and generation < current:
+                return
+            if generation > 0:
+                self._lease_generation = generation
             self._lease = attempt_id
             if attempt_id:
                 if not self.inputs.grant_gameplay(attempt_id):

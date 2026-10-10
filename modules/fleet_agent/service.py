@@ -20,7 +20,7 @@ from core.wingman_fleet.models import (
 )
 from core.wingman_fleet.reasons import Reason
 from modules.fleet_agent.backend import ExecContext, GameBackend
-from modules.fleet_agent.journal import CommandJournal
+from modules.fleet_agent.journal import CommandJournal, JournalCorrupt
 from modules.fleet_agent.transport import Transport, TransportError
 
 HEARTBEAT_SEC = 0.5
@@ -73,8 +73,33 @@ class AgentService:
         self.epoch = 0
         self.session_stopped = False
         self._run_released = False
+        self._session_generation = 0
+        self._lease_generation = 0
+        self._fail_closed = False
         self._shut_down = False
         self._draining = False
+        self._restore_session()
+
+    def _restore_session(self) -> None:
+        try:
+            run_id, stopped, generation = self.journal.load_session()
+        except JournalCorrupt as exc:
+            self._fail_closed = True
+            self.session_stopped = True
+            self.cancel.set()
+            self.last_error = f"journal corrupt: {exc}"
+            return
+        self.run_id = run_id
+        self._session_generation = generation
+        if stopped and run_id:
+            self.session_stopped = True
+            self.cancel.set()
+            self._run_released = False
+
+    def _persist_session(self) -> None:
+        if self._fail_closed:
+            return
+        self.journal.save_session(self.run_id, self.session_stopped, self._session_generation)
 
     # ----- clocks / lease ------------------------------------------------------------
     def coordinator_time(self) -> float:
@@ -93,14 +118,22 @@ class AgentService:
             else:
                 self.lease_attempt, self.lease_until = "", 0.0
             grant = self.lease_attempt
-        self._push_lease()
+            self._lease_generation += 1
+            generation = self._lease_generation
+        self._push_lease(generation)
         with self._lock:
-            # SAFE_STOP can land while set_gameplay is still applying the old attempt.
-            blocked = self._gameplay_blocked() or self.lease_attempt != grant
-            if blocked:
+            # The apply above can return after SAFE_STOP already wrote a newer decision.
+            superseded = (
+                generation != self._lease_generation
+                or self._gameplay_blocked()
+                or self.lease_attempt != grant
+            )
+            if superseded and generation == self._lease_generation:
                 self.lease_attempt, self.lease_until = "", 0.0
-        if blocked and grant:
-            self._push_lease()
+                self._lease_generation += 1
+            follow = self._lease_generation if superseded else 0
+        if follow:
+            self._push_lease(follow)
 
     def enforce_lease(self) -> None:
         with self._lock:
@@ -109,11 +142,17 @@ class AgentService:
                 self.lease_attempt, self.lease_until = "", 0.0
             else:
                 return
-        self._push_lease()
+        self._push_lease(self._lease_generation)
 
-    def _push_lease(self) -> None:
+    def _push_lease(self, generation: int | None = None) -> None:
         try:
-            self.backend.set_gameplay(self.lease_attempt)
+            attempt = self.lease_attempt
+            setter = self.backend.set_gameplay
+            names = getattr(getattr(setter, "__code__", None), "co_varnames", ())
+            if generation is not None and "generation" in names:
+                setter(attempt, generation)
+            else:
+                setter(attempt)
         except Exception as exc:
             self.log(f"agent: set_gameplay failed: {exc!r}")
             self.backend.safe_stop("lease update failed")
@@ -197,13 +236,18 @@ class AgentService:
             self.epoch += 1
             self._run_released = not bool(run_id)
             if run_id:
-                self.session_stopped = False
-                self.cancel.clear()
+                if self._fail_closed:
+                    self.session_stopped = True
+                else:
+                    self.session_stopped = False
+                    self.cancel.clear()
+            self._session_generation += 1
         detail = f"run changed to {run_id}" if run_id else "coordinator has no run"
         self._fail_queued(pending, Reason.OPERATOR_STOP.value, detail)
+        self._persist_session()
 
     def _accept(self, cmd: Command, server_time: float) -> None:
-        if cmd.agent_id != self.agent_id:
+        if self._fail_closed or cmd.agent_id != self.agent_id:
             return
         known = self.journal.known(cmd.command_id)
         if known is not None:
@@ -242,9 +286,15 @@ class AgentService:
             if latch:
                 self.session_stopped = True
                 self.lease_attempt, self.lease_until = "", 0.0
+                self._lease_generation += 1
+                self._session_generation += 1
             pending = list(self.queue)
             self.queue.clear()
+            generation = self._lease_generation if latch else None
         self._fail_queued(pending, reason, detail)
+        if latch:
+            self._persist_session()
+            self._push_lease(generation)
 
     def _fail_queued(self, pending: list, reason: str, detail: str) -> None:
         for item in pending:

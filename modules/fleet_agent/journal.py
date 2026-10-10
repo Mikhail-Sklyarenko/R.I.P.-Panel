@@ -13,7 +13,17 @@ _SCHEMA = """
 CREATE TABLE IF NOT EXISTS journal(
   command_id TEXT PRIMARY KEY, type TEXT NOT NULL, run_id TEXT NOT NULL,
   received_at REAL NOT NULL, state TEXT NOT NULL, result_json TEXT, acked INTEGER NOT NULL DEFAULT 0);
+CREATE TABLE IF NOT EXISTS agent_session(
+  id INTEGER PRIMARY KEY CHECK(id=1),
+  run_id TEXT NOT NULL,
+  stopped INTEGER NOT NULL,
+  generation INTEGER NOT NULL,
+  updated_at REAL NOT NULL);
 """
+
+
+class JournalCorrupt(RuntimeError):
+    """The local journal cannot be trusted. The agent must fail closed."""
 
 
 class CommandJournal:
@@ -73,6 +83,37 @@ class CommandJournal:
     def prune(self, older_than_sec: float = 7 * 86400) -> None:
         with self._lock:
             self.db.execute("DELETE FROM journal WHERE acked=1 AND received_at<?", (time.time() - older_than_sec,))
+
+    def load_session(self) -> tuple[str, bool, int]:
+        """Return (run_id, stopped, generation). A damaged row fails closed."""
+        with self._lock:
+            try:
+                row = self.db.execute(
+                    "SELECT run_id, stopped, generation FROM agent_session WHERE id=1"
+                ).fetchone()
+            except sqlite3.DatabaseError as exc:
+                raise JournalCorrupt(str(exc)) from exc
+        if row is None:
+            return "", False, 0
+        run_id, stopped, generation = row
+        if not isinstance(run_id, str) or stopped not in (0, 1) or not isinstance(generation, int):
+            raise JournalCorrupt("agent_session row is not usable")
+        return run_id, bool(stopped), int(generation)
+
+    def save_session(self, run_id: str, stopped: bool, generation: int) -> None:
+        with self._lock:
+            self.db.execute("BEGIN IMMEDIATE")
+            try:
+                self.db.execute(
+                    "INSERT INTO agent_session(id, run_id, stopped, generation, updated_at) VALUES(1,?,?,?,?)"
+                    " ON CONFLICT(id) DO UPDATE SET run_id=excluded.run_id, stopped=excluded.stopped,"
+                    " generation=excluded.generation, updated_at=excluded.updated_at",
+                    (run_id, 1 if stopped else 0, int(generation), time.time()),
+                )
+                self.db.execute("COMMIT")
+            except BaseException:
+                self.db.execute("ROLLBACK")
+                raise
 
     def close(self) -> None:
         with self._lock:

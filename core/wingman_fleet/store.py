@@ -9,8 +9,9 @@ import json
 import sqlite3
 import threading
 import time
+from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any, Iterable, Iterator
 
 from core.wingman_fleet.models import Command, CommandResult, ResultStatus, RunPlan, dumps
 
@@ -31,6 +32,12 @@ CREATE TABLE IF NOT EXISTS friendships(
     a TEXT NOT NULL, b TEXT NOT NULL, confirmed_at REAL NOT NULL, PRIMARY KEY(a, b));
 CREATE TABLE IF NOT EXISTS agents(
     agent_id TEXT PRIMARY KEY, computer TEXT, last_seen REAL, info_json TEXT);
+CREATE TABLE IF NOT EXISTS operator_requests(
+    request_key TEXT PRIMARY KEY, command_id TEXT NOT NULL, run_id TEXT NOT NULL,
+    agent_id TEXT NOT NULL, type TEXT NOT NULL, created_at REAL NOT NULL);
+CREATE TABLE IF NOT EXISTS operator_stops(
+    run_id TEXT NOT NULL, agent_id TEXT NOT NULL, command_id TEXT NOT NULL,
+    created_at REAL NOT NULL, PRIMARY KEY(run_id, agent_id));
 """
 
 
@@ -44,6 +51,35 @@ class FleetStore:
         self.db.execute("PRAGMA journal_mode=WAL")
         self.db.execute("PRAGMA synchronous=NORMAL")
         self.db.executescript(SCHEMA)
+        self._migrate_runs()
+
+    @contextmanager
+    def transaction(self) -> Iterator[sqlite3.Connection]:
+        """One IMMEDIATE transaction. isolation_level=None does not group statements by itself."""
+        with self._lock:
+            self.db.execute("BEGIN IMMEDIATE")
+            try:
+                yield self.db
+            except BaseException:
+                try:
+                    self.db.execute("ROLLBACK")
+                except sqlite3.Error:
+                    pass
+                raise
+            else:
+                self.db.execute("COMMIT")
+
+    def _migrate_runs(self) -> None:
+        with self._lock:
+            rows = self.db.execute(
+                "SELECT run_id FROM runs WHERE active=1 ORDER BY created_at DESC, run_id DESC"
+            ).fetchall()
+            if len(rows) > 1:
+                keep = rows[0][0]
+                self.db.execute("UPDATE runs SET active=0 WHERE active=1 AND run_id<>?", (keep,))
+            self.db.execute(
+                "CREATE UNIQUE INDEX IF NOT EXISTS runs_one_active ON runs(active) WHERE active=1"
+            )
 
     def close(self) -> None:
         with self._lock:
@@ -51,11 +87,12 @@ class FleetStore:
 
     # ----- runs ----------------------------------------------------------------------
     def save_run(self, plan: RunPlan) -> None:
-        with self._lock:
+        with self.transaction():
             self.db.execute("UPDATE runs SET active=0 WHERE run_id<>?", (plan.run_id,))
             self.db.execute(
                 "INSERT OR IGNORE INTO runs(run_id, plan_json, created_at, updated_at) VALUES(?,?,?,?)",
                 (plan.run_id, plan.to_json(), plan.created_at, time.time()))
+            self.db.execute("UPDATE runs SET active=1, updated_at=? WHERE run_id=?", (time.time(), plan.run_id))
 
     def save_state(self, run_id: str, state: dict[str, Any]) -> None:
         with self._lock:
@@ -88,6 +125,48 @@ class FleetStore:
                 if cur.rowcount:
                     added.append(c)
         return added
+
+    def accept_operator_command(self, cmd: Command, request_key: str, *, latch_stop: bool) -> Command:
+        """Insert the operator command and, for SAFE_STOP, the durable ban in one transaction.
+
+        The same request_key returns the original command and does not insert another.
+        """
+        if not request_key:
+            raise ValueError("operator request_key is required")
+        with self.transaction():
+            existing = self.db.execute(
+                "SELECT command_id FROM operator_requests WHERE request_key=?", (request_key,)
+            ).fetchone()
+            if existing is not None:
+                row = self.db.execute(
+                    "SELECT command_json FROM commands WHERE command_id=?", (existing[0],)
+                ).fetchone()
+                if row is None:
+                    raise RuntimeError(f"operator request {request_key} has no command")
+                return Command.from_dict(json.loads(row[0]))
+            self.db.execute(
+                "INSERT INTO commands(command_id, run_id, agent_id, type, command_json, issued_at, updated_at)"
+                " VALUES(?,?,?,?,?,?,?)",
+                (cmd.command_id, cmd.run_id, cmd.agent_id, cmd.type.value, dumps(cmd), cmd.issued_at, time.time()),
+            )
+            self.db.execute(
+                "INSERT INTO operator_requests(request_key, command_id, run_id, agent_id, type, created_at)"
+                " VALUES(?,?,?,?,?,?)",
+                (request_key, cmd.command_id, cmd.run_id, cmd.agent_id, cmd.type.value, time.time()),
+            )
+            if latch_stop:
+                self.db.execute(
+                    "INSERT OR IGNORE INTO operator_stops(run_id, agent_id, command_id, created_at) VALUES(?,?,?,?)",
+                    (cmd.run_id, cmd.agent_id, cmd.command_id, time.time()),
+                )
+        return cmd
+
+    def operator_stopped_agents(self, run_id: str) -> list[str]:
+        with self._lock:
+            rows = self.db.execute(
+                "SELECT agent_id FROM operator_stops WHERE run_id=? ORDER BY agent_id", (run_id,)
+            ).fetchall()
+        return [row[0] for row in rows]
 
     def pending_for(self, agent_id: str, run_id: str) -> list[Command]:
         with self._lock:
