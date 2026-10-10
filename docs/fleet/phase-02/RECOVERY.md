@@ -19,7 +19,9 @@ The command, the idempotency key, and `operator_stops` commit in one `BEGIN IMME
 
 A lost ACK leaves the coordinator at the last durable state. The result write and the book update are one transaction, so a crash between them does not acknowledge the result. The next delivery applies it. It does not mark the missing agent committed or released. The operator action is reconcile, then repeat the same command id. An older `assignment_generation` is ignored for release and rejected for commit.
 
-A new agent `boot_id` clears `verification_status`, `verification_seq`, `verification_id`, and `identity_at`. A VERIFY result that still carries the previous boot is ignored. READY returns only after a measurement from the current boot.
+A new `process_generation` or a new `boot_id` clears `verification_status`, `verification_seq`, `verification_id`, and `identity_at`. A VERIFY result that still carries the previous boot or the previous process generation is stored and not applied. READY returns only after a measurement from the admitted session. The admitted generation survives a coordinator restart. A wiped agent journal does not reset it; re-enrollment does.
+
+A crash during the result transaction rolls the result and the book change back together. The heartbeat is not acknowledged. The same terminal body can be delivered again and is applied once. `operator_stops` is a different table and is not cleared by a new process generation.
 
 `FleetStore.transaction` records the owning thread. A nested call on that thread joins the open transaction and does not commit or roll it back. Another thread waits on the lock. It does not write into the open transaction. The owner's rollback discards only the owner's writes.
 

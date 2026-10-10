@@ -21,13 +21,15 @@ Existing tables `runs`, `commands`, `events`, `friendships`, `agents` stay. New 
 - `operator_requests(request_key)` and `operator_stops(run_id, agent_id)` from phase 02.0. One active run is enforced by `runs_one_active`.
 - `preparations` and `preparation_slots`. Partial unique indexes `assignment_one_agent` and `assignment_one_steam` apply to statuses `prepared`, `committed`, `active`, `reconcile_required`.
 - `assignment_events` is the transition log.
-- `agent_credentials` stores a SHA-256 of a per-agent token, not the token.
-- `agent_presence` stores `boot_id`, `protocol`, and `last_seen`. It is the availability row used by draft, prepare, and READY. A catalog cache row can still be shown after it goes stale; it is not that proof.
+- `agent_credentials` stores a SHA-256 of a per-agent token, not the token, plus `registration_generation`.
+- `agent_presence` stores `boot_id`, `protocol`, `last_seen`, `process_generation`, and `registration_generation`. It is the admitted session and the availability row used by draft, prepare, and READY. A catalog cache row can still be shown after it goes stale; it is not that proof.
+- `verification_seq(preparation_id, agent_id, next_seq)` allocates VERIFY order. It is not a wall clock.
 - `catalog_cache` stores the public snapshot fields only.
-- `catalog_heads` keeps `boot_id` and `sequence`. A new non-empty boot may replace a snapshot at the same generation. An empty boot id does not.
+- `catalog_heads` keeps `boot_id` and `sequence`. Once `process_generation` is admitted, the snapshot must name that session. An empty boot id does not reset the fence.
+- `PRAGMA user_version` is 4 after `AssignmentBook` opens the file. A higher version refuses to open. Opening twice does not drop rows.
 
 `RunPlan` is still the immutable run snapshot in `runs.plan_json`. A preparation is not a run. `FleetRoster` JSON remains the slot layout and is not proof of READY.
 
 ## Agent journal
 
-`agent_session` is one row: `run_id`, `stopped`, `generation`. A corrupt row fails closed. Interrupted `running` commands are still marked failed on open and are not replayed.
+`agent_session` is one row: `run_id`, `stopped`, `generation`, `process_generation`, `registration_generation`. `generation` is still the SAFE_STOP / lease latch. `process_generation` is the process fence and is not reset by `save_session`. `PRAGMA user_version` is 2. A newer journal refuses to open. A negative or non-integer process counter fails closed. Interrupted `running` commands are still marked failed on open and are not replayed. An unacked result keeps the evidence it was finished with, including the old boot and process generation.

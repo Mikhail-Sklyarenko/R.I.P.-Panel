@@ -1,6 +1,6 @@
 # Phase 03
 
-Phase 02.7 closed the audit findings in `FINDINGS_02_7.md`. It did not start this phase. Phase 02 is still a simulated assignment layer with a TLS mode and an enrollment form. It is not a finished four-PC deployment.
+Phase 02.8 closed the message-fencing defects in `FINDINGS_02_8.md`. It did not start this phase. Phase 02 is still a simulated assignment layer with a TLS mode and an enrollment form. It is not a finished four-PC deployment.
 
 1. Run `SECURE_LAN` on four Windows PCs. `lan_ready` may become true from the configuration. `four_pc_proven` must stay false until that trial is recorded.
 2. Confirm DPAPI enrollment on each PC: the coordinator shows a one-time code, the agent PC claims it, and the next heartbeat is `registered`. Revoke one PC and confirm it stays rejected.

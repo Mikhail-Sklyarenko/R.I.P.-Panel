@@ -51,3 +51,9 @@ The full suite excluding `tests/test_csgobot*.py` was `11 failed, 961 passed, 3 
 - `tests/test_wingman.py::test_complete_synthetic_cycle`
 
 CustomTkinter created a withdrawn window on a 1920x1080 display. The Wingman tab buttons were not clicked, and Steam was not started.
+
+## Phase 02.8
+
+Branch `fix/fleet-phase02-message-fencing`. The 02.7 profile plus `tests/test_fleet_phase028.py` passed as `167 passed in 48.49s`. The base profile on `cce9210` was `146 passed`. The new file is 21 tests. See `ACCEPTANCE_02_8.md` and `FINDINGS_02_8.md`.
+
+The full suite excluding `tests/test_csgobot*.py` was `11 failed, 982 passed, 3 skipped` in 857.23s. The same 11 names as Phase 02.7 failed. The pass count rose by 21, which is the new fencing file. `four_pc_proven` stays false.
