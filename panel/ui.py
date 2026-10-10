@@ -486,6 +486,20 @@ class PanelView:
         ctk.CTkButton(parent, text="Сохранить слоты и конфиг", command=self._save_fleet).pack(
             fill="x", padx=8, pady=4
         )
+        ctk.CTkLabel(
+            parent,
+            text="Назначения аккаунтов подтверждаются отдельно и не запускают игру",
+        ).pack(anchor="w", padx=8, pady=(8, 2))
+        assign = ctk.CTkFrame(parent, fg_color="transparent")
+        assign.pack(fill="x", padx=8, pady=2)
+        ctk.CTkButton(assign, text="Подготовить 4 назначения", width=180,
+                      command=self._fleet_prepare).pack(side="left", padx=2)
+        ctk.CTkButton(assign, text="Подтвердить состав", width=160,
+                      command=self._fleet_commit).pack(side="left", padx=2)
+        ctk.CTkButton(assign, text="Отменить подготовку", width=160,
+                      command=self._fleet_release).pack(side="left", padx=2)
+        ctk.CTkButton(assign, text="Обновить", width=100,
+                      command=self.ctrl.refresh_fleet_dashboard).pack(side="left", padx=2)
         ops = ctk.CTkFrame(parent, fg_color="transparent")
         ops.pack(fill="x", padx=8, pady=2)
         ctk.CTkButton(ops, text="Пара 1 повтор", width=110,
@@ -505,6 +519,31 @@ class PanelView:
         ):
             ctk.CTkButton(extra, text=text, width=120,
                           command=lambda c=cmd: self._fleet_local_command(c)).pack(side="left", padx=2)
+
+    def _fleet_selection(self) -> list[dict]:
+        desk = self.ctrl.fleet_desk()
+        rows = []
+        for slot, vars_ in self._fleet_slots.items():
+            agent_id = vars_["agent_id"].get().strip()
+            accounts = desk.accounts_for(agent_id) if desk is not None else []
+            account = next((item for item in accounts if item["steam_id64"] and item["enabled"]), None)
+            rows.append({
+                "slot_id": slot,
+                "agent_id": agent_id,
+                "local_account_id": account["local_account_id"] if account else "",
+                "steam_id64": account["steam_id64"] if account else "",
+                "expected_catalog_revision": int(account["catalog_revision"]) if account else 0,
+            })
+        return rows
+
+    def _fleet_prepare(self) -> None:
+        self.ctrl.fleet_account_action("prepare", self._fleet_selection())
+
+    def _fleet_commit(self) -> None:
+        self.ctrl.fleet_account_action("commit")
+
+    def _fleet_release(self) -> None:
+        self.ctrl.fleet_account_action("release")
 
     def _fleet_start_coordinator(self) -> None:
         try:

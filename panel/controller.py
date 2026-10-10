@@ -465,6 +465,19 @@ class PanelController:
         host = self._fleet_host
         st = host.status() if host is not None else {}
         lines.append(f"координатор: {'да' if st.get('coordinator') else 'нет'}  {st.get('url', '')}")
+        lines.append("транспорт: HTTP без TLS, реальная сеть между ПК не готова")
+        desk = getattr(self, "_fleet_desk", None)
+        if desk is not None:
+            if desk.error:
+                lines.append(f"ошибка назначения: {desk.error}")
+            elif desk.notice:
+                lines.append(f"назначение: {desk.notice}")
+            for row in desk.rows():
+                lines.append(
+                    f"ПК {row['slot_id']} {row['agent_id'] or '—'} связь={row['link']} "
+                    f"аккаунт={row['local_account_id'] or '—'} steam={row['steam_id64'] or '—'} "
+                    f"резерв={row['reservation_status'] or '—'} личность={row['identity'] or 'не проверена'}"
+                )
         if st.get("run_id"):
             lines.append(f"run {st['run_id']}  {st.get('run_state', '')}  {st.get('run_reason', '')}")
             lines.append(f"циклы {st.get('cycles', 0)}  волна {st.get('wave', 0)}")
@@ -507,8 +520,52 @@ class PanelController:
         if self._wingman_test_running():
             self.append_log("Сначала остановите тест Напарников")
             return
-        run_id = self._fleet().start_run()
+        host = self._fleet()
+        book = getattr(host, "assignments", None)
+        if book is None or not book.current_ready():
+            self.append_log("Запуск запрещён: четыре назначения не подтверждены свежей проверкой личности")
+            return
+        run_id = host.start_run()
         self.append_log(f"fleet run started {run_id}")
+
+    def fleet_desk(self):
+        from panel.fleet_desk import FleetDesk
+        host = self._fleet()
+        book = getattr(host, "assignments", None)
+        if book is None:
+            return None
+        desk = getattr(self, "_fleet_desk", None)
+        if desk is None or desk.book is not book:
+            desk = FleetDesk(book)
+            self._fleet_desk = desk
+        return desk
+
+    def fleet_account_action(self, action: str, selections: list | None = None, run_id: str = "") -> str:
+        desk = self.fleet_desk()
+        if desk is None:
+            self.append_log("Сначала запустите координатор")
+            self.refresh_fleet_dashboard()
+            return ""
+        host = self._fleet()
+        links = {}
+        if host.coordinator is not None:
+            links = {agent_id: link.value for agent_id, link in host.coordinator.links().items()}
+        if action == "prepare":
+            message = desk.prepare(selections or [], links)
+        elif action == "commit":
+            import uuid
+            message = desk.commit(run_id or uuid.uuid4().hex)
+        elif action == "release":
+            message = desk.release()
+        else:
+            message = ""
+            desk.error = "неизвестное действие"
+        if desk.error:
+            self.append_log(f"Назначение отклонено: {desk.error}")
+        elif message:
+            self.append_log(f"Назначение: {message}")
+        self.refresh_fleet_dashboard()
+        return desk.error or message
 
     def stop_fleet_run(self) -> None:
         self._fleet().stop_run()
