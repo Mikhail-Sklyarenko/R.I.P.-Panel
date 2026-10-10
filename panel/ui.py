@@ -492,6 +492,30 @@ class PanelView:
             parent,
             text="Назначения аккаунтов подтверждаются отдельно и не запускают игру",
         ).pack(anchor="w", padx=8, pady=(8, 2))
+        self._account_choices: dict[int, dict[str, str]] = {}
+        self._account_menus: dict[int, tuple[ctk.StringVar, ctk.CTkOptionMenu]] = {}
+        for slot, pair_id, role in SLOT_LAYOUT:
+            card = ctk.CTkFrame(parent)
+            card.pack(fill="x", padx=8, pady=2)
+            ctk.CTkLabel(card, text=f"PC-0{slot} {role.value} {pair_id}", width=150).pack(side="left", padx=4)
+            choice = ctk.StringVar(value="выберите аккаунт")
+            menu = ctk.CTkOptionMenu(
+                card, values=["выберите аккаунт"], variable=choice, width=280,
+                command=lambda _value, slot_id=slot: self._choose_fleet_account(slot_id),
+            )
+            menu.pack(side="left", padx=4)
+            detail = ctk.CTkLabel(card, text="нет данных", anchor="w")
+            detail.pack(side="left", padx=4)
+            self._account_menus[slot] = (choice, menu, detail)
+            ctk.CTkButton(
+                card, text="Код", width=50,
+                command=lambda slot_id=slot: self._fleet_enroll_slot(slot_id),
+            ).pack(side="left", padx=2)
+            ctk.CTkButton(
+                card, text="Отозвать", width=80,
+                command=lambda slot_id=slot: self._fleet_revoke_slot(slot_id),
+            ).pack(side="left", padx=2)
+        self.ctrl._fleet_card_hook = self._fill_account_menus
         assign = ctk.CTkFrame(parent, fg_color="transparent")
         assign.pack(fill="x", padx=8, pady=2)
         ctk.CTkButton(assign, text="Подготовить 4 назначения", width=180,
@@ -502,6 +526,19 @@ class PanelView:
                       command=self._fleet_release).pack(side="left", padx=2)
         ctk.CTkButton(assign, text="Обновить", width=100,
                       command=self.ctrl.refresh_fleet_dashboard).pack(side="left", padx=2)
+        ctk.CTkButton(assign, text="Проверить SteamID64", width=150,
+                      command=lambda: self._fleet_action("verify")).pack(side="left", padx=2)
+        ctk.CTkButton(assign, text="Повторить согласование", width=170,
+                      command=lambda: self._fleet_action("reconcile")).pack(side="left", padx=2)
+        ctk.CTkButton(assign, text="Диагностика", width=110,
+                      command=lambda: self._fleet_action("diagnostics")).pack(side="left", padx=2)
+        claim = ctk.CTkFrame(parent, fg_color="transparent")
+        claim.pack(fill="x", padx=8, pady=2)
+        self._fleet_enroll_code = ctk.StringVar(value="")
+        ctk.CTkEntry(claim, textvariable=self._fleet_enroll_code, width=220,
+                     placeholder_text="код регистрации этого ПК").pack(side="left", padx=2)
+        ctk.CTkButton(claim, text="Подтвердить регистрацию", width=180,
+                      command=self._fleet_claim).pack(side="left", padx=2)
         ops = ctk.CTkFrame(parent, fg_color="transparent")
         ops.pack(fill="x", padx=8, pady=2)
         ctk.CTkButton(ops, text="Пара 1 повтор", width=110,
@@ -522,6 +559,49 @@ class PanelView:
             ctk.CTkButton(extra, text=text, width=120,
                           command=lambda c=cmd: self._fleet_local_command(c)).pack(side="left", padx=2)
 
+    def _fill_account_menus(self) -> None:
+        desk = self.ctrl.fleet_desk()
+        if desk is None:
+            return
+        for slot, (choice, menu, detail) in self._account_menus.items():
+            agent_id = self._fleet_slots[slot]["agent_id"].get().strip()
+            accounts = desk.accounts_for(agent_id) if agent_id else []
+            labels = ["выберите аккаунт"]
+            mapping: dict[str, str] = {}
+            for account in accounts:
+                label = (
+                    f"{account['display_name'] or 'без имени'} | "
+                    f"{account['steam_id64'] or 'без SteamID64'} | "
+                    f"{account['binding_status']} | {account['local_account_id'][:8]}"
+                )
+                labels.append(label)
+                mapping[label] = account["local_account_id"]
+            menu.configure(values=labels or ["выберите аккаунт"])
+            self._account_choices[slot] = mapping
+            if choice.get() not in labels:
+                choice.set("выберите аккаунт")
+                self._fleet_slots[slot]["local_account_id"].set("")
+                if desk is not None:
+                    desk.selection.pop(slot, None)
+            row = next((item for item in desk.rows() if item["slot_id"] == slot), None) if desk else None
+            if row is None:
+                detail.configure(text="нет данных")
+            else:
+                detail.configure(text=(
+                    f"{row['registration']} | {row['link']} | "
+                    f"{row['verification_status'] or 'личность не проверена'} | "
+                    f"{row['reservation_status'] or 'не назначен'}"
+                )[:120])
+
+    def _choose_fleet_account(self, slot: int) -> None:
+        choice, _menu, _detail = self._account_menus[slot]
+        local_id = self._account_choices.get(slot, {}).get(choice.get(), "")
+        self._fleet_slots[slot]["local_account_id"].set(local_id)
+        desk = self.ctrl.fleet_desk()
+        agent_id = self._fleet_slots[slot]["agent_id"].get().strip()
+        if desk is not None and local_id and agent_id:
+            desk.choose(slot, agent_id, local_id)
+
     def _fleet_selection(self) -> list[dict]:
         desk = self.ctrl.fleet_desk()
         rows = []
@@ -530,8 +610,6 @@ class PanelView:
             accounts = desk.accounts_for(agent_id) if desk is not None else []
             wanted = vars_["local_account_id"].get().strip()
             account = next((item for item in accounts if item["local_account_id"] == wanted), None)
-            if account is None:
-                account = next((item for item in accounts if item["steam_id64"] and item["enabled"]), None)
             rows.append({
                 "slot_id": slot,
                 "agent_id": agent_id,
@@ -541,8 +619,63 @@ class PanelView:
             })
         return rows
 
+    def _fleet_guard(self) -> bool:
+        if getattr(self, "_fleet_busy", False):
+            return False
+        self._fleet_busy = True
+        return True
+
+    def _fleet_action(self, action: str, agent_id: str = "") -> None:
+        if not self._fleet_guard():
+            return
+        try:
+            self.ctrl.fleet_account_action(action, agent_id=agent_id)
+        finally:
+            self._fleet_busy = False
+
+    def _fleet_enroll_slot(self, slot: int) -> None:
+        agent_id = self._fleet_slots[slot]["agent_id"].get().strip()
+        if not agent_id:
+            self.ctrl.append_log("fleet: у слота нет agent id")
+            return
+        self._fleet_action("enroll", agent_id)
+
+    def _fleet_revoke_slot(self, slot: int) -> None:
+        agent_id = self._fleet_slots[slot]["agent_id"].get().strip()
+        if not agent_id:
+            self.ctrl.append_log("fleet: у слота нет agent id")
+            return
+        self._fleet_action("revoke", agent_id)
+
+    def _fleet_claim(self) -> None:
+        if not self._fleet_guard():
+            return
+        code = self._fleet_enroll_code.get().strip()
+        self._fleet_enroll_code.set("")
+
+        def work() -> None:
+            try:
+                agent_id = self.ctrl._fleet().claim_agent(code)
+                text = f"агент {agent_id} зарегистрирован, токен сохранён локально"
+            except Exception as exc:
+                text = f"регистрация отклонена: {exc}"
+            self.root.after(0, lambda: self._fleet_claim_done(text))
+
+        import threading
+        threading.Thread(target=work, daemon=True).start()
+
+    def _fleet_claim_done(self, text: str) -> None:
+        self._fleet_busy = False
+        self.ctrl.append_log(text)
+        self.ctrl.refresh_fleet_dashboard()
+
     def _fleet_prepare(self) -> None:
-        self.ctrl.fleet_account_action("prepare", self._fleet_selection())
+        if not self._fleet_guard():
+            return
+        try:
+            self.ctrl.fleet_account_action("prepare", self._fleet_selection())
+        finally:
+            self._fleet_busy = False
 
     def _fleet_commit(self) -> None:
         self.ctrl.fleet_account_action("commit")

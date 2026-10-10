@@ -9,6 +9,7 @@ from __future__ import annotations
 import hmac
 import json
 import socket
+import ssl
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -75,6 +76,21 @@ class _Handler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:
         path = urlparse(self.path).path
+        if path == "/v1/enroll":
+            payload = self._body()
+            book = getattr(self.coordinator, "assignments", None)
+            if payload is None:
+                return
+            if book is None:
+                self._send(403, {"ok": False, "error": "enrollment unavailable"})
+                return
+            try:
+                token = book.claim_enrollment(str(payload["agent_id"]), str(payload["code"]))
+            except (KeyError, TypeError, RuntimeError):
+                self._send(403, {"ok": False, "error": "enrollment rejected"})
+                return
+            self._send(200, {"ok": True, "agent_token": token})
+            return
         if path == "/v1/heartbeat":
             payload = self._body()
             if payload is not None:
@@ -107,6 +123,7 @@ class FleetServer:
     def __init__(self, coordinator: Coordinator, *, host: str = "0.0.0.0", port: int = 8790):
         handler = type("FleetHandler", (_Handler,), {"coordinator": coordinator})
         self.coordinator = coordinator
+        self.tls = False
         self.httpd = ThreadingHTTPServer((host, port), handler)
         self.httpd.daemon_threads = True
         self._stop = threading.Event()
@@ -117,7 +134,22 @@ class FleetServer:
     def port(self) -> int:
         return int(self.httpd.server_address[1])
 
-    def start(self) -> "FleetServer":
+    def enable_tls(self, certfile: str, keyfile: str) -> None:
+        context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+        context.minimum_version = ssl.TLSVersion.TLSv1_2
+        context.load_cert_chain(certfile, keyfile)
+        self.httpd.socket = context.wrap_socket(self.httpd.socket, server_side=True)
+        self.tls = True
+
+    def start(self, *, certfile: str = "", keyfile: str = "") -> "FleetServer":
+        bound = str(self.httpd.server_address[0])
+        if bound not in {"127.0.0.1", "localhost", "::1"} and not (certfile and keyfile):
+            self.httpd.server_close()
+            raise RuntimeError("cleartext HTTP is refused outside localhost; SECURE_LAN requires TLS")
+        if certfile or keyfile:
+            if not certfile or not keyfile:
+                raise RuntimeError("tls needs both a certificate and a key")
+            self.enable_tls(certfile, keyfile)
         for t in self._threads:
             t.start()
         return self

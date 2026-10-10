@@ -82,10 +82,12 @@ def test_prepare_commit_release_are_idempotent(tmp_path):
             preparation_id="prep-2", local_account_id=alpha["local_account_id"], steam_id64=SID,
             catalog_revision=revision, generation=1, coordinator_generation=1,
         )
-    assert catalog.commit(preparation_id="prep-1", generation=2, run_id="run-1") == "committed"
-    assert catalog.commit(preparation_id="prep-1", generation=2, run_id="run-1") == "committed"
+    assert catalog.commit(preparation_id="prep-1", generation=1, run_id="run-1") == "committed"
+    assert catalog.commit(preparation_id="prep-1", generation=1, run_id="run-1") == "committed"
     with pytest.raises(CatalogError):
-        catalog.commit(preparation_id="prep-1", generation=1, run_id="run-1")
+        catalog.commit(preparation_id="prep-1", generation=2, run_id="run-1")
+    with pytest.raises(CatalogError):
+        catalog.commit(preparation_id="prep-1", generation=1, run_id="run-other")
     catalog.db.execute(
         "UPDATE reservations SET status='active' WHERE preparation_id='prep-1'"
     )

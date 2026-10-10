@@ -10,9 +10,10 @@ from core.wingman_fleet.roster import SLOT_LAYOUT
 class FleetDesk:
     def __init__(self, book: AssignmentBook):
         self.book = book
-        self.preparation_id = ""
+        self.preparation_id = book.current()
         self.error = ""
-        self.notice = ""
+        self.notice = book.status(self.preparation_id)["status"] if self.preparation_id else ""
+        self.selection: dict[int, dict[str, Any]] = {}
 
     def rows(self, links: dict[str, str] | None = None) -> list[dict[str, Any]]:
         links = links or {}
@@ -41,6 +42,10 @@ class FleetDesk:
                 "reservation_status": slot.get("reservation_status", ""),
                 "assignment_status": assignment_status,
                 "identity": slot.get("identity_observed", ""),
+                "verification_status": slot.get("verification_status", ""),
+                "verification_error": slot.get("verification_error", ""),
+                "registration": self.book.registration_state(agent_id) if agent_id else "unregistered",
+                "display_name": slot.get("display_name", ""),
             })
         return rows
 
@@ -53,9 +58,36 @@ class FleetDesk:
             ).fetchall()
         return [dict(row) for row in found]
 
-    def prepare(self, selections: list[dict[str, Any]], links: dict[str, str]) -> str:
+    def choose(self, slot_id: int, agent_id: str, local_account_id: str) -> str:
+        match = next(
+            (item for item in self.accounts_for(agent_id) if item["local_account_id"] == local_account_id),
+            None,
+        )
+        if match is None:
+            self.selection.pop(slot_id, None)
+            self.error = "аккаунт не найден в актуальном каталоге этого компьютера"
+            self.notice = ""
+            return self.error
+        self.selection[slot_id] = {
+            "slot_id": slot_id,
+            "agent_id": agent_id,
+            "local_account_id": match["local_account_id"],
+            "steam_id64": match["steam_id64"],
+            "expected_catalog_revision": int(match["catalog_revision"]),
+            "display_name": match["display_name"],
+        }
+        self.error = ""
+        return match["local_account_id"]
+
+    def prepare(self, selections: list[dict[str, Any]] | None = None, links: dict[str, str] | None = None) -> str:
+        chosen = list(selections) if selections is not None else list(self.selection.values())
+        if len(chosen) != 4 or any(not item.get("local_account_id") for item in chosen):
+            self.error = "выберите аккаунт на каждом из четырёх компьютеров"
+            self.notice = ""
+            return ""
+        links = links or {}
         try:
-            self.preparation_id = self.book.draft(selections, links=links)
+            self.preparation_id = self.book.draft(chosen, links=links)
             self.book.begin_prepare(self.preparation_id)
             queued = self.book.enqueue(self.preparation_id, "prepare")
             state = self.book.status(self.preparation_id)["status"]
@@ -94,4 +126,73 @@ class FleetDesk:
         except AssignmentError as exc:
             self.error = str(exc)
             self.notice = ""
+        return self.notice
+
+    def enroll(self, agent_id: str) -> str:
+        try:
+            code = self.book.open_enrollment(agent_id)
+        except AssignmentError as exc:
+            self.error = str(exc)
+            self.notice = ""
+            return ""
+        self.error = ""
+        self.notice = f"код для {agent_id}: {code}"
+        return code
+
+    def revoke(self, agent_id: str) -> str:
+        self.book.revoke_agent(agent_id)
+        self.error = ""
+        self.notice = f"{agent_id}: регистрация отозвана"
+        return self.notice
+
+    def verify(self) -> str:
+        if not self.preparation_id:
+            self.error = "нет подготовки"
+            self.notice = ""
+            return ""
+        try:
+            queued = self.book.enqueue(self.preparation_id, "verify")
+        except AssignmentError as exc:
+            self.error = str(exc)
+            self.notice = ""
+            return ""
+        self.error = ""
+        self.notice = f"проверка отправлена; команд: {queued}"
+        return self.notice
+
+    def reconcile(self) -> str:
+        if not self.preparation_id:
+            self.error = "нет подготовки"
+            self.notice = ""
+            return ""
+        try:
+            state = self.book.reconcile(self.preparation_id)
+            queued = self.book.enqueue(self.preparation_id, "reconcile")
+        except AssignmentError as exc:
+            self.error = str(exc)
+            self.notice = ""
+            return ""
+        self.error = ""
+        self.notice = f"{state}; команд: {queued}"
+        return self.notice
+
+    def diagnostics(self) -> str:
+        lines = [self.notice or self.error or "нет активного сообщения"]
+        if self.preparation_id:
+            try:
+                state = self.book.status(self.preparation_id)
+            except AssignmentError as exc:
+                lines.append(str(exc))
+            else:
+                lines.append(
+                    f"подготовка {state['status']} run={state['run_id'] or '—'} {state['last_error']}"
+                )
+        for row in self.rows():
+            lines.append(
+                f"PC-0{row['slot_id']} {row['agent_id'] or '—'} регистрация={row['registration']} "
+                f"связь={row['link']} проверка={row['verification_status'] or 'нет'} "
+                f"резерв={row['reservation_status'] or 'нет'} {row['verification_error']}"
+            )
+        self.notice = "\n".join(lines)
+        self.error = ""
         return self.notice

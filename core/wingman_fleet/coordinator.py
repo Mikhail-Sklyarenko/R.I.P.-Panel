@@ -181,8 +181,10 @@ class Coordinator:
             return 400, {"ok": False, "error": f"bad payload: {exc}"}
         agent_id = obs.agent_id
         book = getattr(self, "assignments", None)
-        if book is not None and book.has_credential(agent_id):
-            if not book.authenticate(agent_id, str(payload.get("agent_token") or "")):
+        if book is not None:
+            try:
+                book.authorize(agent_id, str(payload.get("agent_token") or ""))
+            except Exception:
                 return 403, {"ok": False, "error": "unauthorized"}
         with self.lock:
             now = self.clock()
@@ -199,16 +201,30 @@ class Coordinator:
             catalog = payload.get("catalog")
             if book is not None and isinstance(catalog, dict):
                 book.remember_catalog(agent_id, catalog)
+            if book is not None:
+                book.note_boot(agent_id, boot_id)
             accepted: list[str] = []
             for r in results:
                 result_run = self._result_run(r, agent_id, active_run)
-                stored = self.store.record_result(r, agent_id=agent_id, run_id=result_run)
+                owner = self.store.command_owner(r.command_id)
+                assignment = (
+                    book is not None and owner is not None
+                    and owner[2] in {item.value for item in ASSIGNMENT_COMMANDS}
+                )
+                try:
+                    if assignment:
+                        with self.store.transaction():
+                            stored = self.store.record_result(r, agent_id=agent_id, run_id=result_run)
+                            self._fold_assignment_result(r, agent_id)
+                    else:
+                        stored = self.store.record_result(r, agent_id=agent_id, run_id=result_run)
+                except Exception as exc:
+                    self.store.event("assignment", run_id=result_run, agent_id=agent_id, detail=str(exc)[:240])
+                    continue
                 if stored and r.terminal and not r.succeeded:
                     self.store.event("command_result", run_id=result_run,
                                      agent_id=agent_id, reason=r.reason, detail=f"{r.command_id}: {r.detail}",
                                      data=r.evidence or None)
-                if stored:
-                    self._fold_assignment_result(r, agent_id)
                 if stored or self.store.result_is_stored(r, agent_id=agent_id, run_id=result_run):
                     accepted.append(r.command_id)
             if obs.protocol != PROTOCOL_VERSION:
@@ -242,23 +258,31 @@ class Coordinator:
             return
         cmd = Command.from_dict(json.loads(raw[0]))
         preparation_id = str(cmd.params.get("preparation_id") or cmd.run_id)
-        try:
-            if cmd.type is CommandType.PREPARE_ASSIGNMENT:
-                book.note_prepare(preparation_id, agent_id, ok=result.succeeded, detail=result.detail)
-            elif cmd.type is CommandType.COMMIT_ASSIGNMENT:
-                book.note_commit(
-                    preparation_id, agent_id, ok=result.succeeded,
-                    generation=int(cmd.params.get("generation") or 0), detail=result.detail,
-                )
-            elif cmd.type is CommandType.RELEASE_ASSIGNMENT:
-                book.note_release(preparation_id, agent_id, ok=result.succeeded, detail=result.detail)
-            elif cmd.type is CommandType.VERIFY_ASSIGNMENT:
-                book.note_identity(
-                    preparation_id, agent_id, str(cmd.params.get("observed_steam_id64") or ""),
-                    now=self.clock(), fresh=result.succeeded and result.evidence.get("status") == "verified",
-                )
-        except Exception as exc:
-            self.store.event("assignment", run_id=preparation_id, agent_id=agent_id, detail=str(exc)[:240])
+        if cmd.type is CommandType.PREPARE_ASSIGNMENT:
+            book.note_prepare(preparation_id, agent_id, ok=result.succeeded, detail=result.detail)
+        elif cmd.type is CommandType.COMMIT_ASSIGNMENT:
+            book.note_commit(
+                preparation_id, agent_id, ok=result.succeeded,
+                generation=int(cmd.params.get("generation") or 0), detail=result.detail,
+            )
+        elif cmd.type is CommandType.RELEASE_ASSIGNMENT:
+            raw_generation = cmd.params.get("generation")
+            book.note_release(
+                preparation_id, agent_id, ok=result.succeeded, detail=result.detail,
+                generation=int(raw_generation) if raw_generation not in (None, "") else None,
+            )
+        elif cmd.type is CommandType.VERIFY_ASSIGNMENT:
+            evidence = result.evidence or {}
+            book.note_identity(
+                preparation_id, agent_id, str(evidence.get("observed_steam_id64") or ""),
+                now=self.clock(),
+                fresh=bool(result.succeeded and evidence.get("fresh") and evidence.get("status") == "verified"),
+                source=str(evidence.get("source") or ""),
+                generation=int(cmd.params.get("generation") or 0),
+                boot_id=str(evidence.get("boot_id") or ""),
+                verification_id=str(evidence.get("verification_id") or ""),
+                seq=int(cmd.params.get("seq") or 0),
+            )
 
     def _result_run(self, result: CommandResult, agent_id: str, active_run: str) -> str:
         row = self.store.command_owner(result.command_id)

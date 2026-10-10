@@ -6,7 +6,8 @@ import hmac
 import sqlite3
 import time
 import uuid
-from typing import Any
+from contextlib import contextmanager
+from typing import Any, Iterator
 
 from core.wingman_fleet.accounts import parse_steam_id64
 from core.wingman_fleet.roster import SLOT_LAYOUT
@@ -31,6 +32,10 @@ _TRANSITIONS: dict[str, frozenset[str]] = {
 
 class AssignmentError(RuntimeError):
     pass
+
+
+_PROOF_SOURCES = frozenset({"steam_local", "gsi"})
+_VERIFIED = "verified"
 
 
 class AssignmentBook:
@@ -80,6 +85,16 @@ class AssignmentBook:
                 agent_id TEXT PRIMARY KEY,
                 token_hash TEXT NOT NULL,
                 revoked INTEGER NOT NULL DEFAULT 0);
+            CREATE TABLE IF NOT EXISTS catalog_heads(
+                agent_id TEXT PRIMARY KEY,
+                catalog_generation INTEGER NOT NULL,
+                boot_id TEXT NOT NULL DEFAULT '',
+                sequence INTEGER NOT NULL DEFAULT 0,
+                received_at REAL NOT NULL);
+            CREATE TABLE IF NOT EXISTS enrollments(
+                agent_id TEXT PRIMARY KEY,
+                code_hash TEXT NOT NULL,
+                expires_at REAL NOT NULL);
             CREATE TABLE IF NOT EXISTS catalog_cache(
                 agent_id TEXT NOT NULL,
                 local_account_id TEXT NOT NULL,
@@ -93,12 +108,36 @@ class AssignmentBook:
                 PRIMARY KEY(agent_id, local_account_id));
             """
         )
+        for table, name, decl in (
+            ("preparation_slots", "verification_status", "TEXT NOT NULL DEFAULT 'unverified'"),
+            ("preparation_slots", "verification_source", "TEXT NOT NULL DEFAULT ''"),
+            ("preparation_slots", "verification_boot_id", "TEXT NOT NULL DEFAULT ''"),
+            ("preparation_slots", "verification_generation", "INTEGER NOT NULL DEFAULT 0"),
+            ("preparation_slots", "verification_error", "TEXT NOT NULL DEFAULT ''"),
+            ("preparation_slots", "verification_id", "TEXT NOT NULL DEFAULT ''"),
+            ("preparation_slots", "verification_seq", "INTEGER NOT NULL DEFAULT 0"),
+            ("preparation_slots", "link_state", "TEXT NOT NULL DEFAULT ''"),
+            ("preparations", "plan_json", "TEXT NOT NULL DEFAULT ''"),
+            ("catalog_heads", "vault_status", "TEXT NOT NULL DEFAULT ''"),
+        ):
+            try:
+                self.store.db.execute(f"ALTER TABLE {table} ADD COLUMN {name} {decl}")
+            except sqlite3.OperationalError:
+                pass
+
+    @contextmanager
+    def _tx(self) -> Iterator[Any]:
+        if self.store.db.in_transaction:
+            yield self.store.db
+            return
+        with self.store.transaction():
+            yield self.store.db
 
     def register_agent(self, agent_id: str, token: str) -> None:
         if not agent_id or not token:
             raise AssignmentError("agent registration needs an id and a token")
         digest = hashlib.sha256(token.encode("utf-8")).hexdigest()
-        with self.store.transaction():
+        with self._tx():
             row = self.store.db.execute(
                 "SELECT token_hash, revoked FROM agent_credentials WHERE agent_id=?", (agent_id,)
             ).fetchone()
@@ -111,15 +150,55 @@ class AssignmentBook:
             )
 
     def revoke_agent(self, agent_id: str) -> None:
-        with self.store.transaction():
+        with self._tx():
             self.store.db.execute("UPDATE agent_credentials SET revoked=1 WHERE agent_id=?", (agent_id,))
 
-    def has_credential(self, agent_id: str) -> bool:
+    def registration_state(self, agent_id: str) -> str:
         with self.store._lock:
             row = self.store.db.execute(
                 "SELECT revoked FROM agent_credentials WHERE agent_id=?", (agent_id,)
             ).fetchone()
-        return row is not None and not row["revoked"]
+        if row is None:
+            return "unregistered"
+        return "revoked" if row["revoked"] else "registered"
+
+    def has_credential(self, agent_id: str) -> bool:
+        return self.registration_state(agent_id) == "registered"
+
+    def authorize(self, agent_id: str, token: str) -> str:
+        state = self.registration_state(agent_id)
+        if state == "revoked":
+            raise AssignmentError("agent registration is revoked")
+        if state != "registered" or not self.authenticate(agent_id, token):
+            raise AssignmentError("agent is not registered")
+        return state
+
+    def open_enrollment(self, agent_id: str, *, ttl_sec: float = 300.0) -> str:
+        if not agent_id or self.registration_state(agent_id) == "registered":
+            raise AssignmentError("enrollment needs an unregistered or revoked agent id")
+        code = uuid.uuid4().hex
+        digest = hashlib.sha256(code.encode("utf-8")).hexdigest()
+        with self._tx():
+            self.store.db.execute(
+                "INSERT INTO enrollments(agent_id, code_hash, expires_at) VALUES(?,?,?) "
+                "ON CONFLICT(agent_id) DO UPDATE SET code_hash=excluded.code_hash, expires_at=excluded.expires_at",
+                (agent_id, digest, self.clock() + ttl_sec),
+            )
+        return code
+
+    def claim_enrollment(self, agent_id: str, code: str) -> str:
+        digest = hashlib.sha256(str(code).encode("utf-8")).hexdigest()
+        with self.store._lock:
+            row = self.store.db.execute(
+                "SELECT code_hash, expires_at FROM enrollments WHERE agent_id=?", (agent_id,)
+            ).fetchone()
+        if row is None or not hmac.compare_digest(row["code_hash"], digest) or self.clock() > float(row["expires_at"]):
+            raise AssignmentError("enrollment code is not valid")
+        token = uuid.uuid4().hex
+        self.register_agent(agent_id, token)
+        with self._tx():
+            self.store.db.execute("DELETE FROM enrollments WHERE agent_id=?", (agent_id,))
+        return token
 
     def current(self) -> str:
         with self.store._lock:
@@ -147,18 +226,39 @@ class AssignmentBook:
         if snapshot.get("agent_id") not in (None, "", agent_id):
             raise AssignmentError("catalog snapshot is for a different agent")
         accounts = snapshot.get("accounts") or []
-        revision = int(snapshot.get("catalog_revision") or 0)
-        with self.store.transaction():
+        generation = int(snapshot.get("catalog_generation") or snapshot.get("catalog_revision") or 0)
+        sequence = int(snapshot.get("sequence") or 0)
+        boot_id = str(snapshot.get("boot_id") or "")
+        with self.store._lock:
+            head = self.store.db.execute(
+                "SELECT catalog_generation, sequence FROM catalog_heads WHERE agent_id=?", (agent_id,)
+            ).fetchone()
+        if head is not None and (
+            generation < int(head["catalog_generation"])
+            or (generation == int(head["catalog_generation"]) and sequence < int(head["sequence"]))
+        ):
+            return
+        with self._tx():
             self.store.db.execute("DELETE FROM catalog_cache WHERE agent_id=?", (agent_id,))
             for item in accounts:
+                account_revision = int(item.get("account_revision") or item.get("catalog_revision") or generation)
                 self.store.db.execute(
                     "INSERT INTO catalog_cache(agent_id, local_account_id, steam_id64, display_name, enabled,"
                     " binding_status, availability_status, catalog_revision, received_at) VALUES(?,?,?,?,?,?,?,?,?)",
                     (agent_id, str(item["local_account_id"]), str(item.get("steam_id64") or ""),
                      str(item.get("display_name") or "")[:80], 1 if item.get("enabled", True) else 0,
                      str(item.get("binding_status") or "unbound"),
-                     str(item.get("availability_status") or "available"), revision, self.clock()),
+                     str(item.get("availability_status") or "available"), account_revision, self.clock()),
                 )
+            self.store.db.execute(
+                "INSERT INTO catalog_heads(agent_id, catalog_generation, boot_id, sequence, received_at, vault_status) "
+                "VALUES(?,?,?,?,?,?) ON CONFLICT(agent_id) DO UPDATE SET "
+                "catalog_generation=excluded.catalog_generation, boot_id=excluded.boot_id, "
+                "sequence=excluded.sequence, received_at=excluded.received_at, "
+                "vault_status=excluded.vault_status",
+                (agent_id, generation, boot_id, sequence, self.clock(),
+                 str(snapshot.get("vault_status") or "")[:40]),
+            )
 
     def draft(self, selections: list[dict[str, Any]], *, links: dict[str, str] | None = None) -> str:
         """Validate four slots and persist a draft. Nothing is reserved yet."""
@@ -170,7 +270,7 @@ class AssignmentBook:
         preparation_id = uuid.uuid4().hex
         generation = self._next_generation()
         now = self.clock()
-        with self.store.transaction():
+        with self._tx():
             self.store.db.execute(
                 "INSERT INTO preparations(preparation_id, coordinator_generation, status, created_at, updated_at)"
                 " VALUES(?,?,?,?,?)",
@@ -209,7 +309,7 @@ class AssignmentBook:
         if not run_id:
             raise AssignmentError("commit needs a run_id")
         self._move(preparation_id, "prepared", "committing")
-        with self.store.transaction():
+        with self._tx():
             self.store.db.execute(
                 "UPDATE preparations SET run_id=?, status='committed', updated_at=? WHERE preparation_id=?",
                 (run_id, self.clock(), preparation_id),
@@ -219,13 +319,15 @@ class AssignmentBook:
 
     def note_commit(self, preparation_id: str, agent_id: str, *, ok: bool, generation: int, detail: str = "") -> str:
         slot = self._slot_for_agent(preparation_id, agent_id)
-        if int(generation) < int(slot["assignment_generation"]):
-            raise AssignmentError("stale assignment generation")
+        if int(generation) != int(slot["assignment_generation"]):
+            raise AssignmentError("assignment generation does not match")
         prep = self._require(preparation_id)
+        if prep["status"] in ("released", "failed"):
+            return prep["status"]
         if prep["status"] not in ("committed", "committing", "reconcile_required", "verifying_identity", "ready"):
             raise AssignmentError("commit result arrived without a durable commit decision")
         status = "committed" if ok else "reconcile_required"
-        with self.store.transaction():
+        with self._tx():
             self.store.db.execute(
                 "UPDATE preparation_slots SET reservation_status=?, assignment_generation=? "
                 "WHERE preparation_id=? AND agent_id=?",
@@ -241,17 +343,54 @@ class AssignmentBook:
         return self._require(preparation_id)["status"]
 
     def note_identity(self, preparation_id: str, agent_id: str, observed_steam_id64: str, *, now: float,
-                      fresh: bool) -> str:
+                      fresh: bool, source: str = "gsi", generation: int | None = None, boot_id: str = "",
+                      verification_id: str = "", seq: int = 0) -> str:
         slot = self._slot_for_agent(preparation_id, agent_id)
+        expected_generation = int(slot["assignment_generation"])
+        if generation is not None and int(generation) != expected_generation:
+            return self._require(preparation_id)["status"]
+        if int(slot["verification_seq"] or 0) > int(seq):
+            return self._require(preparation_id)["status"]
         observed = parse_steam_id64(observed_steam_id64) if observed_steam_id64 else ""
-        matched = fresh and observed == slot["steam_id64"]
-        with self.store.transaction():
+        status, error = self._verification_status(slot["steam_id64"], observed, fresh=fresh, source=source)
+        with self._tx():
             self.store.db.execute(
-                "UPDATE preparation_slots SET identity_observed=?, identity_at=? WHERE preparation_id=? AND agent_id=?",
-                (observed, now, preparation_id, agent_id),
+                "UPDATE preparation_slots SET identity_observed=?, identity_at=?, verification_status=?,"
+                " verification_source=?, verification_generation=?, verification_boot_id=?, verification_error=?,"
+                " verification_id=?, verification_seq=? WHERE preparation_id=? AND agent_id=?",
+                (observed, now, status, source, expected_generation, boot_id, error, verification_id, int(seq),
+                 preparation_id, agent_id),
             )
-            self._event(preparation_id, "identity", f"{agent_id}:{'match' if matched else 'mismatch'}")
+            self._event(preparation_id, "identity", f"{agent_id}:{status}")
         return self._refresh_ready(preparation_id, now)
+
+    def note_link(self, agent_id: str, link: str) -> None:
+        with self._tx():
+            self.store.db.execute(
+                "UPDATE preparation_slots SET link_state=? WHERE agent_id=? AND reservation_status='committed'",
+                (link, agent_id),
+            )
+
+    def note_boot(self, agent_id: str, boot_id: str) -> None:
+        """A new process is not allowed to keep the previous identity proof."""
+        with self._tx():
+            self.store.db.execute(
+                "UPDATE preparation_slots SET verification_status='unverified', verification_error='agent restarted' "
+                "WHERE agent_id=? AND verification_boot_id<>? AND verification_boot_id<>'' "
+                "AND reservation_status='committed'",
+                (agent_id, boot_id),
+            )
+
+    def _verification_status(self, expected: str, observed: str, *, fresh: bool, source: str) -> tuple[str, str]:
+        if not fresh:
+            return "unverified", "observation was not fresh"
+        if source not in _PROOF_SOURCES:
+            return "unverified", "source is not an active login"
+        if not observed:
+            return "unavailable", "steam identity was not observed"
+        if observed != expected:
+            return "mismatch", f"observed {observed}"
+        return _VERIFIED, ""
 
     def begin_release(self, preparation_id: str) -> str:
         """Ask agents to drop the reservation. The group is not released until they answer."""
@@ -264,11 +403,15 @@ class AssignmentBook:
             self._move(preparation_id, prep["status"], "aborting")
         return "aborting"
 
-    def note_release(self, preparation_id: str, agent_id: str, *, ok: bool, detail: str = "") -> str:
+    def note_release(self, preparation_id: str, agent_id: str, *, ok: bool, detail: str = "",
+                     generation: int | None = None) -> str:
+        slot = self._slot_for_agent(preparation_id, agent_id)
+        if generation is not None and int(generation) != int(slot["assignment_generation"]):
+            return self._require(preparation_id)["status"]
         if not ok:
             self._move(preparation_id, self._require(preparation_id)["status"], "reconcile_required", force=True)
             return "reconcile_required"
-        with self.store.transaction():
+        with self._tx():
             self.store.db.execute(
                 "UPDATE preparation_slots SET reservation_status='released' "
                 "WHERE preparation_id=? AND agent_id=?",
@@ -305,30 +448,23 @@ class AssignmentBook:
                 "commit": CommandType.COMMIT_ASSIGNMENT,
                 "release": CommandType.RELEASE_ASSIGNMENT,
                 "reconcile": CommandType.RECONCILE_ASSIGNMENT,
+                "verify": CommandType.VERIFY_ASSIGNMENT,
             }[kind]
+            verification_id = uuid.uuid4().hex if kind == "verify" else ""
+            if verification_id:
+                params["verification_id"] = verification_id
+                params["seq"] = int(self.clock() * 1000)
+            command_id = (
+                f"{preparation_id}/verify/{verification_id}/{slot['agent_id']}"
+                if verification_id else f"{preparation_id}/{kind}/{slot['agent_id']}"
+            )
             commands.append(Command(
-                f"{preparation_id}/{kind}/{slot['agent_id']}",
-                preparation_id, slot["agent_id"], command_type, params, "", 1, 240.0, self.clock(),
+                command_id, preparation_id, slot["agent_id"], command_type, params, "", 1, 240.0, self.clock(),
             ))
         return len(self.store.add_commands(commands))
 
     def release(self, preparation_id: str) -> str:
-        prep = self._require(preparation_id)
-        if prep["status"] == "released":
-            return "released"
-        if self._blocking_run() and prep["run_id"] and prep["status"] in ("committed", "ready", "verifying_identity"):
-            raise AssignmentError("cannot release assignments that belong to the active run")
-        with self.store.transaction():
-            self.store.db.execute(
-                "UPDATE preparation_slots SET reservation_status='released' WHERE preparation_id=?",
-                (preparation_id,),
-            )
-            self.store.db.execute(
-                "UPDATE preparations SET status='released', updated_at=? WHERE preparation_id=?",
-                (self.clock(), preparation_id),
-            )
-            self._event(preparation_id, "released", "operator release")
-        return "released"
+        raise AssignmentError("direct release is closed; wait for four agent acknowledgements")
 
     def reconcile(self, preparation_id: str) -> str:
         prep = self._require(preparation_id)
@@ -361,11 +497,11 @@ class AssignmentBook:
                 (preparation_id,),
             ).fetchall())
 
-    def ready(self, preparation_id: str, now: float | None = None) -> bool:
+    def ready(self, preparation_id: str, now: float | None = None, links: dict[str, str] | None = None) -> bool:
         now = self.clock() if now is None else now
-        self._refresh_ready(preparation_id, now)
+        self._refresh_ready(preparation_id, now, links)
         prep = self._require(preparation_id)
-        return prep["status"] == "ready" and self._identities_fresh(preparation_id, now)
+        return prep["status"] == "ready" and self._identities_fresh(preparation_id, now, links)
 
     def _reject_conflicts(self, slots: list[dict[str, Any]], preparation_id: str) -> None:
         for slot in slots:
@@ -391,20 +527,14 @@ class AssignmentBook:
             for row in self.slots(preparation_id)
         ]
 
-    def _refresh_ready(self, preparation_id: str, now: float) -> str:
+    def _refresh_ready(self, preparation_id: str, now: float, links: dict[str, str] | None = None) -> str:
         prep = self._require(preparation_id)
         if prep["status"] not in ("committed", "verifying_identity", "ready"):
             return prep["status"]
-        slots = self.slots(preparation_id)
-        if len(slots) != 4 or any(row["reservation_status"] != "committed" for row in slots):
-            return prep["status"]
-        fresh = all(
-            row["identity_observed"] == row["steam_id64"] and now - float(row["identity_at"]) <= self.identity_ttl_sec
-            for row in slots
-        )
+        fresh = self._identities_fresh(preparation_id, now, links)
         target = "ready" if fresh else "committed"
         if prep["status"] != target:
-            with self.store.transaction():
+            with self._tx():
                 self.store.db.execute(
                     "UPDATE preparations SET status=?, updated_at=? WHERE preparation_id=?",
                     (target, self.clock(), preparation_id),
@@ -412,20 +542,37 @@ class AssignmentBook:
                 self._event(preparation_id, target, "identity gate")
         return target
 
-    def _identities_fresh(self, preparation_id: str, now: float) -> bool:
+    def _slot_proven(self, row: Any, now: float, links: dict[str, str] | None) -> bool:
+        if row["reservation_status"] != "committed":
+            return False
+        if row["verification_status"] != _VERIFIED:
+            return False
+        if row["verification_source"] not in _PROOF_SOURCES:
+            return False
+        if int(row["verification_generation"] or 0) != int(row["assignment_generation"]):
+            return False
+        if row["identity_observed"] != row["steam_id64"]:
+            return False
+        age = now - float(row["identity_at"] or 0)
+        if age < 0 or age > self.identity_ttl_sec:
+            return False
+        if row["link_state"] not in ("", "healthy"):
+            return False
+        if links is not None and links.get(row["agent_id"]) != "healthy":
+            return False
+        return True
+
+    def _identities_fresh(self, preparation_id: str, now: float, links: dict[str, str] | None = None) -> bool:
         slots = self.slots(preparation_id)
-        return len(slots) == 4 and all(
-            row["identity_observed"] == row["steam_id64"] and now - float(row["identity_at"]) <= self.identity_ttl_sec
-            for row in slots
-        )
+        return len(slots) == 4 and all(self._slot_proven(row, now, links) for row in slots)
 
     def _note_slot(self, preparation_id: str, agent_id: str, *, ok: bool, success: str, failure: str,
                    complete_status: str, detail: str) -> str:
         prep = self._require(preparation_id)
         if prep["status"] not in ("preparing", "prepared", "aborting", "reconcile_required"):
-            raise AssignmentError(f"prepare result is not accepted in {prep['status']}")
+            return prep["status"]
         status = success if ok else failure
-        with self.store.transaction():
+        with self._tx():
             current = self._slot_for_agent(preparation_id, agent_id)
             if current["reservation_status"] == success and ok:
                 pass
@@ -499,6 +646,58 @@ class AssignmentBook:
             (agent_id, local_account_id),
         ).fetchone()
 
+    def build_run_plan(self, roster: Any, *, build_version: str, resource_manifest: str,
+                       links: dict[str, str] | None = None) -> Any:
+        """Freeze the committed assignment into an immutable run. Refuses any other roster."""
+        from core.wingman_fleet.models import AccountProfile, PairProfile, RetryPolicy, RunPlan
+        from modules.fleet_agent.identity import steam64_to_friend_code
+        now = self.clock()
+        with self._tx():
+            preparation_id = self.current()
+            if not preparation_id:
+                raise AssignmentError("there is no assignment to start")
+            self._refresh_ready(preparation_id, now, links)
+            if not self._identities_fresh(preparation_id, now, links):
+                raise AssignmentError("assignments are not ready")
+            prep = self._require(preparation_id)
+            slots = {int(row["slot_id"]): row for row in self.slots(preparation_id)}
+            accounts = {}
+            seen_names: set[str] = set()
+            for slot_id, pair_id, role in SLOT_LAYOUT:
+                row = slots[slot_id]
+                cached = self._cached(row["agent_id"], row["local_account_id"])
+                display = str(cached["display_name"] if cached is not None else "") or row["agent_id"]
+                if display.casefold() in seen_names:
+                    display = f"{display}-{slot_id}"
+                seen_names.add(display.casefold())
+                accounts[slot_id] = AccountProfile(
+                    f"{row['agent_id']}:{row['local_account_id']}", row["steam_id64"], display,
+                    steam64_to_friend_code(row["steam_id64"]), row["agent_id"], pair_id, role,
+                )
+            pairs = (
+                PairProfile("pair-1", 1, accounts[1], accounts[2]),
+                PairProfile("pair-2", 2, accounts[3], accounts[4]),
+            )
+            plan = RunPlan(
+                prep["run_id"], now, pairs, build_version, resource_manifest,
+                RetryPolicy.from_dict(getattr(roster, "retry", {}) or {}),
+            )
+            roster.replace_slots({
+                slot_id: {
+                    "agent_id": row["agent_id"],
+                    "steam_id64": row["steam_id64"],
+                    "display_name": accounts[slot_id].display_name,
+                    "friend_code": accounts[slot_id].friend_code,
+                    "local_account_id": row["local_account_id"],
+                }
+                for slot_id, row in slots.items()
+            })
+            self.store.db.execute(
+                "UPDATE preparations SET plan_json=? WHERE preparation_id=?",
+                (plan.to_json(), preparation_id),
+            )
+        return plan
+
     def _blocking_run(self) -> bool:
         row = self.store.db.execute("SELECT run_id FROM runs WHERE active=1").fetchone()
         return row is not None
@@ -529,7 +728,7 @@ class AssignmentBook:
             return
         if not force and target not in _TRANSITIONS.get(current, frozenset()):
             raise AssignmentError(f"cannot move {current} to {target}")
-        with self.store.transaction():
+        with self._tx():
             self.store.db.execute(
                 "UPDATE preparations SET status=?, updated_at=? WHERE preparation_id=?",
                 (target, self.clock(), preparation_id),

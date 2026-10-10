@@ -28,6 +28,14 @@ class FleetRole(str, Enum):
     AGENT = "agent"
 
 
+class FleetTransportMode(str, Enum):
+    """How this PC talks to the fleet. Simulation never opens a socket."""
+
+    SIMULATION = "simulation"
+    LOCALHOST_DEVELOPMENT = "localhost_development"
+    SECURE_LAN = "secure_lan"
+
+
 class AppConfig(BaseModel):
     """Пользовательские настройки; пути Steam/CS2 задаются в UI позже."""
 
@@ -282,5 +290,12 @@ class AppConfig(BaseModel):
         default=False,
         description="Start coordinator/agent when the panel opens",
     )
+    wingman_fleet_transport: FleetTransportMode = Field(
+        default=FleetTransportMode.LOCALHOST_DEVELOPMENT,
+        description="simulation, localhost_development, or secure_lan",
+    )
+    wingman_fleet_tls_cert: str = Field(default="", description="PEM certificate for SECURE_LAN")
+    wingman_fleet_tls_key: str = Field(default="", description="PEM private key for SECURE_LAN")
+    wingman_fleet_tls_ca: str = Field(default="", description="PEM CA the agent uses to verify the coordinator")
 
     model_config = {"extra": "ignore"}

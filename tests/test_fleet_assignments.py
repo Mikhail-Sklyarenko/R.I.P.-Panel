@@ -118,10 +118,17 @@ def test_prepare_commit_and_release_are_idempotent_and_fenced(tmp_path):
     assert book.decide_commit(prep, run_id="run-9") == run_id
     with pytest.raises(AssignmentError):
         book.note_commit(prep, "pc1", ok=True, generation=0)
-    book.note_commit(prep, "pc1", ok=True, generation=2)
-    assert book.note_commit(prep, "pc1", ok=True, generation=2) == "committed"
-    assert book.release(prep) == "released"
-    assert book.release(prep) == "released"
+    with pytest.raises(AssignmentError):
+        book.note_commit(prep, "pc1", ok=True, generation=2)
+    book.note_commit(prep, "pc1", ok=True, generation=1)
+    assert book.note_commit(prep, "pc1", ok=True, generation=1) == "committed"
+    with pytest.raises(AssignmentError):
+        book.release(prep)
+    assert book.begin_release(prep) == "aborting"
+    for index in range(1, 5):
+        book.note_release(prep, f"pc{index}", ok=True)
+    assert book.status(prep)["status"] == "released"
+    assert book.begin_release(prep) == "released"
     book.store.close()
 
 
@@ -135,7 +142,9 @@ def test_one_rejection_does_not_become_ready_and_blocks_reuse_until_release(tmp_
     assert book.ready(prep) is False
     with pytest.raises(AssignmentError):
         book.draft(_selection())
-    book.release(prep)
+    assert book.begin_release(prep) == "aborting"
+    for index in range(1, 5):
+        book.note_release(prep, f"pc{index}", ok=True)
     again = book.draft(_selection())
     assert again != prep
     book.store.close()

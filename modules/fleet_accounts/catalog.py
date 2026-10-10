@@ -119,16 +119,23 @@ class AccountCatalog:
             if current > SCHEMA_VERSION:
                 raise CatalogError(f"catalog schema {current} is newer than this program")
             if current == SCHEMA_VERSION:
+                self._ensure_vault_column()
                 return
             backup = self.path.with_suffix(self.path.suffix + f".v{current}.bak")
             if self.path.is_file() and self.path.stat().st_size and not backup.is_file():
-                shutil.copy2(self.path, backup)
+                self._backup_to(backup)
             self.db.executescript(_SCHEMA)
             self.db.execute(
                 "INSERT INTO meta(key, value) VALUES('schema_version', ?) "
                 "ON CONFLICT(key) DO UPDATE SET value=excluded.value",
                 (str(SCHEMA_VERSION),),
             )
+            self._ensure_vault_column()
+
+    def _ensure_vault_column(self) -> None:
+        cols = {row[1] for row in self.db.execute("PRAGMA table_info(accounts)").fetchall()}
+        if cols and "vault_present" not in cols:
+            self.db.execute("ALTER TABLE accounts ADD COLUMN vault_present INTEGER NOT NULL DEFAULT 1")
 
     def sync_logins(self, index_logins: list[str], vault_logins: list[str] | None = None) -> list[str]:
         """Link catalog rows to vault-index logins. Never deletes a row automatically."""
@@ -150,16 +157,27 @@ class AccountCatalog:
                 if key not in vault:
                     issues.append(f"index_without_vault:{login}")
                     self._issue(login, "index_without_vault")
+                present = 1 if key in vault else 0
                 row = self.db.execute(
-                    "SELECT local_account_id, login FROM accounts WHERE login = ? COLLATE NOCASE", (login,)
+                    "SELECT local_account_id, login, vault_present FROM accounts WHERE login = ? COLLATE NOCASE",
+                    (login,),
                 ).fetchone()
                 if row is None:
                     self.db.execute(
-                        "INSERT INTO accounts(local_account_id, login, binding_status, availability_status, updated_at)"
-                        " VALUES(?,?,?,?,?)",
-                        (uuid.uuid4().hex, login, BindingStatus.UNBOUND.value, Availability.AVAILABLE.value, time.time()),
+                        "INSERT INTO accounts(local_account_id, login, binding_status, availability_status,"
+                        " vault_present, updated_at) VALUES(?,?,?,?,?,?)",
+                        (uuid.uuid4().hex, login, BindingStatus.UNBOUND.value, Availability.AVAILABLE.value,
+                         present, time.time()),
                     )
-                elif row["login"] != login:
+                    self._bump_generation()
+                else:
+                    if int(row["vault_present"]) != present:
+                        self.db.execute(
+                            "UPDATE accounts SET vault_present=? WHERE local_account_id=?",
+                            (present, row["local_account_id"]),
+                        )
+                        self._bump_generation()
+                if row is not None and row["login"] != login:
                     issues.append(f"login_case_changed:{row['login']}->{login}")
                     self._issue(login, "login_case_changed")
             if vault_logins is not None:
@@ -215,19 +233,54 @@ class AccountCatalog:
             ).fetchone()
 
     def revision(self) -> int:
+        """Monotonic generation of the whole catalog, not the max account revision."""
         with self._lock:
-            row = self.db.execute("SELECT COALESCE(MAX(catalog_revision), 0) AS rev FROM accounts").fetchone()
-        return int(row["rev"] if row else 0)
+            row = self.db.execute("SELECT value FROM meta WHERE key='catalog_generation'").fetchone()
+        return int(row["value"]) if row else 0
 
-    def snapshot(self) -> CatalogSnapshot:
+    def _bump_generation(self) -> int:
+        generation = self.revision() + 1
+        self.db.execute(
+            "INSERT INTO meta(key, value) VALUES('catalog_generation', ?) "
+            "ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+            (str(generation),),
+        )
+        return generation
+
+    def snapshot(self, *, boot_id: str = "", sequence: int = 0) -> CatalogSnapshot:
+        generation = self.revision()
         views = tuple(
             CatalogAccountView(
                 row["local_account_id"], row["steam_id64"], row["display_name"], bool(row["enabled"]),
-                row["binding_status"], row["availability_status"],
+                row["binding_status"], row["availability_status"], int(row["catalog_revision"]),
             )
             for row in self.accounts()
         )
-        return CatalogSnapshot(self.agent_id, self.revision(), views)
+        return CatalogSnapshot(
+            self.agent_id, generation, views, generation, boot_id, sequence, self.vault_status(),
+        )
+
+    def vault_status(self) -> str:
+        """Short diagnostic. It never includes a password, secret, or maFile."""
+        for login, issue in self.issues():
+            if login == "*" and issue.startswith("vault_"):
+                return issue.removeprefix("vault_")
+            if issue == "index_without_vault":
+                return "index_without_vault"
+        return "ok"
+
+    def note_vault_status(self, code: str) -> None:
+        if code not in {"missing", "bad_key", "corrupt", "unreadable"}:
+            code = "unreadable"
+        with self._tx():
+            self._issue("*", f"vault_{code}")
+
+    def _backup_to(self, dest: Path) -> None:
+        target = sqlite3.connect(dest)
+        try:
+            self.db.backup(target)
+        finally:
+            target.close()
 
     def set_enabled(self, local_account_id: str, enabled: bool) -> None:
         with self._tx():
@@ -241,6 +294,7 @@ class AccountCatalog:
             if row["availability_status"] in _OPEN:
                 raise CatalogError("cannot remove an account with an open assignment")
             self.db.execute("DELETE FROM accounts WHERE local_account_id=?", (local_account_id,))
+            self._bump_generation()
 
     def bind(self, local_account_id: str, steam_id64: str, *, source: str = "manual",
              confirm_rebind: bool = False) -> None:
@@ -319,6 +373,9 @@ class AccountCatalog:
                 "SELECT * FROM reservations WHERE preparation_id=?", (preparation_id,)
             ).fetchone()
             if existing is not None:
+                if (existing["local_account_id"] != local_account_id or existing["steam_id64"] != steam_id64
+                        or int(existing["generation"]) != int(generation)):
+                    raise CatalogError("preparation parameters do not match the stored reservation")
                 return existing["status"]
             active = self.db.execute("SELECT preparation_id FROM active_reservation WHERE id=1").fetchone()
             if active is not None:
@@ -351,8 +408,10 @@ class AccountCatalog:
             ).fetchone()
             if row is None:
                 raise CatalogError("unknown preparation")
-            if int(generation) < int(row["generation"]):
-                raise CatalogError("stale assignment generation")
+            if int(generation) != int(row["generation"]):
+                raise CatalogError("assignment generation does not match")
+            if row["run_id"] and row["run_id"] != run_id:
+                raise CatalogError("commit run_id does not match the stored assignment")
             if row["status"] in (Availability.COMMITTED.value, Availability.ACTIVE.value) and row["run_id"] == run_id:
                 return row["status"]
             if row["status"] not in (Availability.PREPARED.value, Availability.RECONCILE_REQUIRED.value,
@@ -371,7 +430,7 @@ class AccountCatalog:
                 "SELECT * FROM reservations WHERE preparation_id=?", (preparation_id,)
             ).fetchone()
             if row is None:
-                return Availability.RELEASED.value
+                raise CatalogError("unknown preparation is not proof that it was released")
             if row["status"] == Availability.RELEASED.value:
                 return Availability.RELEASED.value
             if row["status"] == Availability.ACTIVE.value and not allow_active_run:
@@ -417,6 +476,7 @@ class AccountCatalog:
                 "SELECT catalog_revision FROM accounts WHERE local_account_id=?", (local_account_id,)
             ).fetchone()
             fields["catalog_revision"] = int(current["catalog_revision"]) + 1
+            self._bump_generation()
         fields["updated_at"] = time.time()
         keys = list(fields)
         assignments = ", ".join(f"{key}=?" for key in keys)

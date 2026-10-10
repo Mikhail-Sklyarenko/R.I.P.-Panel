@@ -49,6 +49,7 @@ class CatalogAccountView:
     enabled: bool
     binding_status: str
     availability_status: str
+    account_revision: int = 0
 
     def as_dict(self) -> dict[str, object]:
         return {
@@ -58,6 +59,7 @@ class CatalogAccountView:
             "enabled": self.enabled,
             "binding_status": self.binding_status,
             "availability_status": self.availability_status,
+            "account_revision": self.account_revision,
         }
 
 
@@ -66,10 +68,18 @@ class CatalogSnapshot:
     agent_id: str
     catalog_revision: int
     accounts: tuple[CatalogAccountView, ...]
+    catalog_generation: int = 0
+    boot_id: str = ""
+    sequence: int = 0
+    vault_status: str = "ok"
 
     def as_dict(self) -> dict[str, object]:
         return {
             "agent_id": self.agent_id,
             "catalog_revision": self.catalog_revision,
+            "catalog_generation": self.catalog_generation,
+            "boot_id": self.boot_id,
+            "sequence": self.sequence,
+            "vault_status": self.vault_status,
             "accounts": [item.as_dict() for item in self.accounts],
         }

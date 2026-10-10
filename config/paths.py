@@ -104,6 +104,11 @@ def get_wingman_fleet_db_path() -> Path:
     return get_wingman_fleet_dir() / "coordinator.db"
 
 
+def get_agent_token_path(agent_id: str) -> Path:
+    safe = "".join(c if c.isalnum() or c in "-_" else "_" for c in agent_id) or "agent"
+    return get_wingman_fleet_dir() / "credentials" / f"{safe}.bin"
+
+
 def get_wingman_agent_journal_path(agent_id: str) -> Path:
     safe = "".join(c if c.isalnum() or c in "-_" else "_" for c in agent_id) or "agent"
     return get_wingman_fleet_dir() / f"journal-{safe}.db"

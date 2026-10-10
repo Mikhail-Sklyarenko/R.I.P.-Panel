@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import ssl
 import urllib.error
 import urllib.request
 from typing import Any, Protocol
@@ -15,17 +16,29 @@ class Transport(Protocol):
     def heartbeat(self, payload: dict[str, Any]) -> dict[str, Any]: ...
 
 
+def https_context(ca_file: str) -> ssl.SSLContext:
+    """Trust only the supplied CA. Certificate checks stay enabled."""
+    if not ca_file:
+        raise TransportError("https requires a trusted CA file")
+    context = ssl.create_default_context(cafile=ca_file)
+    context.minimum_version = ssl.TLSVersion.TLSv1_2
+    if context.verify_mode != ssl.CERT_REQUIRED or not context.check_hostname:
+        raise TransportError("certificate verification cannot be disabled")
+    return context
+
+
 class HttpTransport:
-    def __init__(self, base_url: str, *, timeout: float = 1.0):
+    def __init__(self, base_url: str, *, timeout: float = 1.0, ca_file: str = ""):
         self.url = base_url.rstrip("/") + "/v1/heartbeat"
         self.timeout = timeout
+        self._ssl = https_context(ca_file) if self.url.startswith("https://") else None
 
     def heartbeat(self, payload: dict[str, Any]) -> dict[str, Any]:
         raw = json.dumps(payload, ensure_ascii=False).encode("utf-8")
         req = urllib.request.Request(self.url, data=raw, method="POST",
                                      headers={"Content-Type": "application/json"})
         try:
-            with urllib.request.urlopen(req, timeout=self.timeout) as resp:
+            with urllib.request.urlopen(req, timeout=self.timeout, context=self._ssl) as resp:
                 return json.loads(resp.read().decode("utf-8"))
         except urllib.error.HTTPError as exc:
             try:

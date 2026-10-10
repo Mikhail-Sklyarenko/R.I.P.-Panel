@@ -63,7 +63,9 @@ def test_coordinator_accepts_assignment_result_without_an_active_run(tmp_path):
         "observation": to_dict(Observation("pc1", 2)),
         "results": [to_dict(CommandResult("prep/prepare/pc1", ResultStatus.FAILED, "assignment_rejected", "disk"))],
     })
-    assert code == 200 and "prep/prepare/pc1" in resp["accepted_results"]
+    assert code == 200 and "prep/prepare/pc1" not in resp["accepted_results"]
+    pending = store.db.execute("SELECT status FROM commands WHERE command_id=?", ("prep/prepare/pc1",)).fetchone()
+    assert pending[0] == "pending"
     old, old_body = coord.handle_heartbeat({
         "token": TOKEN, "boot_id": "legacy", "agent_token": "agent-secret",
         "observation": to_dict(Observation("pc1", 3, protocol=2)),

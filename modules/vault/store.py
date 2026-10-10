@@ -130,6 +130,30 @@ def list_accounts() -> list[AccountIndexEntry]:
     return list(_load_index().accounts)
 
 
+def vault_login_names(path: Path | None = None) -> tuple[list[str], str]:
+    """Logins present in the vault, plus a diagnostic code.
+
+    The code is one of ok, missing, bad_key, corrupt, unreadable.
+    Passwords and maFile secrets are never returned.
+    """
+    vault_path = Path(path) if path is not None else get_vault_enc_path()
+    if not vault_path.is_file():
+        return [], "missing"
+    try:
+        raw = vault_path.read_bytes()
+    except OSError:
+        return [], "unreadable"
+    try:
+        data = decrypt(raw)
+    except ValueError:
+        return [], "bad_key"
+    try:
+        payload = VaultPayload.model_validate_json(data.decode("utf-8"))
+    except (UnicodeError, ValueError):
+        return [], "corrupt"
+    return [secret.login for secret in payload.accounts.values() if secret.login], "ok"
+
+
 def list_unfarmed_logins() -> list[str]:
     """Очередь конвейера: аккаунты без farmed_this_week."""
     return [

@@ -457,6 +457,12 @@ class PanelController:
             widget.configure(state="disabled")
         except Exception:
             pass
+        hook = getattr(self, "_fleet_card_hook", None)
+        if hook is not None:
+            try:
+                hook()
+            except Exception:
+                pass
 
     def format_fleet_status(self) -> str:
         from core.wingman_fleet.roster import SLOT_LAYOUT
@@ -465,7 +471,10 @@ class PanelController:
         host = self._fleet_host
         st = host.status() if host is not None else {}
         lines.append(f"координатор: {'да' if st.get('coordinator') else 'нет'}  {st.get('url', '')}")
-        lines.append("транспорт: HTTP без TLS, реальная сеть между ПК не готова")
+        transport = st.get("transport") or "localhost-http"
+        lan = "конфигурация LAN готова" if st.get("lan_ready") else "конфигурация LAN не готова"
+        proven = "четыре ПК подтверждены" if st.get("four_pc_proven") else "четыре реальных ПК не проверялись"
+        lines.append(f"транспорт: {transport}; {lan}; {proven}")
         desk = getattr(self, "_fleet_desk", None)
         if desk is not None:
             if desk.error:
@@ -476,7 +485,10 @@ class PanelController:
                 lines.append(
                     f"ПК {row['slot_id']} {row['agent_id'] or '—'} связь={row['link']} "
                     f"аккаунт={row['local_account_id'] or '—'} steam={row['steam_id64'] or '—'} "
-                    f"резерв={row['reservation_status'] or '—'} личность={row['identity'] or 'не проверена'}"
+                    f"резерв={row['reservation_status'] or '—'} "
+                    f"регистрация={row.get('registration') or '—'} "
+                    f"проверка={row.get('verification_status') or 'нет'} "
+                    f"личность={row['identity'] or 'не проверена'}"
                 )
                 for account in desk.accounts_for(row["agent_id"]) if row["agent_id"] else ():
                     lines.append(
@@ -546,7 +558,8 @@ class PanelController:
             self._fleet_desk = desk
         return desk
 
-    def fleet_account_action(self, action: str, selections: list | None = None, run_id: str = "") -> str:
+    def fleet_account_action(self, action: str, selections: list | None = None, run_id: str = "",
+                             agent_id: str = "") -> str:
         desk = self.fleet_desk()
         if desk is None:
             self.append_log("Сначала запустите координатор")
@@ -563,12 +576,24 @@ class PanelController:
             message = desk.commit(run_id or uuid.uuid4().hex)
         elif action == "release":
             message = desk.release()
+        elif action == "verify":
+            message = desk.verify()
+        elif action == "reconcile":
+            message = desk.reconcile()
+        elif action == "diagnostics":
+            message = desk.diagnostics()
+        elif action == "enroll":
+            message = desk.enroll(agent_id)
+        elif action == "revoke":
+            message = desk.revoke(agent_id)
         else:
             message = ""
             desk.error = "неизвестное действие"
         if desk.error:
             self.append_log(f"Назначение отклонено: {desk.error}")
-        elif message:
+        elif action == "enroll" and message:
+            self.append_log(f"Код регистрации {agent_id} показан в панели и не записан в журнал")
+        elif message and action != "diagnostics":
             self.append_log(f"Назначение: {message}")
         self.refresh_fleet_dashboard()
         return desk.error or message

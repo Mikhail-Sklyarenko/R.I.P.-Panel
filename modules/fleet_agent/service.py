@@ -183,7 +183,7 @@ class AgentService:
         if self.agent_token:
             payload["agent_token"] = self.agent_token
         if self.catalog is not None:
-            payload["catalog"] = self.catalog.snapshot().as_dict()
+            payload["catalog"] = self.catalog.snapshot(boot_id=self.boot_id, sequence=self.sequence).as_dict()
         t0 = self.wall()
         try:
             resp = self.transport.heartbeat(payload)
@@ -321,7 +321,10 @@ class AgentService:
         return _CommandCancel(self.cancel, epoch, self)
 
     def _run(self, cmd: Command, epoch: int | None = None) -> None:
-        if cmd.type not in URGENT:
+        if cmd.type in ASSIGNMENT_COMMANDS and (self._stop.is_set() or self._fail_closed):
+            self._fail(cmd, Reason.OPERATOR_STOP.value, "agent is stopped")
+            return
+        if cmd.type not in URGENT and cmd.type not in ASSIGNMENT_COMMANDS:
             with self._lock:
                 bound = self.epoch if epoch is None else epoch
                 stale = self.cancel.is_set() or self.session_stopped or bound != self.epoch
@@ -352,6 +355,19 @@ class AgentService:
                              detail=detail)
         self.journal.finish(result)
 
+    def _measure_identity(self) -> tuple[str, str]:
+        """The coordinator never supplies the observed SteamID64. This PC measures it."""
+        probe = getattr(self, "identity_probe", None)
+        if probe is None and hasattr(self.backend, "verify_active_identity"):
+            probe = self.backend.verify_active_identity
+        if probe is None:
+            return "", "unconfirmed"
+        found = probe()
+        source = getattr(getattr(found, "identity", None), "value", "") or "unconfirmed"
+        if source not in ("steam_local", "gsi"):
+            source = "unconfirmed"
+        return str(getattr(found, "steam_id64", "") or ""), source
+
     def _apply_assignment(self, cmd: Command) -> CommandResult:
         """Local catalog only. This never starts Steam, CS2, or a gameplay lease."""
         if self.catalog is None:
@@ -379,9 +395,20 @@ class AgentService:
                 self.catalog.mark_reconcile(str(params["preparation_id"]))
                 status = "reconcile_required"
             elif cmd.type is CommandType.VERIFY_ASSIGNMENT:
+                observed, source = self._measure_identity()
                 status = self.catalog.note_identity(
-                    str(params["local_account_id"]), str(params.get("observed_steam_id64") or ""),
-                    source=str(params.get("source") or "gsi"), now=float(params.get("now") or self.wall()),
+                    str(params["local_account_id"]), observed, source=source, now=self.wall(),
+                )
+                return CommandResult(
+                    cmd.command_id, ResultStatus.COMPLETED,
+                    evidence={
+                        "status": status,
+                        "observed_steam_id64": observed,
+                        "source": source,
+                        "fresh": status == "verified",
+                        "verification_id": str(params.get("verification_id") or ""),
+                        "boot_id": self.boot_id,
+                    },
                 )
             else:
                 return CommandResult(cmd.command_id, ResultStatus.FAILED, "bad_command", cmd.type.value)
