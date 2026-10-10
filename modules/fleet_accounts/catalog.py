@@ -322,23 +322,38 @@ class AccountCatalog:
                 (local_account_id, previous, steam_id64, source, time.time()),
             )
 
-    def note_identity(self, local_account_id: str, observed_steam_id64: str, *, source: str, now: float) -> str:
-        """Record a probe. A manual value or a remembered VDF name is not verification."""
+    def note_identity(self, local_account_id: str, observed_steam_id64: str, *, source: str, now: float,
+                      identity_status: str = "") -> str:
+        """Record a probe. A conflict or an unconfirmed status is never VERIFIED."""
         observed = observed_steam_id64.strip()
         if observed:
             observed = parse_steam_id64(observed)
         with self._tx():
             row = self._require(local_account_id)
             expected = row["steam_id64"]
-            if source == "manual" or source == "loginusers":
+            if identity_status == "mismatch" or source == "conflict":
+                self._touch(local_account_id, binding_status=BindingStatus.MISMATCH.value,
+                            last_verified_at=now, last_verified_source=source or "conflict",
+                            last_error="sources disagree" if not observed or observed == expected else f"observed {observed}")
+                return BindingStatus.MISMATCH.value
+            if identity_status in ("unconfirmed", "manual", "loginusers") or source in ("manual", "loginusers", "unconfirmed"):
                 self._touch(local_account_id, binding_status=BindingStatus.UNCONFIRMED.value,
-                            last_error="manual or remembered data is not an active login")
+                            last_verified_at=0, last_verified_source=source,
+                            last_error="manual or remembered data is not an active login"
+                            if source in ("manual", "loginusers") else "identity was not confirmed")
                 return BindingStatus.UNCONFIRMED.value
             if not observed:
                 status = BindingStatus.UNBOUND.value if not expected else BindingStatus.UNCONFIRMED.value
                 self._touch(local_account_id, binding_status=status, last_verified_at=0,
                             last_verified_source=source, last_error="Steam identity was not observed")
                 return status
+            if source not in ("steam_local", "gsi") or (
+                identity_status and identity_status not in ("steam_local", "gsi")
+            ):
+                self._touch(local_account_id, binding_status=BindingStatus.UNCONFIRMED.value,
+                            last_verified_at=0, last_verified_source=source,
+                            last_error="identity status is not a proof")
+                return BindingStatus.UNCONFIRMED.value
             if not expected:
                 self._touch(local_account_id, last_error="observed SteamID64 is not bound to this account")
                 return row["binding_status"]

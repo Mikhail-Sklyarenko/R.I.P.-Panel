@@ -36,6 +36,7 @@ def _verify_result(command_id: str, steam: str, *, boot_id: str, verification_id
         "verification_id": verification_id,
         "boot_id": boot_id,
         "process_generation": 1,
+        "identity_status": "gsi" if status == "verified" else "mismatch" if status == "mismatch" else "unconfirmed",
     })
 
 

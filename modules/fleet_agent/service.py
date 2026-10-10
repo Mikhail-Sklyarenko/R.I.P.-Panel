@@ -241,6 +241,7 @@ class AgentService:
         if self.catalog is not None:
             snapshot = self.catalog.snapshot(boot_id=self.boot_id, sequence=self.sequence).as_dict()
             snapshot["process_generation"] = self.process_generation
+            snapshot["registration_generation"] = self.registration_generation
             payload["catalog"] = snapshot
         t0 = self.wall()
         try:
@@ -411,29 +412,59 @@ class AgentService:
                 detail = f"{detail}: {result.detail}"
             result = replace(result, status=ResultStatus.UNCONFIRMED, reason=Reason.EFFECT_UNCONFIRMED.value,
                              detail=detail)
+        if cmd.type is CommandType.VERIFY_ASSIGNMENT and result.status is not ResultStatus.COMPLETED:
+            self._invalidate_local_identity(cmd)
         self.journal.finish(result)
 
-    def _measure_identity(self) -> tuple[str, str]:
+    def _identity_evidence(self, found, params: dict) -> dict[str, Any]:
+        identity = found.identity
+        kind = str(getattr(identity, "value", "") or "")
+        observed = str(getattr(found, "steam_id64", "") or "")
+        expected = str(params.get("steam_id64") or "")
+        if kind == Identity.MISMATCH.value:
+            status, source, fresh = "mismatch", "conflict", True
+        elif kind in (Identity.GSI.value, Identity.STEAM_LOCAL.value) and observed and observed == expected:
+            status, source, fresh = "verified", kind, True
+        else:
+            status, source, fresh = "unconfirmed", "unconfirmed", False
+        return {
+            "identity_status": kind,
+            "status": status,
+            "observed_steam_id64": observed,
+            "source": source,
+            "fresh": fresh,
+            "verification_id": str(params.get("verification_id") or ""),
+            "boot_id": self.boot_id,
+            "process_generation": self.process_generation,
+        }
+
+    def _measure_identity(self) -> SteamIdentity:
         """The coordinator never supplies the observed SteamID64. This PC measures it."""
+        from modules.fleet_agent.identity import SteamIdentity
         probe = getattr(self, "identity_probe", None)
         if probe is None and not str(getattr(self.backend, "expected", "") or ""):
-            return "", "unconfirmed"
+            return SteamIdentity(Identity.UNCONFIRMED, detail="no expected account")
         if probe is None and hasattr(self.backend, "measure_identity"):
             probe = self.backend.measure_identity
         elif probe is None and hasattr(self.backend, "verify_active_identity"):
             probe = self.backend.verify_active_identity
         if probe is None:
-            return "", "unconfirmed"
+            return SteamIdentity(Identity.UNCONFIRMED, detail="no identity probe")
         found = probe()
-        identity = getattr(found, "identity", None)
-        source = getattr(identity, "value", "") or "unconfirmed"
-        steam = str(getattr(found, "steam_id64", "") or "")
-        if identity is Identity.MISMATCH and steam:
-            detail = str(getattr(found, "detail", "") or "")
-            source = "gsi" if "GSI" in detail else "steam_local"
-        elif source not in ("steam_local", "gsi"):
-            source = "unconfirmed"
-        return steam, source
+        if getattr(found, "identity", None) is None:
+            return SteamIdentity(Identity.UNCONFIRMED, detail="probe returned no status")
+        return found
+
+    def _invalidate_local_identity(self, cmd: Command) -> None:
+        if self.catalog is None:
+            return
+        local = str(cmd.params.get("local_account_id") or "")
+        if not local:
+            return
+        try:
+            self.catalog.note_identity(local, "", source="unconfirmed", identity_status="unconfirmed", now=self.wall())
+        except (CatalogError, KeyError, TypeError, ValueError):
+            return
 
     def _apply_assignment(self, cmd: Command) -> CommandResult:
         """Local catalog only. This never starts Steam, CS2, or a gameplay lease."""
@@ -475,22 +506,13 @@ class AgentService:
                 self.catalog.mark_reconcile(str(params["preparation_id"]))
                 status = "reconcile_required"
             elif cmd.type is CommandType.VERIFY_ASSIGNMENT:
-                observed, source = self._measure_identity()
-                status = self.catalog.note_identity(
-                    str(params["local_account_id"]), observed, source=source, now=self.wall(),
+                found = self._measure_identity()
+                evidence = self._identity_evidence(found, params)
+                self.catalog.note_identity(
+                    str(params["local_account_id"]), evidence["observed_steam_id64"],
+                    source=evidence["source"], identity_status=evidence["identity_status"], now=self.wall(),
                 )
-                return CommandResult(
-                    cmd.command_id, ResultStatus.COMPLETED,
-                    evidence={
-                        "status": status,
-                        "observed_steam_id64": observed,
-                        "source": source,
-                        "fresh": status in {"verified", "mismatch"},
-                        "verification_id": str(params.get("verification_id") or ""),
-                        "boot_id": self.boot_id,
-                        "process_generation": self.process_generation,
-                    },
-                )
+                return CommandResult(cmd.command_id, ResultStatus.COMPLETED, evidence=evidence)
             else:
                 return CommandResult(cmd.command_id, ResultStatus.FAILED, "bad_command", cmd.type.value)
         except (CatalogError, KeyError, TypeError, ValueError) as exc:

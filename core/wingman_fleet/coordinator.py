@@ -8,6 +8,7 @@ from __future__ import annotations
 import hmac
 import json
 import secrets
+import sqlite3
 import threading
 import time
 import uuid
@@ -16,7 +17,7 @@ from typing import Any, Callable
 
 from core.wingman_fleet import PROTOCOL_VERSION
 from core.wingman_fleet.models import (
-    ASSIGNMENT_COMMANDS, Command, CommandResult, CommandType, Link, Observation, RunPlan, to_dict,
+    ASSIGNMENT_COMMANDS, Command, CommandResult, CommandType, Link, Observation, ResultStatus, RunPlan, to_dict,
 )
 from core.wingman_fleet.pair_fsm import HALTED, PairCtx, PairMachine
 from core.wingman_fleet.reasons import describe
@@ -215,24 +216,40 @@ class Coordinator:
                 if decision:
                     return 409, {"ok": False, "error": decision, "commands": []}
             current = self.agents.get(agent_id)
-            if (current is not None and current.observation is not None
+            registration_reset = False
+            if book is not None:
+                presence = book.store.db.execute(
+                    "SELECT process_generation, boot_id FROM agent_presence WHERE agent_id=?", (agent_id,)
+                ).fetchone()
+                registration_reset = presence is None or int(presence["process_generation"] or 0) == 0
+            if (not registration_reset and current is not None and current.observation is not None
                     and obs.sequence <= current.observation.sequence and boot_id == current.boot_id):
                 return 409, {"ok": False, "error": "out-of-order heartbeat", "commands": []}
+            if book is not None and not book.heartbeat_sequence_allowed(
+                agent_id, process_generation=process_generation, boot_id=boot_id, sequence=obs.sequence,
+            ):
+                return 409, {"ok": False, "error": "out-of-order heartbeat", "commands": []}
+            active_run = self.plan.run_id if self.plan else ""
+            catalog = payload.get("catalog")
+            if book is not None:
+                try:
+                    with self.store.transaction():
+                        book.install_session(
+                            agent_id, process_generation=process_generation,
+                            registration_generation=registration_generation, boot_id=boot_id,
+                            protocol=int(obs.protocol), seen_at=now, sequence=obs.sequence,
+                        )
+                        if isinstance(catalog, dict):
+                            catalog = dict(catalog)
+                            catalog.setdefault("registration_generation", registration_generation)
+                            book.remember_catalog(agent_id, catalog)
+                except sqlite3.Error:
+                    return 500, {"ok": False, "error": "store_failed", "commands": []}
             st = self.agents.setdefault(agent_id, AgentLinkState(agent_id))
             st.boot_id = boot_id
             st.computer = str(payload.get("computer", ""))
             st.protocol = obs.protocol
             st.last_seen, st.observation, st.received_at = now, obs, now
-            active_run = self.plan.run_id if self.plan else ""
-            catalog = payload.get("catalog")
-            if book is not None:
-                book.install_session(
-                    agent_id, process_generation=process_generation,
-                    registration_generation=registration_generation, boot_id=boot_id,
-                    protocol=int(obs.protocol), seen_at=now,
-                )
-                if isinstance(catalog, dict):
-                    book.remember_catalog(agent_id, catalog)
             accepted: list[str] = []
             for r in results:
                 result_run = self._result_run(r, agent_id, active_run)
@@ -324,15 +341,46 @@ class Coordinator:
                 raise AssignmentError("assignment generation does not match")
             if not book.evidence_matches_session(agent_id, evidence):
                 return
+            identity_status = str(evidence.get("identity_status") or "")
+            source = str(evidence.get("source") or "")
+            observed = str(evidence.get("observed_steam_id64") or "")
+            status_text = str(evidence.get("status") or "")
+            fresh = evidence.get("fresh") is True
+            expected = str(slot["steam_id64"])
+            positive = (
+                result.status is ResultStatus.COMPLETED
+                and identity_status in ("steam_local", "gsi")
+                and status_text == "verified"
+                and fresh
+                and observed == expected
+                and source in ("steam_local", "gsi")
+            )
+            conflict = result.status is ResultStatus.COMPLETED and (
+                identity_status == "mismatch"
+                or status_text == "mismatch"
+                or source == "conflict"
+                or (fresh and observed and observed != expected and source in ("steam_local", "gsi"))
+            )
+            if result.status is ResultStatus.ALREADY_APPLIED:
+                return
+            if conflict:
+                recorded_status, recorded_source, recorded_fresh = "mismatch", source or "conflict", True
+            elif positive:
+                recorded_status, recorded_source, recorded_fresh = identity_status, source, True
+            elif result.terminal:
+                recorded_status, recorded_source, recorded_fresh = "unconfirmed", "unconfirmed", False
+            else:
+                return
             book.note_identity(
-                preparation_id, agent_id, str(evidence.get("observed_steam_id64") or ""),
+                preparation_id, agent_id, observed,
                 now=self.clock(),
-                fresh=bool(evidence.get("fresh")),
-                source=str(evidence.get("source") or ""),
+                fresh=recorded_fresh,
+                source=recorded_source,
                 generation=int(cmd.params.get("generation") or 0),
                 boot_id=str(evidence.get("boot_id") or ""),
                 verification_id=str(evidence.get("verification_id") or ""),
                 seq=int(cmd.params.get("seq") or 0),
+                identity_status=recorded_status,
             )
 
     def _result_run(self, result: CommandResult, agent_id: str, active_run: str) -> str:

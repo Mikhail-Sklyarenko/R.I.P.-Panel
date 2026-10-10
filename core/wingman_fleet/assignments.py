@@ -93,7 +93,8 @@ class AssignmentBook:
                 protocol INTEGER NOT NULL DEFAULT 0,
                 last_seen REAL NOT NULL DEFAULT 0,
                 process_generation INTEGER NOT NULL DEFAULT 0,
-                registration_generation INTEGER NOT NULL DEFAULT 0);
+                registration_generation INTEGER NOT NULL DEFAULT 0,
+                last_sequence INTEGER NOT NULL DEFAULT 0);
             CREATE TABLE IF NOT EXISTS verification_seq(
                 preparation_id TEXT NOT NULL,
                 agent_id TEXT NOT NULL,
@@ -104,7 +105,8 @@ class AssignmentBook:
                 catalog_generation INTEGER NOT NULL,
                 boot_id TEXT NOT NULL DEFAULT '',
                 sequence INTEGER NOT NULL DEFAULT 0,
-                received_at REAL NOT NULL);
+                received_at REAL NOT NULL,
+                registration_generation INTEGER NOT NULL DEFAULT 0);
             CREATE TABLE IF NOT EXISTS enrollments(
                 agent_id TEXT PRIMARY KEY,
                 code_hash TEXT NOT NULL,
@@ -136,16 +138,18 @@ class AssignmentBook:
             ("agent_credentials", "registration_generation", "INTEGER NOT NULL DEFAULT 0"),
             ("agent_presence", "process_generation", "INTEGER NOT NULL DEFAULT 0"),
             ("agent_presence", "registration_generation", "INTEGER NOT NULL DEFAULT 0"),
+            ("agent_presence", "last_sequence", "INTEGER NOT NULL DEFAULT 0"),
+            ("catalog_heads", "registration_generation", "INTEGER NOT NULL DEFAULT 0"),
         ):
             try:
                 self.store.db.execute(f"ALTER TABLE {table} ADD COLUMN {name} {decl}")
             except sqlite3.OperationalError:
                 pass
         version = int(self.store.db.execute("PRAGMA user_version").fetchone()[0])
-        if version > 4:
+        if version > 5:
             raise AssignmentError("fleet schema is newer than this program")
-        if version < 4:
-            self.store.db.execute("PRAGMA user_version=4")
+        if version < 5:
+            self.store.db.execute("PRAGMA user_version=5")
 
     @contextmanager
     def _tx(self) -> Iterator[Any]:
@@ -169,7 +173,13 @@ class AssignmentBook:
             generation = previous + 1 if changed else max(previous, 1)
             if changed and row is not None:
                 self.store.db.execute(
-                    "UPDATE agent_presence SET process_generation=0, boot_id='' WHERE agent_id=?",
+                    "UPDATE agent_presence SET process_generation=0, boot_id='', last_sequence=0 WHERE agent_id=?",
+                    (agent_id,),
+                )
+                self.store.db.execute(
+                    "UPDATE preparation_slots SET verification_status='unverified', "
+                    "verification_error='registration changed', verification_seq=0, verification_id='', "
+                    "identity_at=0, identity_observed='' WHERE agent_id=? AND reservation_status='committed'",
                     (agent_id,),
                 )
             self.store.db.execute(
@@ -178,6 +188,10 @@ class AssignmentBook:
                 "revoked=0, registration_generation=excluded.registration_generation",
                 (agent_id, digest, generation),
             )
+        if changed and row is not None:
+            current = self.current()
+            if current:
+                self._refresh_ready(current, self.clock())
 
     def revoke_agent(self, agent_id: str) -> None:
         with self._tx():
@@ -261,9 +275,17 @@ class AssignmentBook:
         boot_id = str(snapshot.get("boot_id") or "")
         with self.store._lock:
             head = self.store.db.execute(
-                "SELECT catalog_generation, sequence, boot_id FROM catalog_heads WHERE agent_id=?", (agent_id,)
+                "SELECT catalog_generation, sequence, boot_id, registration_generation "
+                "FROM catalog_heads WHERE agent_id=?",
+                (agent_id,),
             ).fetchone()
-        if head is not None and generation < int(head["catalog_generation"]):
+        current_reg = self.registration_generation(agent_id)
+        snap_reg = snapshot.get("registration_generation")
+        if snap_reg is not None and current_reg and int(snap_reg) != current_reg:
+            return
+        head_reg = int(head["registration_generation"] or 0) if head is not None else 0
+        new_registration = bool(current_reg and head_reg and current_reg != head_reg)
+        if head is not None and not new_registration and generation < int(head["catalog_generation"]):
             return
         presence = self.store.db.execute(
             "SELECT boot_id, process_generation FROM agent_presence WHERE agent_id=?", (agent_id,)
@@ -295,13 +317,14 @@ class AssignmentBook:
                      str(item.get("availability_status") or "available"), account_revision, self.clock()),
                 )
             self.store.db.execute(
-                "INSERT INTO catalog_heads(agent_id, catalog_generation, boot_id, sequence, received_at, vault_status) "
-                "VALUES(?,?,?,?,?,?) ON CONFLICT(agent_id) DO UPDATE SET "
+                "INSERT INTO catalog_heads(agent_id, catalog_generation, boot_id, sequence, received_at, "
+                "vault_status, registration_generation) VALUES(?,?,?,?,?,?,?) ON CONFLICT(agent_id) DO UPDATE SET "
                 "catalog_generation=excluded.catalog_generation, boot_id=excluded.boot_id, "
                 "sequence=excluded.sequence, received_at=excluded.received_at, "
-                "vault_status=excluded.vault_status",
+                "vault_status=excluded.vault_status, "
+                "registration_generation=excluded.registration_generation",
                 (agent_id, generation, boot_id, sequence, self.clock(),
-                 str(snapshot.get("vault_status") or "")[:40]),
+                 str(snapshot.get("vault_status") or "")[:40], current_reg),
             )
 
     def draft(self, selections: list[dict[str, Any]], *, links: dict[str, str] | None = None) -> str:
@@ -388,7 +411,7 @@ class AssignmentBook:
 
     def note_identity(self, preparation_id: str, agent_id: str, observed_steam_id64: str, *, now: float,
                       fresh: bool, source: str = "gsi", generation: int | None = None, boot_id: str = "",
-                      verification_id: str = "", seq: int = 0) -> str:
+                      verification_id: str = "", seq: int = 0, identity_status: str = "") -> str:
         slot = self._slot_for_agent(preparation_id, agent_id)
         expected_generation = int(slot["assignment_generation"])
         if generation is not None and int(generation) != expected_generation:
@@ -400,7 +423,9 @@ class AssignmentBook:
         if stored_seq > int(seq) or (stored_seq == int(seq) and stored_seq > 0):
             return self._require(preparation_id)["status"]
         observed = parse_steam_id64(observed_steam_id64) if observed_steam_id64 else ""
-        status, error = self._verification_status(slot["steam_id64"], observed, fresh=fresh, source=source)
+        status, error = self._verification_status(
+            slot["steam_id64"], observed, fresh=fresh, source=source, identity_status=identity_status,
+        )
         with self._tx():
             self.store.db.execute(
                 "UPDATE preparation_slots SET identity_observed=?, identity_at=?, verification_status=?,"
@@ -420,7 +445,8 @@ class AssignmentBook:
             )
 
     def note_presence(self, agent_id: str, *, protocol: int, seen_at: float, boot_id: str = "",
-                      process_generation: int = -1, registration_generation: int = -1) -> None:
+                      process_generation: int = -1, registration_generation: int = -1,
+                      last_sequence: int = -1, reset_sequence: bool = False) -> None:
         """Record the heartbeat that proves an agent is present. This is not an identity proof."""
         process_value = int(process_generation)
         registration_value = int(registration_generation)
@@ -436,6 +462,17 @@ class AssignmentBook:
                  process_value, process_value, registration_value, registration_value,
                  process_value, process_value, registration_value, registration_value),
             )
+            if int(last_sequence) >= 0:
+                if reset_sequence:
+                    self.store.db.execute(
+                        "UPDATE agent_presence SET last_sequence=? WHERE agent_id=?",
+                        (int(last_sequence), agent_id),
+                    )
+                else:
+                    self.store.db.execute(
+                        "UPDATE agent_presence SET last_sequence=? WHERE agent_id=? AND last_sequence<?",
+                        (int(last_sequence), agent_id, int(last_sequence)),
+                    )
 
     def registration_generation(self, agent_id: str) -> int:
         with self.store._lock:
@@ -463,6 +500,24 @@ class AssignmentBook:
             return "boot_conflict"
         return ""
 
+    def heartbeat_sequence_allowed(self, agent_id: str, *, process_generation: int, boot_id: str,
+                                   sequence: int) -> bool:
+        """False when this boot already accepted a sequence at least this large."""
+        row = self.store.db.execute(
+            "SELECT boot_id, process_generation, last_sequence FROM agent_presence WHERE agent_id=?",
+            (agent_id,),
+        ).fetchone()
+        if row is None:
+            return True
+        stored_gen = int(row["process_generation"] or 0)
+        stored_boot = str(row["boot_id"] or "")
+        stored_seq = int(row["last_sequence"] or 0)
+        if stored_gen and int(process_generation) > stored_gen:
+            return True
+        if stored_boot and stored_boot == boot_id and stored_seq and int(sequence) <= stored_seq:
+            return False
+        return True
+
     def evidence_matches_session(self, agent_id: str, evidence: dict[str, Any]) -> bool:
         row = self.store.db.execute(
             "SELECT boot_id, process_generation FROM agent_presence WHERE agent_id=?", (agent_id,)
@@ -479,7 +534,7 @@ class AssignmentBook:
         return not live_boot or ev_boot == live_boot
 
     def install_session(self, agent_id: str, *, process_generation: int, registration_generation: int,
-                        boot_id: str, protocol: int, seen_at: float) -> None:
+                        boot_id: str, protocol: int, seen_at: float, sequence: int = -1) -> None:
         previous_boot = self._live_boot(agent_id)
         previous_gen = 0
         row = self.store.db.execute(
@@ -487,11 +542,15 @@ class AssignmentBook:
         ).fetchone()
         if row is not None:
             previous_gen = int(row["process_generation"] or 0)
-        if boot_id and (previous_boot != boot_id or (previous_gen and int(process_generation) > previous_gen)):
+        new_process = bool(boot_id) and (
+            previous_boot != boot_id or (previous_gen and int(process_generation) > previous_gen)
+        )
+        if new_process:
             self.note_boot(agent_id, boot_id)
         self.note_presence(
             agent_id, protocol=protocol, seen_at=seen_at, boot_id=boot_id,
             process_generation=int(process_generation), registration_generation=int(registration_generation),
+            last_sequence=int(sequence), reset_sequence=new_process,
         )
 
     def note_boot(self, agent_id: str, boot_id: str) -> None:
@@ -523,7 +582,13 @@ class AssignmentBook:
         ).fetchone()
         return str(row["boot_id"] or "") if row is not None else ""
 
-    def _verification_status(self, expected: str, observed: str, *, fresh: bool, source: str) -> tuple[str, str]:
+    def _verification_status(self, expected: str, observed: str, *, fresh: bool, source: str,
+                             identity_status: str = "") -> tuple[str, str]:
+        declared = identity_status or (source if source in _PROOF_SOURCES else "")
+        if declared == "mismatch" or source == "conflict":
+            return "mismatch", "sources disagree" if not observed or observed == expected else f"observed {observed}"
+        if declared in ("unconfirmed", "manual", "loginusers") or source in ("manual", "loginusers", "unconfirmed"):
+            return "unverified", "identity was not confirmed"
         if not fresh:
             return "unverified", "observation was not fresh"
         if source not in _PROOF_SOURCES:
