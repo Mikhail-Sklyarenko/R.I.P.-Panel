@@ -8,7 +8,7 @@ Phase 02 adds a local account catalog and a four-slot assignment protocol on top
 - Fleet-only metadata (stable local id, SteamID64 binding, binding status, availability) lives in a sidecar SQLite catalog next to the vault index. The login is the join key. The coordinator never receives the login, password, shared secret, or maFile.
 - Coordinator SQLite (`FleetStore`) is the source of truth for operator stops, the single active run, assignment preparations, and commit decisions.
 - `data/wingman_fleet.json` remains the slot layout (token, port, retry, four fixed slots). Confirmed assignments are projected into it. A hand-edited roster is not treated as READY.
-- `RunPlan` stays an immutable snapshot. Account preparation does not create one.
+- `RunPlan` stays an immutable snapshot. Production `FleetHost.start_run` builds it from the assignment book inside one transaction, then projects those four slots into the roster. A hand-edited roster is not a second way to start.
 - The agent `CommandJournal` is the source of truth for the SAFE_STOP latch (`agent_session`). Restart does not replay a command that was left `running`.
 
 ## Reused without rewrite

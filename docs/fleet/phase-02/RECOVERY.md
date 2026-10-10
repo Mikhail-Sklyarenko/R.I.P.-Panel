@@ -17,7 +17,7 @@ The command, the idempotency key, and `operator_stops` commit in one `BEGIN IMME
 
 ## Split network
 
-A lost ACK leaves the coordinator at the last durable state. It does not mark the missing agent committed or released. The operator action is reconcile, then repeat the same command id. An older `assignment_generation` is rejected.
+A lost ACK leaves the coordinator at the last durable state. The result write and the book update are one transaction, so a crash between them does not acknowledge the result. The next delivery applies it. It does not mark the missing agent committed or released. The operator action is reconcile, then repeat the same command id. An older `assignment_generation` is ignored for release and rejected for commit. A new agent `boot_id` clears the identity proof.
 
 ## Active run
 
