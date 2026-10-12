@@ -1,6 +1,6 @@
 # Phase 03
 
-Phase 02.8 closed the message-fencing defects in `FINDINGS_02_8.md`. The identity-integrity patch on `fix/fleet-phase02-identity-integrity` closed the false VERIFIED, result-status, heartbeat-sequence, and registration-catalog defects in `FINAL_IDENTITY_INTEGRITY.md`. It did not start this phase. Phase 02 is still a simulated assignment layer with a TLS mode and an enrollment form. It is not a finished four-PC deployment.
+Phase 02 software on `fix/fleet-phase02-catalog-ui-lan-acceptance` closed the inherited-catalog and previous-registration PREPARE holes. HTTPS loopback and a real Wingman window were checked on one Windows host. It did not start this phase. Four physical PCs and a live Steam identity are still outstanding. See `FOUR_PC_TEST_RUNBOOK.md`.
 
 1. Run `SECURE_LAN` on four Windows PCs. `lan_ready` may become true from the configuration. `four_pc_proven` must stay false until that trial is recorded.
 2. Confirm DPAPI enrollment on each PC: the coordinator shows a one-time code, the agent PC claims it, and the next heartbeat is `registered`. Revoke one PC and confirm it stays rejected.

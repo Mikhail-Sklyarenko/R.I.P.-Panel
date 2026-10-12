@@ -63,3 +63,11 @@ The full suite excluding `tests/test_csgobot*.py` was `11 failed, 982 passed, 3 
 Branch `fix/fleet-phase02-identity-integrity`. The 02.8 profile plus `tests/test_fleet_identity_integrity.py` passed as `181 passed in 52.99s`. The 02.8 profile on `bb00bc0` was `167 passed`. The new file is 14 tests. See `FINAL_IDENTITY_INTEGRITY.md`.
 
 The full suite excluding `tests/test_csgobot*.py` was `11 failed, 995 passed, 3 skipped` in 1061.60s. It collected 13 of the 14 new tests; `test_already_applied_does_not_restore_ready` was added while that process was running and passed in the 181 profile above. The same 11 names as Phase 02.8 failed. No new failure appeared outside that list. `four_pc_proven` stays false. Windows UI and four physical PCs were not run.
+
+## Catalog, UI, LAN
+
+Branch `fix/fleet-phase02-catalog-ui-lan-acceptance`. The identity-integrity profile plus `tests/test_fleet_catalog_acceptance.py`, `tests/test_fleet_windows_ui.py`, and `tests/test_fleet_secure_lan.py` passed as `200 passed in 68.75s`. The previous profile was `181 passed`. See `FINAL_CATALOG_ACCEPTANCE.md`, `WINDOWS_UI_ACCEPTANCE.md`, and `SECURE_LAN_ACCEPTANCE.md`.
+
+The full suite excluding `tests/test_csgobot*.py` was `11 failed, 1015 passed, 3 skipped` in 990.35s. That is 20 more passes than the 995-count identity-integrity run: the missing `test_already_applied_does_not_restore_ready` plus 19 new catalog/UI/TLS tests. The same 11 names failed. No new failure appeared in the fleet files.
+
+Windows UI was a real CustomTkinter window on this host at 1280×720, scale 100%. Two-PC and four-PC LAN were not available. `four_pc_proven` stays false.
