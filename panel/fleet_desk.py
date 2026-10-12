@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from core.wingman_fleet.assignments import AssignmentBook, AssignmentError
+from core.wingman_fleet.assignments import STALE_CATALOG, AssignmentBook, AssignmentError
 from core.wingman_fleet.roster import SLOT_LAYOUT
 
 
@@ -14,9 +14,9 @@ class FleetDesk:
         self.error = ""
         self.notice = book.status(self.preparation_id)["status"] if self.preparation_id else ""
         self.selection: dict[int, dict[str, Any]] = {}
+        self.slot_agents: dict[int, str] = {}
 
     def rows(self, links: dict[str, str] | None = None) -> list[dict[str, Any]]:
-        links = links or {}
         chosen = {}
         assignment_status = ""
         if self.preparation_id:
@@ -30,13 +30,23 @@ class FleetDesk:
         rows = []
         for slot_id, pair_id, role in SLOT_LAYOUT:
             slot = chosen.get(slot_id, {})
-            agent_id = str(slot.get("agent_id") or "")
+            agent_id = str(slot.get("agent_id") or self.slot_agents.get(slot_id) or "")
+            presence = self.book.connection_state(agent_id, links=links) if agent_id else "UNREGISTERED"
+            link = {
+                "ONLINE / HEALTHY": "healthy",
+                "SUSPECT": "suspect",
+                "OFFLINE": "offline",
+                "UNREGISTERED": "offline",
+                "REVOKED": "offline",
+                "PROTOCOL MISMATCH": "offline",
+            }.get(presence, "offline")
             rows.append({
                 "slot_id": slot_id,
                 "pair_id": pair_id,
                 "role": role.value,
                 "agent_id": agent_id,
-                "link": links.get(agent_id, "offline") if agent_id else "offline",
+                "link": link,
+                "presence": presence,
                 "steam_id64": slot.get("steam_id64", ""),
                 "local_account_id": slot.get("local_account_id", ""),
                 "reservation_status": slot.get("reservation_status", ""),
@@ -46,19 +56,43 @@ class FleetDesk:
                 "verification_error": slot.get("verification_error", ""),
                 "registration": self.book.registration_state(agent_id) if agent_id else "unregistered",
                 "display_name": slot.get("display_name", ""),
+                "catalog_error": self.book.catalog_usable(agent_id) if agent_id else "",
             })
         return rows
 
     def accounts_for(self, agent_id: str) -> list[dict[str, Any]]:
+        if not agent_id or self.book.catalog_usable(agent_id):
+            return []
+        with self.book.store._lock:
+            found = self.book.store.db.execute(
+                "SELECT local_account_id, steam_id64, display_name, enabled, binding_status, availability_status,"
+                " catalog_revision FROM catalog_cache WHERE agent_id=? AND enabled=1 ORDER BY display_name",
+                (agent_id,),
+            ).fetchall()
+        return [dict(row) for row in found]
+
+    def diagnostic_accounts(self, agent_id: str) -> list[dict[str, Any]]:
         with self.book.store._lock:
             found = self.book.store.db.execute(
                 "SELECT local_account_id, steam_id64, display_name, enabled, binding_status, availability_status,"
                 " catalog_revision FROM catalog_cache WHERE agent_id=? ORDER BY display_name",
                 (agent_id,),
             ).fetchall()
-        return [dict(row) for row in found]
+        stale = bool(self.book.catalog_usable(agent_id))
+        rows = []
+        for row in found:
+            item = dict(row)
+            item["stale"] = stale
+            rows.append(item)
+        return rows
 
     def choose(self, slot_id: int, agent_id: str, local_account_id: str) -> str:
+        reason = self.book.catalog_usable(agent_id) if agent_id else STALE_CATALOG
+        if reason:
+            self.selection.pop(slot_id, None)
+            self.error = reason
+            self.notice = ""
+            return reason
         match = next(
             (item for item in self.accounts_for(agent_id) if item["local_account_id"] == local_account_id),
             None,
@@ -86,14 +120,22 @@ class FleetDesk:
             self.notice = ""
             return ""
         links = links or {}
+        started = ""
         try:
             self.preparation_id = self.book.draft(chosen, links=links)
+            started = self.preparation_id
             self.book.begin_prepare(self.preparation_id, links)
             queued = self.book.enqueue(self.preparation_id, "prepare")
             state = self.book.status(self.preparation_id)["status"]
             self.error = ""
             self.notice = f"{state}; команд в очереди: {queued}"
         except AssignmentError as exc:
+            if started:
+                try:
+                    self.book.discard_unstarted(started)
+                except AssignmentError:
+                    pass
+                self.preparation_id = self.book.current() or ""
             self.error = str(exc)
             self.notice = ""
         return self.notice
@@ -190,9 +232,15 @@ class FleetDesk:
         for row in self.rows():
             lines.append(
                 f"PC-0{row['slot_id']} {row['agent_id'] or '—'} регистрация={row['registration']} "
-                f"связь={row['link']} проверка={row['verification_status'] or 'нет'} "
+                f"связь={row.get('presence') or row['link']} проверка={row['verification_status'] or 'нет'} "
                 f"резерв={row['reservation_status'] or 'нет'} {row['verification_error']}"
             )
+            for account in self.diagnostic_accounts(row["agent_id"]) if row["agent_id"] else ():
+                mark = "устаревший снимок" if account.get("stale") else "актуально"
+                lines.append(
+                    f"    {account['local_account_id']} {account['display_name']} "
+                    f"{account['steam_id64'] or 'без SteamID64'} {mark}"
+                )
         self.notice = "\n".join(lines)
         self.error = ""
         return self.notice

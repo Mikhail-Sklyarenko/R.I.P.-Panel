@@ -467,6 +467,17 @@ class PanelView:
         ctk.CTkOptionMenu(parent, values=["coordinator", "agent"],
                          variable=self._vars["wingman_fleet_role"]).pack(fill="x", padx=8, pady=2)
         self._add_switch(parent, "wingman_fleet_autostart", bool(getattr(cfg, "wingman_fleet_autostart", False)))
+        self._vars["wingman_fleet_transport"] = ctk.StringVar(
+            value=getattr(cfg.wingman_fleet_transport, "value", str(cfg.wingman_fleet_transport))
+        )
+        ctk.CTkLabel(parent, text="wingman_fleet_transport").pack(anchor="w", padx=8, pady=(6, 0))
+        ctk.CTkOptionMenu(
+            parent, values=["simulation", "localhost_development", "secure_lan"],
+            variable=self._vars["wingman_fleet_transport"],
+        ).pack(fill="x", padx=8, pady=2)
+        self._add_entry(parent, "wingman_fleet_tls_ca", getattr(cfg, "wingman_fleet_tls_ca", ""))
+        self._add_entry(parent, "wingman_fleet_tls_cert", getattr(cfg, "wingman_fleet_tls_cert", ""))
+        self._add_entry(parent, "wingman_fleet_tls_key", getattr(cfg, "wingman_fleet_tls_key", ""))
         roster = self.ctrl._fleet().roster()
         self._fleet_slots: dict[int, dict[str, ctk.StringVar]] = {}
         for slot, pair_id, role in SLOT_LAYOUT:
@@ -539,6 +550,20 @@ class PanelView:
                      placeholder_text="код регистрации этого ПК").pack(side="left", padx=2)
         ctk.CTkButton(claim, text="Подтвердить регистрацию", width=180,
                       command=self._fleet_claim).pack(side="left", padx=2)
+        bind = ctk.CTkFrame(parent, fg_color="transparent")
+        bind.pack(fill="x", padx=8, pady=2)
+        self._fleet_bind_account = ctk.StringVar(value="")
+        self._fleet_bind_steam = ctk.StringVar(value="")
+        self._fleet_bind_confirm = ctk.BooleanVar(value=False)
+        ctk.CTkEntry(bind, textvariable=self._fleet_bind_account, width=160,
+                     placeholder_text="логин или local_account_id").pack(side="left", padx=2)
+        ctk.CTkEntry(bind, textvariable=self._fleet_bind_steam, width=180,
+                     placeholder_text="SteamID64").pack(side="left", padx=2)
+        ctk.CTkCheckBox(bind, text="подтвердить смену", variable=self._fleet_bind_confirm, width=140).pack(
+            side="left", padx=2
+        )
+        ctk.CTkButton(bind, text="Привязать SteamID64", width=160,
+                      command=self._fleet_bind_steam_id).pack(side="left", padx=2)
         ops = ctk.CTkFrame(parent, fg_color="transparent")
         ops.pack(fill="x", padx=8, pady=2)
         ctk.CTkButton(ops, text="Пара 1 повтор", width=110,
@@ -587,11 +612,12 @@ class PanelView:
             if row is None:
                 detail.configure(text="нет данных")
             else:
+                catalog_note = row.get("catalog_error") or "каталог актуален"
                 detail.configure(text=(
-                    f"{row['registration']} | {row['link']} | "
+                    f"{row['registration']} | {row.get('presence') or row['link']} | "
                     f"{row['verification_status'] or 'личность не проверена'} | "
-                    f"{row['reservation_status'] or 'не назначен'}"
-                )[:120])
+                    f"{row['reservation_status'] or 'не назначен'} | {catalog_note}"
+                )[:160])
 
     def _choose_fleet_account(self, slot: int) -> None:
         choice, _menu, _detail = self._account_menus[slot]
@@ -707,16 +733,55 @@ class PanelView:
         except Exception as extra:
             self.ctrl.append_log(f"fleet: {extra}")
 
+    def _fleet_bind_steam_id(self) -> None:
+        account = self._fleet_bind_account.get().strip()
+        steam = self._fleet_bind_steam.get().strip()
+        if not account or not steam:
+            self.ctrl.append_log("укажите локальный аккаунт и SteamID64")
+            return
+        try:
+            status = self.ctrl.bind_local_steam(
+                account, steam, confirm=bool(self._fleet_bind_confirm.get()),
+            )
+            self.ctrl.append_log(f"привязка сохранена: {status}")
+            self.ctrl.refresh_fleet_dashboard()
+        except Exception as exc:
+            self.ctrl.append_log(f"привязка отклонена: {exc}")
+
     def _save_fleet(self) -> None:
         from config.schema import FleetRole
+        from config.schema import FleetTransportMode
+        from pathlib import Path
+        transport = FleetTransportMode(self._vars["wingman_fleet_transport"].get())
+        url = self._vars["wingman_fleet_url"].get().strip()
+        if transport is FleetTransportMode.SECURE_LAN and not url.lower().startswith("https://"):
+            self.ctrl.append_log("SECURE_LAN требует https:// в wingman_fleet_url")
+            return
+        tls_key = self._vars["wingman_fleet_tls_key"].get().strip()
+        tls_cert = self._vars["wingman_fleet_tls_cert"].get().strip()
+        tls_ca = self._vars["wingman_fleet_tls_ca"].get().strip()
+        if transport is FleetTransportMode.SECURE_LAN:
+            missing = [name for name, path in (("CA", tls_ca),) if not path or not Path(path).is_file()]
+            if self._vars["wingman_fleet_role"].get() == "coordinator":
+                missing.extend(
+                    name for name, path in (("сертификат", tls_cert), ("ключ", tls_key))
+                    if not path or not Path(path).is_file()
+                )
+            if missing:
+                self.ctrl.append_log("SECURE_LAN: нет файлов: " + ", ".join(missing))
+                return
         updates = {
-            "wingman_fleet_url": self._vars["wingman_fleet_url"].get().strip(),
+            "wingman_fleet_url": url,
             "wingman_fleet_port": int(self._vars["wingman_fleet_port"].get() or "8790"),
             "wingman_fleet_token": self._vars["wingman_fleet_token"].get().strip(),
             "wingman_fleet_agent_id": self._vars["wingman_fleet_agent_id"].get().strip(),
             "wingman_fleet_expected_steamid64": self._vars["wingman_fleet_expected_steamid64"].get().strip(),
             "wingman_fleet_role": FleetRole(self._vars["wingman_fleet_role"].get()),
             "wingman_fleet_autostart": bool(self._vars["wingman_fleet_autostart"].get()),
+            "wingman_fleet_transport": transport,
+            "wingman_fleet_tls_ca": tls_ca,
+            "wingman_fleet_tls_cert": tls_cert,
+            "wingman_fleet_tls_key": tls_key,
         }
         self.ctrl.save_config_from_ui(updates)
         for slot, vars_ in getattr(self, "_fleet_slots", {}).items():

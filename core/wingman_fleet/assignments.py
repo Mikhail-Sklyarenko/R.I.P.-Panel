@@ -35,6 +35,9 @@ class AssignmentError(RuntimeError):
     pass
 
 
+STALE_CATALOG = "Каталог этого компьютера устарел. Дождитесь нового подключения агента."
+
+
 _PROOF_SOURCES = frozenset({"steam_local", "gsi"})
 _VERIFIED = "verified"
 
@@ -284,8 +287,10 @@ class AssignmentBook:
         if snap_reg is not None and current_reg and int(snap_reg) != current_reg:
             return
         head_reg = int(head["registration_generation"] or 0) if head is not None else 0
+        inherited_unknown = bool(head is not None and head_reg == 0 and current_reg)
         new_registration = bool(current_reg and head_reg and current_reg != head_reg)
-        if head is not None and not new_registration and generation < int(head["catalog_generation"]):
+        replace_head = inherited_unknown or new_registration
+        if head is not None and not replace_head and generation < int(head["catalog_generation"]):
             return
         presence = self.store.db.execute(
             "SELECT boot_id, process_generation FROM agent_presence WHERE agent_id=?", (agent_id,)
@@ -856,6 +861,9 @@ class AssignmentBook:
         for slot in slots:
             if slot["slot_id"] not in expected:
                 raise AssignmentError("unknown slot")
+            reason = self.catalog_usable(slot["agent_id"])
+            if reason:
+                raise AssignmentError(reason)
             cached = self._cached(slot["agent_id"], slot["local_account_id"])
             if cached is None:
                 raise AssignmentError(f"{slot['agent_id']} has no catalog entry for that account")
@@ -871,12 +879,78 @@ class AssignmentBook:
                 raise AssignmentError("account is unbound")
             self._require_present(slot["agent_id"], links)
 
+    def catalog_usable(self, agent_id: str, *, now: float | None = None) -> str:
+        """Empty when this catalog may be used for a new assignment."""
+        now = self.clock() if now is None else now
+        if self.registration_state(agent_id) != "registered":
+            return STALE_CATALOG
+        current_reg = self.registration_generation(agent_id)
+        head = self.store.db.execute(
+            "SELECT catalog_generation, received_at, registration_generation, boot_id "
+            "FROM catalog_heads WHERE agent_id=?",
+            (agent_id,),
+        ).fetchone()
+        if head is None:
+            return STALE_CATALOG
+        head_reg = int(head["registration_generation"] or 0)
+        if not head_reg or head_reg != current_reg:
+            return STALE_CATALOG
+        catalog_age = now - float(head["received_at"] or 0)
+        if catalog_age < 0 or catalog_age > self.identity_ttl_sec:
+            return STALE_CATALOG
+        presence = self.store.db.execute(
+            "SELECT boot_id, process_generation FROM agent_presence WHERE agent_id=?", (agent_id,)
+        ).fetchone()
+        if presence is not None and int(presence["process_generation"] or 0) > 0:
+            live_boot = str(presence["boot_id"] or "")
+            head_boot = str(head["boot_id"] or "")
+            if live_boot and head_boot and live_boot != head_boot:
+                return STALE_CATALOG
+        return ""
+
+    def connection_state(self, agent_id: str, *, now: float | None = None,
+                         links: dict[str, str] | None = None) -> str:
+        """Operator-facing presence. This is not an identity proof."""
+        now = self.clock() if now is None else now
+        registration = self.registration_state(agent_id) if agent_id else "unregistered"
+        if registration == "revoked":
+            return "REVOKED"
+        if registration != "registered":
+            return "UNREGISTERED"
+        row = self.store.db.execute(
+            "SELECT protocol, last_seen FROM agent_presence WHERE agent_id=?", (agent_id,)
+        ).fetchone()
+        if row is None:
+            return "OFFLINE"
+        if int(row["protocol"] or 0) != PROTOCOL_VERSION:
+            return "PROTOCOL MISMATCH"
+        from core.wingman_fleet.coordinator import OFFLINE_AFTER_SEC, SUSPECT_AFTER_SEC
+        age = now - float(row["last_seen"] or 0)
+        if age < 0 or age > OFFLINE_AFTER_SEC:
+            link = "offline"
+        elif age > SUSPECT_AFTER_SEC:
+            link = "suspect"
+        else:
+            link = "healthy"
+        supplied = (links or {}).get(agent_id)
+        if supplied in ("offline", "suspect") and link == "healthy":
+            link = supplied
+        return {"healthy": "ONLINE / HEALTHY", "suspect": "SUSPECT", "offline": "OFFLINE"}[link]
+
+    def discard_unstarted(self, preparation_id: str) -> None:
+        prep = self._require(preparation_id)
+        if prep["status"] in ("draft", "validating"):
+            self._move(preparation_id, prep["status"], "failed")
+
     def _require_present(self, agent_id: str, links: dict[str, str]) -> None:
         from core.wingman_fleet.coordinator import SUSPECT_AFTER_SEC
         if links.get(agent_id) != "healthy":
             raise AssignmentError(f"{agent_id} is not online")
         if self.registration_state(agent_id) != "registered":
             raise AssignmentError(f"{agent_id} is not registered")
+        reason = self.catalog_usable(agent_id)
+        if reason:
+            raise AssignmentError(reason)
         row = self.store.db.execute(
             "SELECT protocol, last_seen FROM agent_presence WHERE agent_id=?", (agent_id,)
         ).fetchone()
@@ -886,14 +960,6 @@ class AssignmentBook:
         age = now - float(row["last_seen"] or 0)
         if age < 0 or age > SUSPECT_AFTER_SEC:
             raise AssignmentError(f"{agent_id} heartbeat is not fresh")
-        head = self.store.db.execute(
-            "SELECT received_at FROM catalog_heads WHERE agent_id=?", (agent_id,)
-        ).fetchone()
-        if head is None:
-            raise AssignmentError(f"{agent_id} has no catalog snapshot")
-        catalog_age = now - float(head["received_at"] or 0)
-        if catalog_age < 0 or catalog_age > self.identity_ttl_sec:
-            raise AssignmentError(f"{agent_id} catalog snapshot is not fresh")
 
     def _normalize(self, selections: list[dict[str, Any]]) -> list[dict[str, Any]]:
         normalized = []

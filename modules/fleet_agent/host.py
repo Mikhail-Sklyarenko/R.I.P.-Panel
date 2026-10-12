@@ -200,8 +200,32 @@ class FleetHost:
             journal.bind_registration(generation)
         finally:
             journal.close()
-        self.log(f"fleet agent {agent_id} enrolled")
+        if self.agent is not None and self.agent.agent_id == agent_id:
+            self._restart_local_agent()
+            self.log(f"fleet agent {agent_id} enrolled and restarted")
+        else:
+            self.log(f"fleet agent {agent_id} enrolled")
         return agent_id
+
+    def _restart_local_agent(self) -> dict[str, Any]:
+        """Stop the running agent and start a new process generation with the new token."""
+        agent = self.agent
+        thread = self._thread
+        if agent is not None:
+            agent.stop()
+        if thread is not None and thread.is_alive():
+            thread.join(timeout=3.0)
+        if agent is not None:
+            agent.shutdown()
+            self.agent = None
+        self._thread = None
+        if self.backend is not None:
+            try:
+                self.backend.close()
+            except Exception:
+                pass
+            self.backend = None
+        return self.start_agent()
 
     def stop_run(self) -> None:
         if self.coordinator is not None:

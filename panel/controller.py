@@ -481,15 +481,20 @@ class PanelController:
                 lines.append(f"ошибка назначения: {desk.error}")
             elif desk.notice:
                 lines.append(f"назначение: {desk.notice}")
-            for row in desk.rows():
+            links = {}
+            if host is not None and host.coordinator is not None:
+                links = {agent_id: link.value for agent_id, link in host.coordinator.links().items()}
+            for row in desk.rows(links):
                 lines.append(
-                    f"ПК {row['slot_id']} {row['agent_id'] or '—'} связь={row['link']} "
+                    f"ПК {row['slot_id']} {row['agent_id'] or '—'} связь={row.get('presence') or row['link']} "
                     f"аккаунт={row['local_account_id'] or '—'} steam={row['steam_id64'] or '—'} "
                     f"резерв={row['reservation_status'] or '—'} "
                     f"регистрация={row.get('registration') or '—'} "
                     f"проверка={row.get('verification_status') or 'нет'} "
                     f"личность={row['identity'] or 'не проверена'}"
                 )
+                if row.get("catalog_error"):
+                    lines.append(f"    {row['catalog_error']}")
                 for account in desk.accounts_for(row["agent_id"]) if row["agent_id"] else ():
                     lines.append(
                         f"    {account['local_account_id']} {account['display_name']} "
@@ -556,6 +561,11 @@ class PanelController:
         if desk is None or desk.book is not book:
             desk = FleetDesk(book)
             self._fleet_desk = desk
+        roster = host.roster()
+        desk.slot_agents = {
+            int(slot): str(entry.get("agent_id") or "")
+            for slot, entry in roster.slots.items()
+        }
         return desk
 
     def fleet_account_action(self, action: str, selections: list | None = None, run_id: str = "",
@@ -606,6 +616,28 @@ class PanelController:
         if self._fleet_host is not None:
             self._fleet_host.stop()
             self.append_log("fleet host stopped")
+
+    def bind_local_steam(self, login_or_id: str, steam_id64: str, *, confirm: bool = False) -> str:
+        from config.loader import load_config
+        from config.paths import get_data_dir
+        from core.wingman_fleet.accounts import CatalogError, parse_steam_id64
+        from modules.fleet_accounts.catalog import AccountCatalog
+        cfg = load_config()
+        agent_id = (cfg.wingman_fleet_agent_id or "").strip()
+        if not agent_id:
+            raise CatalogError("задайте wingman_fleet_agent_id")
+        steam = parse_steam_id64(steam_id64)
+        catalog = AccountCatalog(get_data_dir() / "fleet_catalog.db", agent_id=agent_id)
+        try:
+            row = catalog.get(login_or_id.strip()) or catalog.by_login(login_or_id.strip())
+            if row is None:
+                raise CatalogError("аккаунт не найден в локальном каталоге")
+            catalog.bind(row["local_account_id"], steam, confirm_rebind=confirm)
+            status = catalog.get(row["local_account_id"])["binding_status"]
+            self.append_log(f"локальная привязка {row['local_account_id'][:8]} → {steam} ({status})")
+            return status
+        finally:
+            catalog.close()
 
     def save_fleet_slot(self, slot: int, agent_id: str, steam_id64: str, display_name: str,
                         friend_code: str = "") -> None:
